@@ -209,6 +209,10 @@ export default function SignInScreen() {
           </View>
         </View>
 
+        <Link href="/(auth)/forgot-password" style={{ alignSelf: "flex-end", marginTop: -6 }}>
+          <Text style={[styles.linkText, { color: c.primary, fontSize: 13 }]}>Forgot password?</Text>
+        </Link>
+
         <Pressable
           style={[styles.primaryBtn, { backgroundColor: c.primary, opacity: (!email || !password || loading) ? 0.6 : 1 }]}
           onPress={handleEmailSignIn}

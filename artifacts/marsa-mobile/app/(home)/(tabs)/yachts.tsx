@@ -55,7 +55,7 @@ export default function MyYachtsScreen() {
         <Text style={[styles.title, { color: c.foreground }]}>My Yachts</Text>
         <Pressable
           style={[styles.addBtn, { backgroundColor: colors.light.navy }]}
-          onPress={() => Alert.alert("Coming Soon", "Yacht creation is available on the web dashboard.")}
+          onPress={() => router.push("/(home)/new-yacht")}
         >
           <Ionicons name="add" size={18} color="#fff" />
           <Text style={styles.addBtnText}>Add Yacht</Text>
@@ -78,8 +78,8 @@ export default function MyYachtsScreen() {
           icon="boat-outline"
           title="No yachts yet"
           subtitle="List your first yacht on MARSA and start earning"
-          actionLabel="Add Yacht"
-          onAction={() => Alert.alert("Coming Soon", "Yacht creation is available on the web dashboard.")}
+          actionLabel="List Your Yacht"
+          onAction={() => router.push("/(home)/new-yacht")}
         />
       ) : (
         <FlatList

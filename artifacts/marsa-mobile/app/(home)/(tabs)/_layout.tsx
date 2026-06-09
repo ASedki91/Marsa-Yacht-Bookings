@@ -31,6 +31,10 @@ function NativeTabLayout({ isHost }: { isHost: boolean }) {
           <Label>Earnings</Label>
         </NativeTabs.Trigger>
       )}
+      <NativeTabs.Trigger name="profile">
+        <Icon sf={{ default: "person", selected: "person.fill" }} />
+        <Label>Profile</Label>
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
@@ -80,14 +84,6 @@ function ClassicTabLayout({ isHost }: { isHost: boolean }) {
             style={{ marginRight: 16 }}
           >
             <Ionicons name="notifications-outline" size={22} color={colors.foreground} />
-          </Pressable>
-        ),
-        headerLeft: () => (
-          <Pressable
-            onPress={() => router.push("/(home)/profile")}
-            style={{ marginLeft: 16 }}
-          >
-            <Ionicons name="person-circle-outline" size={26} color={colors.foreground} />
           </Pressable>
         ),
       }}
@@ -143,6 +139,18 @@ function ClassicTabLayout({ isHost }: { isHost: boolean }) {
             ),
           tabBarButton: isHost ? undefined : () => null,
           tabBarItemStyle: isHost ? {} : { display: "none", width: 0 },
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Profile",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="person.fill" tintColor={color} size={24} />
+            ) : (
+              <Ionicons name="person-outline" size={22} color={color} />
+            ),
         }}
       />
     </Tabs>

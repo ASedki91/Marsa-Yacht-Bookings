@@ -131,7 +131,7 @@ export default function BookingsScreen() {
           renderItem={({ item }) => (
             <BookingCard
               booking={item}
-              onPress={() => {}}
+              onPress={() => router.push(`/(home)/booking/${item.id}`)}
               showActions={role === "host"}
               onConfirm={() =>
                 confirm.mutateAsync({ id: item.id }).catch(() => {}).then(() => refetch())

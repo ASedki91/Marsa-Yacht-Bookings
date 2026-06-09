@@ -44,19 +44,26 @@ export default function HomeLayout() {
           options={{ headerShown: false }}
         />
         <Stack.Screen
+          name="booking/[id]"
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="review/[id]"
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="become-host"
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="new-yacht"
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
           name="notifications"
           options={{
             headerShown: true,
             title: "Notifications",
-            headerStyle: { backgroundColor: colors.background },
-            headerTintColor: colors.foreground,
-          }}
-        />
-        <Stack.Screen
-          name="profile"
-          options={{
-            headerShown: true,
-            title: "Profile",
             headerStyle: { backgroundColor: colors.background },
             headerTintColor: colors.foreground,
           }}
