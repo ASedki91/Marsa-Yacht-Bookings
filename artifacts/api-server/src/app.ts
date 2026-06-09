@@ -41,7 +41,20 @@ app.use(
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
 app.use(cors({ credentials: true, origin: true }));
-app.use(express.json());
+
+// Capture raw body for Stripe webhook signature verification before json() parses it
+app.use(
+  express.json({
+    verify: (req: any, _res, buf) => {
+      if (
+        req.originalUrl?.includes("/webhooks/stripe") ||
+        req.path?.includes("/webhooks/stripe")
+      ) {
+        req.rawBody = buf.toString("utf8");
+      }
+    },
+  }),
+);
 app.use(express.urlencoded({ extended: true }));
 
 // Resolve publishable key from the incoming host so the same server

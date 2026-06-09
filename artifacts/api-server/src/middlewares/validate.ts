@@ -28,8 +28,12 @@ export const validateQuery = <T extends ZodTypeAny>(schema: T) => {
       });
       return;
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    req.query = result.data as any;
+    // Express 5: req.query is a getter-only property, so use defineProperty to override it
+    Object.defineProperty(req, "query", {
+      value: result.data,
+      writable: true,
+      configurable: true,
+    });
     next();
   };
 };
