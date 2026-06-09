@@ -1,0 +1,14 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "KLoQRYMUdGkaNBf_2_5P4"
+uri = "file://artifacts/marsa-mobile/assets/images/icon.png"
+type = "image"
+title = "marsa yacht icon"
+
+[[generated]]
+id = "yKXShCuGlvsTnj-JvnxcI"
+uri = "file://artifacts/marsa-mobile/assets/images/yacht-hero.png"
+type = "image"
+title = "luxury yacht marina"
