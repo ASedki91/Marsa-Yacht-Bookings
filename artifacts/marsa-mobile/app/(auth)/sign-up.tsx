@@ -36,12 +36,9 @@ export default function SignUpScreen() {
     if (!isLoaded) return;
     setLoading(true);
     try {
-      const [firstName, ...rest] = name.trim().split(" ");
       await signUp.create({
         emailAddress: email,
         password,
-        firstName: firstName || "",
-        lastName: rest.join(" ") || undefined,
       });
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setPendingVerification(true);
