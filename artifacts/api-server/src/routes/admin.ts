@@ -10,17 +10,26 @@ import {
   withdrawalRequestsTable,
   earningsLedgerTable,
   auditLogsTable,
+  categoriesTable,
+  addOnsTable,
+  bookingTemplatesTable,
 } from "@workspace/db";
-import { and, eq, sql, desc } from "drizzle-orm";
+import { and, eq, sql, desc, asc } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { requireAuth, requireRole, validateBody, validateQuery, auditLog } from "../middlewares/index";
+import {
+  requireAuth,
+  requireRole,
+  validateBody,
+  validateQuery,
+  auditLog,
+} from "../middlewares/index";
 import { notify } from "../lib/notify";
 
 const router: IRouter = Router();
 
 router.use(requireAuth, requireRole("admin"));
 
-// ── Stats ───────────────────────────────────────────────────────────────────
+// ── Stats ─────────────────────────────────────────────────────────────────────
 router.get("/admin/stats", async (_req: Request, res: Response): Promise<void> => {
   const [
     [usersRow],
@@ -66,7 +75,7 @@ router.get("/admin/stats", async (_req: Request, res: Response): Promise<void> =
   });
 });
 
-// ── Users ───────────────────────────────────────────────────────────────────
+// ── Users ─────────────────────────────────────────────────────────────────────
 const adminListUsersQuery = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
   role: z.enum(["guest", "host", "admin"]).optional(),
@@ -119,7 +128,7 @@ router.patch(
   },
 );
 
-// ── Hosts ───────────────────────────────────────────────────────────────────
+// ── Hosts ─────────────────────────────────────────────────────────────────────
 const adminListHostsQuery = z.object({
   status: z.enum(["pending", "verified", "rejected"]).optional(),
   page: z.coerce.number().int().positive().optional().default(1),
@@ -194,7 +203,7 @@ router.post(
   },
 );
 
-// ── Yachts ──────────────────────────────────────────────────────────────────
+// ── Yachts ────────────────────────────────────────────────────────────────────
 router.get("/admin/yachts", async (_req: Request, res: Response): Promise<void> => {
   const yachts = await db
     .select()
@@ -281,7 +290,7 @@ router.post(
   },
 );
 
-// ── Bookings ────────────────────────────────────────────────────────────────
+// ── Bookings ──────────────────────────────────────────────────────────────────
 const adminListBookingsQuery = z.object({
   status: z.string().optional(),
   page: z.coerce.number().int().positive().optional().default(1),
@@ -310,7 +319,7 @@ router.get(
   },
 );
 
-// ── Reviews ─────────────────────────────────────────────────────────────────
+// ── Reviews ───────────────────────────────────────────────────────────────────
 router.get("/admin/reviews", async (_req: Request, res: Response): Promise<void> => {
   const reviews = await db
     .select()
@@ -346,7 +355,6 @@ router.post(
 
     if (!review) { res.status(404).json({ error: "Review not found" }); return; }
 
-    // Recalculate yacht avg_rating when a review changes moderation state
     if (review.yachtId) {
       const [ratingRow] = await db
         .select({
@@ -371,7 +379,7 @@ router.post(
   },
 );
 
-// ── Withdrawals ─────────────────────────────────────────────────────────────
+// ── Withdrawals ───────────────────────────────────────────────────────────────
 router.get("/admin/withdrawals", async (_req: Request, res: Response): Promise<void> => {
   const withdrawals = await db
     .select()
@@ -398,7 +406,9 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).localUser;
     const id = String(req.params.id);
-    const { status, payoutReference, notes } = req.body as z.infer<typeof withdrawalProcessSchema>;
+    const { status, payoutReference, notes } = req.body as z.infer<
+      typeof withdrawalProcessSchema
+    >;
 
     const [withdrawal] = await db
       .update(withdrawalRequestsTable)
@@ -426,7 +436,6 @@ router.post(
         );
     }
 
-    // Resolve userId from hostId for notification
     const [hostProfile] = await db
       .select()
       .from(hostProfilesTable)
@@ -451,7 +460,7 @@ router.post(
   },
 );
 
-// ── Audit Logs ──────────────────────────────────────────────────────────────
+// ── Audit Logs ────────────────────────────────────────────────────────────────
 const auditLogsQuery = z.object({
   entityType: z.string().optional(),
   entityId: z.string().optional(),
@@ -482,6 +491,196 @@ router.get(
       db.select({ count: sql<number>`count(*)::int` }).from(auditLogsTable).where(where),
     ]);
     res.json({ logs, total: countRow?.count ?? 0 });
+  },
+);
+
+// ── Categories CRUD ───────────────────────────────────────────────────────────
+const categorySchema = z.object({
+  name: z.string().min(1).max(100),
+  slug: z.string().min(1).max(100),
+  iconUrl: z.string().url().optional(),
+  sortOrder: z.number().int().optional().default(0),
+});
+
+router.get("/admin/categories", async (_req: Request, res: Response): Promise<void> => {
+  const categories = await db
+    .select()
+    .from(categoriesTable)
+    .orderBy(asc(categoriesTable.sortOrder));
+  res.json({ categories });
+});
+
+router.post(
+  "/admin/categories",
+  validateBody(categorySchema),
+  async (req: Request, res: Response): Promise<void> => {
+    const body = req.body as z.infer<typeof categorySchema>;
+    const [category] = await db
+      .insert(categoriesTable)
+      .values({
+        id: randomUUID(),
+        name: body.name,
+        slug: body.slug,
+        iconUrl: body.iconUrl ?? null,
+        sortOrder: body.sortOrder,
+      })
+      .returning();
+    res.status(201).json(category);
+  },
+);
+
+router.patch(
+  "/admin/categories/:id",
+  validateBody(categorySchema.partial()),
+  async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id);
+    const [category] = await db
+      .update(categoriesTable)
+      .set(req.body)
+      .where(eq(categoriesTable.id, id))
+      .returning();
+    if (!category) { res.status(404).json({ error: "Category not found" }); return; }
+    res.json(category);
+  },
+);
+
+router.delete(
+  "/admin/categories/:id",
+  async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id);
+    const [deleted] = await db
+      .delete(categoriesTable)
+      .where(eq(categoriesTable.id, id))
+      .returning();
+    if (!deleted) { res.status(404).json({ error: "Category not found" }); return; }
+    res.json({ deleted: true });
+  },
+);
+
+// ── Add-ons CRUD ──────────────────────────────────────────────────────────────
+const addOnSchema = z.object({
+  name: z.string().min(1).max(200),
+  description: z.string().max(1000).optional(),
+  priceEgp: z.string().regex(/^\d+(\.\d{1,2})?$/),
+  templateId: z.string().optional(),
+  isActive: z.boolean().optional().default(true),
+});
+
+router.get("/admin/add-ons", async (_req: Request, res: Response): Promise<void> => {
+  const addOns = await db.select().from(addOnsTable).orderBy(asc(addOnsTable.name));
+  res.json({ addOns });
+});
+
+router.post(
+  "/admin/add-ons",
+  validateBody(addOnSchema),
+  async (req: Request, res: Response): Promise<void> => {
+    const body = req.body as z.infer<typeof addOnSchema>;
+    const [addOn] = await db
+      .insert(addOnsTable)
+      .values({
+        id: randomUUID(),
+        name: body.name,
+        description: body.description ?? null,
+        priceEgp: body.priceEgp,
+        templateId: body.templateId ?? null,
+        isActive: body.isActive,
+      })
+      .returning();
+    res.status(201).json(addOn);
+  },
+);
+
+router.patch(
+  "/admin/add-ons/:id",
+  validateBody(addOnSchema.partial()),
+  async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id);
+    const [addOn] = await db
+      .update(addOnsTable)
+      .set(req.body)
+      .where(eq(addOnsTable.id, id))
+      .returning();
+    if (!addOn) { res.status(404).json({ error: "Add-on not found" }); return; }
+    res.json(addOn);
+  },
+);
+
+router.delete(
+  "/admin/add-ons/:id",
+  async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id);
+    const [deleted] = await db
+      .delete(addOnsTable)
+      .where(eq(addOnsTable.id, id))
+      .returning();
+    if (!deleted) { res.status(404).json({ error: "Add-on not found" }); return; }
+    res.json({ deleted: true });
+  },
+);
+
+// ── Booking Templates CRUD ────────────────────────────────────────────────────
+const templateSchema = z.object({
+  name: z.string().min(1).max(200),
+  durationHours: z.number().int().min(1).max(24),
+  description: z.string().max(1000).optional(),
+  isActive: z.boolean().optional().default(true),
+  sortOrder: z.number().int().optional().default(0),
+});
+
+router.get("/admin/booking-templates", async (_req: Request, res: Response): Promise<void> => {
+  const templates = await db
+    .select()
+    .from(bookingTemplatesTable)
+    .orderBy(asc(bookingTemplatesTable.sortOrder));
+  res.json({ templates });
+});
+
+router.post(
+  "/admin/booking-templates",
+  validateBody(templateSchema),
+  async (req: Request, res: Response): Promise<void> => {
+    const body = req.body as z.infer<typeof templateSchema>;
+    const [template] = await db
+      .insert(bookingTemplatesTable)
+      .values({
+        id: randomUUID(),
+        name: body.name,
+        durationHours: body.durationHours,
+        description: body.description ?? null,
+        isActive: body.isActive,
+        sortOrder: body.sortOrder,
+      })
+      .returning();
+    res.status(201).json(template);
+  },
+);
+
+router.patch(
+  "/admin/booking-templates/:id",
+  validateBody(templateSchema.partial()),
+  async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id);
+    const [template] = await db
+      .update(bookingTemplatesTable)
+      .set(req.body)
+      .where(eq(bookingTemplatesTable.id, id))
+      .returning();
+    if (!template) { res.status(404).json({ error: "Template not found" }); return; }
+    res.json(template);
+  },
+);
+
+router.delete(
+  "/admin/booking-templates/:id",
+  async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id);
+    const [deleted] = await db
+      .delete(bookingTemplatesTable)
+      .where(eq(bookingTemplatesTable.id, id))
+      .returning();
+    if (!deleted) { res.status(404).json({ error: "Template not found" }); return; }
+    res.json({ deleted: true });
   },
 );
 

@@ -6,6 +6,13 @@ import { requireAuth, validateBody } from "../middlewares/index";
 
 const router: IRouter = Router();
 
+// ── GET /users/me ────────────────────────────────────────────────────────────
+router.get("/users/me", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const user = (req as any).localUser;
+  res.json({ user });
+});
+
+// ── PATCH /users/me ──────────────────────────────────────────────────────────
 const userUpdateSchema = z.object({
   fullName: z.string().max(200).optional(),
   phone: z.string().max(30).optional(),
@@ -21,7 +28,7 @@ router.patch(
     const user = (req as any).localUser;
     const { fullName, phone, nationality, avatarUrl } = req.body as z.infer<typeof userUpdateSchema>;
 
-    const updates: Partial<typeof user> = {};
+    const updates: Record<string, unknown> = {};
     if (fullName !== undefined) updates.fullName = fullName;
     if (phone !== undefined) updates.phone = phone;
     if (nationality !== undefined) updates.nationality = nationality;
@@ -34,7 +41,7 @@ router.patch(
 
     const [updated] = await db
       .update(usersTable)
-      .set(updates)
+      .set(updates as any)
       .where(eq(usersTable.id, user.id))
       .returning();
 

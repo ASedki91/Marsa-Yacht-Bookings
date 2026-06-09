@@ -5,6 +5,7 @@ import {
   hostProfilesTable,
   hostDocumentsTable,
   yachtsTable,
+  yachtPhotosTable,
   yachtTemplatePricingTable,
   bookingTemplatesTable,
   availabilitySlotsTable,
@@ -12,17 +13,19 @@ import {
   withdrawalRequestsTable,
   photographerRequestsTable,
   auditLogsTable,
-  usersTable,
 } from "@workspace/db";
-import { and, eq, sql, sum, desc } from "drizzle-orm";
+import { and, eq, sql, desc, asc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { requireAuth, requireRole, validateBody } from "../middlewares/index";
 
 const router: IRouter = Router();
 
-router.use(requireAuth);
+// Require authentication for all /host/* paths only.
+// A path-less router.use(requireAuth) would intercept ALL requests passing
+// through the main router, including public routes in later routers.
+router.use("/host", requireAuth);
 
-// ── Host Application ────────────────────────────────────────────────────────
+// ── Host Application ─────────────────────────────────────────────────────────
 const hostApplySchema = z.object({
   bio: z.string().min(10).max(2000),
 });
@@ -46,7 +49,12 @@ router.post(
 
     const [profile] = await db
       .insert(hostProfilesTable)
-      .values({ id: randomUUID(), userId: user.id, bio: req.body.bio, verificationStatus: "pending" })
+      .values({
+        id: randomUUID(),
+        userId: user.id,
+        bio: req.body.bio,
+        verificationStatus: "pending",
+      })
       .returning();
 
     await db
@@ -65,10 +73,11 @@ router.post(
   },
 );
 
-// ── Host Profile ────────────────────────────────────────────────────────────
+// ── Host Profile ─────────────────────────────────────────────────────────────
+// NOTE: No requireRole here — pending applicants (still role=guest) need access
+// during onboarding to check their verification status and update their bio.
 router.get(
   "/host/profile",
-  requireRole("host", "admin"),
   async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).localUser;
     const [profile] = await db
@@ -76,7 +85,10 @@ router.get(
       .from(hostProfilesTable)
       .where(eq(hostProfilesTable.userId, user.id))
       .limit(1);
-    if (!profile) { res.status(404).json({ error: "Host profile not found" }); return; }
+    if (!profile) {
+      res.status(404).json({ error: "No host application found. Submit one via POST /host/apply" });
+      return;
+    }
     res.json(profile);
   },
 );
@@ -87,7 +99,6 @@ const hostProfileUpdateSchema = z.object({
 
 router.put(
   "/host/profile",
-  requireRole("host", "admin"),
   validateBody(hostProfileUpdateSchema),
   async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).localUser;
@@ -96,12 +107,16 @@ router.put(
       .set({ bio: req.body.bio })
       .where(eq(hostProfilesTable.userId, user.id))
       .returning();
-    if (!profile) { res.status(404).json({ error: "Host profile not found" }); return; }
+    if (!profile) {
+      res.status(404).json({ error: "No host application found. Submit one via POST /host/apply" });
+      return;
+    }
     res.json(profile);
   },
 );
 
-// ── Host Documents ──────────────────────────────────────────────────────────
+// ── Host Documents ────────────────────────────────────────────────────────────
+// NOTE: No requireRole — applicants must be able to upload docs before approval.
 const documentSchema = z.object({
   documentType: z.enum(["national_id", "yacht_ownership", "yacht_license", "insurance"]),
   fileUrl: z.string().url(),
@@ -109,7 +124,6 @@ const documentSchema = z.object({
 
 router.post(
   "/host/documents",
-  requireRole("host", "admin"),
   validateBody(documentSchema),
   async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).localUser;
@@ -118,7 +132,10 @@ router.post(
       .from(hostProfilesTable)
       .where(eq(hostProfilesTable.userId, user.id))
       .limit(1);
-    if (!profile) { res.status(404).json({ error: "Host profile not found" }); return; }
+    if (!profile) {
+      res.status(404).json({ error: "No host application found. Submit one via POST /host/apply" });
+      return;
+    }
 
     const [doc] = await db
       .insert(hostDocumentsTable)
@@ -134,7 +151,8 @@ router.post(
   },
 );
 
-// ── Photographer Request ────────────────────────────────────────────────────
+// ── Photographer Request ──────────────────────────────────────────────────────
+// NOTE: No requireRole — available to applicants who want photography during onboarding.
 const photographerSchema = z.object({
   yachtId: z.string().optional(),
   preferredDate: z.string().optional(),
@@ -143,8 +161,7 @@ const photographerSchema = z.object({
 });
 
 router.post(
-  "/host/photographer-request",
-  requireRole("host", "admin"),
+  "/host/photographer",
   validateBody(photographerSchema),
   async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).localUser;
@@ -153,7 +170,10 @@ router.post(
       .from(hostProfilesTable)
       .where(eq(hostProfilesTable.userId, user.id))
       .limit(1);
-    if (!profile) { res.status(404).json({ error: "Host profile not found" }); return; }
+    if (!profile) {
+      res.status(404).json({ error: "No host application found. Submit one via POST /host/apply" });
+      return;
+    }
 
     const [request] = await db
       .insert(photographerRequestsTable)
@@ -171,7 +191,7 @@ router.post(
   },
 );
 
-// ── Host Yachts ─────────────────────────────────────────────────────────────
+// ── Host Yachts (requires verified host role) ─────────────────────────────────
 router.get(
   "/host/yachts",
   requireRole("host", "admin"),
@@ -217,7 +237,7 @@ router.post(
       .where(eq(hostProfilesTable.userId, user.id))
       .limit(1);
     if (!profile) {
-      res.status(404).json({ error: "Host profile not found. Apply to become a host first." });
+      res.status(404).json({ error: "Host profile not found" });
       return;
     }
 
@@ -298,7 +318,99 @@ router.patch(
   },
 );
 
-// ── Availability Slots (batch upsert) ───────────────────────────────────────
+// ── Yacht Photos ──────────────────────────────────────────────────────────────
+
+const photoSchema = z.object({
+  url: z.string().url(),
+  isPrimary: z.boolean().optional().default(false),
+  sortOrder: z.number().int().optional().default(0),
+});
+
+router.post(
+  "/host/yachts/:id/photos",
+  requireRole("host", "admin"),
+  validateBody(photoSchema),
+  async (req: Request, res: Response): Promise<void> => {
+    const user = (req as any).localUser;
+    const yachtId = String(req.params.id);
+
+    const [profile] = await db
+      .select()
+      .from(hostProfilesTable)
+      .where(eq(hostProfilesTable.userId, user.id))
+      .limit(1);
+
+    const [yacht] = profile
+      ? await db
+          .select()
+          .from(yachtsTable)
+          .where(and(eq(yachtsTable.id, yachtId), eq(yachtsTable.hostId, profile.id)))
+          .limit(1)
+      : [];
+
+    if (!yacht) { res.status(404).json({ error: "Yacht not found" }); return; }
+
+    const body = req.body as z.infer<typeof photoSchema>;
+
+    // If new photo is primary, clear existing primary
+    if (body.isPrimary) {
+      await db
+        .update(yachtPhotosTable)
+        .set({ isPrimary: false })
+        .where(and(eq(yachtPhotosTable.yachtId, yachtId), eq(yachtPhotosTable.isPrimary, true)));
+    }
+
+    const [photo] = await db
+      .insert(yachtPhotosTable)
+      .values({
+        id: randomUUID(),
+        yachtId,
+        url: body.url,
+        isPrimary: body.isPrimary,
+        sortOrder: body.sortOrder,
+      })
+      .returning();
+
+    res.status(201).json(photo);
+  },
+);
+
+router.delete(
+  "/host/yachts/:id/photos/:photoId",
+  requireRole("host", "admin"),
+  async (req: Request, res: Response): Promise<void> => {
+    const user = (req as any).localUser;
+    const yachtId = String(req.params.id);
+    const photoId = String(req.params.photoId);
+
+    const [profile] = await db
+      .select()
+      .from(hostProfilesTable)
+      .where(eq(hostProfilesTable.userId, user.id))
+      .limit(1);
+
+    const [yacht] = profile
+      ? await db
+          .select()
+          .from(yachtsTable)
+          .where(and(eq(yachtsTable.id, yachtId), eq(yachtsTable.hostId, profile.id)))
+          .limit(1)
+      : [];
+
+    if (!yacht) { res.status(404).json({ error: "Yacht not found" }); return; }
+
+    const [deleted] = await db
+      .delete(yachtPhotosTable)
+      .where(and(eq(yachtPhotosTable.id, photoId), eq(yachtPhotosTable.yachtId, yachtId)))
+      .returning();
+
+    if (!deleted) { res.status(404).json({ error: "Photo not found" }); return; }
+
+    res.json({ deleted: true });
+  },
+);
+
+// ── Availability Slots (batch upsert) ─────────────────────────────────────────
 const availabilityBatchSchema = z.object({
   slots: z.array(
     z.object({
@@ -336,7 +448,7 @@ router.post(
 
     const slots = req.body.slots as z.infer<typeof availabilityBatchSchema>["slots"];
 
-    // Manual upsert per slot (partial unique index can't be used in onConflictDoUpdate)
+    // Manual upsert per slot — partial unique index cannot use onConflictDoUpdate
     const results = await Promise.all(
       slots.map(async (slot) => {
         const [existing] = await db
@@ -380,7 +492,7 @@ router.post(
   },
 );
 
-// ── Pricing (batch upsert) ──────────────────────────────────────────────────
+// ── Pricing (batch upsert) ────────────────────────────────────────────────────
 const pricingBatchSchema = z.object({
   pricing: z.array(
     z.object({
@@ -456,7 +568,7 @@ router.put(
   },
 );
 
-// ── Submit for Review ───────────────────────────────────────────────────────
+// ── Submit for Review ─────────────────────────────────────────────────────────
 router.post(
   "/host/yachts/:id/submit",
   requireRole("host", "admin"),
@@ -507,7 +619,7 @@ router.post(
   },
 );
 
-// ── Earnings ────────────────────────────────────────────────────────────────
+// ── Earnings ──────────────────────────────────────────────────────────────────
 router.get(
   "/host/earnings",
   requireRole("host", "admin"),
@@ -573,7 +685,7 @@ router.get(
   },
 );
 
-// ── Withdrawals ─────────────────────────────────────────────────────────────
+// ── Withdrawals ───────────────────────────────────────────────────────────────
 router.get(
   "/host/withdrawals",
   requireRole("host", "admin"),
@@ -614,10 +726,15 @@ router.post(
     if (!profile) { res.status(404).json({ error: "Host profile not found" }); return; }
 
     const [available] = await db
-      .select({ total: sql<string>`COALESCE(SUM(${earningsLedgerTable.amountEgp}), 0)::text` })
+      .select({
+        total: sql<string>`COALESCE(SUM(${earningsLedgerTable.amountEgp}), 0)::text`,
+      })
       .from(earningsLedgerTable)
       .where(
-        and(eq(earningsLedgerTable.hostId, profile.id), eq(earningsLedgerTable.status, "available")),
+        and(
+          eq(earningsLedgerTable.hostId, profile.id),
+          eq(earningsLedgerTable.status, "available"),
+        ),
       );
 
     const availableAmount = parseFloat(available?.total ?? "0");

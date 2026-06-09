@@ -18,32 +18,50 @@ const router: IRouter = Router();
 
 /**
  * POST /webhooks/stripe
- * express.json() is configured in app.ts to save req.rawBody for this path.
+ *
+ * Stripe sends events here after payment lifecycle changes.
+ * express.json() in app.ts captures req.rawBody for this path so we can
+ * verify the signature before trusting any payload.
+ *
+ * Security policy:
+ *   - In production: signature verification is REQUIRED. Unsigned requests → 400.
+ *   - In development: if STRIPE_WEBHOOK_SECRET is missing we warn and fall through
+ *     (allows local testing without a Stripe CLI tunnel secret).
  */
 router.post("/webhooks/stripe", async (req: Request, res: Response): Promise<void> => {
   const sig = req.headers["stripe-signature"] as string | undefined;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   const rawBody = (req as any).rawBody as string | undefined;
+  const isProd = process.env.NODE_ENV === "production";
 
   let event;
   try {
     if (webhookSecret && sig && rawBody) {
+      // Full verification path — always preferred
       event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+    } else if (isProd) {
+      // Production requires a verified signature — reject forged/unsigned events
+      logger.warn(
+        { hasSig: !!sig, hasSecret: !!webhookSecret, hasRawBody: !!rawBody },
+        "Stripe webhook rejected: signature missing or unverifiable in production",
+      );
+      res.status(400).json({ error: "Missing Stripe signature — cannot process webhook in production" });
+      return;
     } else {
-      // Dev / no-secret fallback — use parsed JSON body
+      // Development fallback: accept unsigned JSON body with a warning
       event = req.body;
       if (!event?.type) {
         res.status(400).json({ error: "Missing event type" });
         return;
       }
       logger.warn(
-        { hasSecret: !!webhookSecret, hasSig: !!sig },
-        "Stripe webhook: signature validation skipped",
+        { hasSig: !!sig, hasSecret: !!webhookSecret },
+        "Stripe webhook: signature validation skipped (development mode only)",
       );
     }
   } catch (err: any) {
     logger.error({ err }, "Stripe webhook signature verification failed");
-    res.status(400).json({ error: `Webhook error: ${err.message}` });
+    res.status(400).json({ error: `Webhook signature error: ${err.message}` });
     return;
   }
 
@@ -53,14 +71,11 @@ router.post("/webhooks/stripe", async (req: Request, res: Response): Promise<voi
       case "payment_intent.succeeded": {
         const pi = event.data.object as { id: string };
 
-        const [[payment], _] = await Promise.all([
-          db
-            .update(paymentsTable)
-            .set({ status: "succeeded" })
-            .where(eq(paymentsTable.stripePaymentIntentId, pi.id))
-            .returning(),
-          Promise.resolve(), // placeholder
-        ]);
+        const [payment] = await db
+          .update(paymentsTable)
+          .set({ status: "succeeded" })
+          .where(eq(paymentsTable.stripePaymentIntentId, pi.id))
+          .returning();
 
         if (!payment) {
           logger.warn({ piId: pi.id }, "Webhook: no payment row for PI");
@@ -89,7 +104,6 @@ router.post("/webhooks/stripe", async (req: Request, res: Response): Promise<voi
             relatedEntityId: booking.id,
           });
 
-          // Notify the yacht's host
           const [yacht] = await db
             .select()
             .from(yachtsTable)
@@ -176,11 +190,10 @@ router.post("/webhooks/stripe", async (req: Request, res: Response): Promise<voi
 
         const stripeRefundId = charge.refunds?.data?.[0]?.id ?? null;
 
-        const [payment] = await db
+        await db
           .update(paymentsTable)
           .set({ status: "refunded" })
-          .where(eq(paymentsTable.stripePaymentIntentId, piId))
-          .returning();
+          .where(eq(paymentsTable.stripePaymentIntentId, piId));
 
         if (stripeRefundId) {
           await db
@@ -196,7 +209,8 @@ router.post("/webhooks/stripe", async (req: Request, res: Response): Promise<voi
     }
   } catch (err) {
     logger.error({ err, eventType: event.type }, "Error processing Stripe webhook event");
-    // Still respond 200 so Stripe doesn't retry on our processing bugs
+    // Respond 200 so Stripe doesn't retry on our processing bugs;
+    // the event is already verified so retrying won't help.
   }
 
   res.json({ received: true });

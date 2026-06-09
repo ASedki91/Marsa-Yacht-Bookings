@@ -8,6 +8,7 @@ import hostRouter from "./host";
 import bookingsRouter from "./bookings";
 import reviewsRouter from "./reviews";
 import notificationsRouter from "./notifications";
+import paymentsRouter from "./payments";
 import adminRouter from "./admin";
 import webhooksRouter from "./webhooks";
 
@@ -30,6 +31,7 @@ router.use(hostRouter);
 router.use(bookingsRouter);
 router.use(reviewsRouter);
 router.use(notificationsRouter);
+router.use(paymentsRouter);
 router.use(adminRouter);
 
 export default router;

@@ -1,6 +1,1 @@
-- [Orval params collision](orval-params-collision.md) — endpoints with BOTH path params AND query params cause TS2308; use query-params-only layout to avoid.
-- [Express trust proxy](express-trust-proxy.md) — must set `app.set("trust proxy", 1)` when running behind Replit's reverse proxy for rate-limiter to work.
-- [Zod import in api-server](zod-import.md) — api-server must declare `zod` as an explicit dependency (not transitive) or `zod/v4` imports fail at typecheck.
-- [Express 5 param types](express5-patterns.md) — req.params.id typed string|string[]; req.query is getter-only; always String(req.params.id) and Object.defineProperty for query override.
-- [Stripe SDK v22 patterns](stripe-sdk-v22.md) — API version 2026-05-27.dahlia; warn-only when STRIPE_SECRET_KEY missing; rawBody captured via express.json verify callback.
-- [Availability slot upsert](availability-slot-upsert.md) — partial unique index can't use onConflictDoUpdate; use manual find+update/insert per slot.
+- [Host router auth scoping](host-router-auth-scope.md) — router.use(requireAuth) with no path bleeds into all downstream routers; always scope to a path prefix.

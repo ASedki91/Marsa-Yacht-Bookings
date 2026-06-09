@@ -13,6 +13,7 @@ const listNotificationsQuery = z.object({
     .transform((v) => v === "true"),
 });
 
+// ── GET /notifications ────────────────────────────────────────────────────────
 router.get(
   "/notifications",
   requireAuth,
@@ -44,7 +45,8 @@ router.get(
   },
 );
 
-router.post(
+// ── PATCH /notifications/:id/read ─────────────────────────────────────────────
+router.patch(
   "/notifications/:id/read",
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
@@ -63,6 +65,22 @@ router.post(
     }
 
     res.json(notification);
+  },
+);
+
+// ── PATCH /notifications/read-all ─────────────────────────────────────────────
+router.patch(
+  "/notifications/read-all",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const user = (req as any).localUser;
+
+    await db
+      .update(notificationsTable)
+      .set({ isRead: true })
+      .where(and(eq(notificationsTable.userId, user.id), eq(notificationsTable.isRead, false)));
+
+    res.json({ ok: true });
   },
 );
 
