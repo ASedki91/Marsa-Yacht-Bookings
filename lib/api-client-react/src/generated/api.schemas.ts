@@ -521,6 +521,11 @@ export interface EarningsSummary {
   ledger: EarningsLedgerItem[];
 }
 
+export interface EarningsLedgerListResponse {
+  ledger: EarningsLedgerItem[];
+  total: number;
+}
+
 export interface Notification {
   id: string;
   userId: string;
@@ -569,6 +574,107 @@ export interface AdminStats {
   pendingWithdrawals: number;
 }
 
+export interface HostDocumentListResponse {
+  documents: HostDocument[];
+  total: number;
+}
+
+export type DocumentReviewInputStatus = typeof DocumentReviewInputStatus[keyof typeof DocumentReviewInputStatus];
+
+
+export const DocumentReviewInputStatus = {
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export interface DocumentReviewInput {
+  status: DocumentReviewInputStatus;
+  /** @maxLength 500 */
+  reason?: string;
+}
+
+export interface RequestChangesInput {
+  /**
+     * @minLength 10
+     * @maxLength 2000
+     */
+  feedback: string;
+}
+
+export interface PhotographerRequestListResponse {
+  requests: PhotographerRequest[];
+  total: number;
+}
+
+export type PhotographerRequestUpdateInputStatus = typeof PhotographerRequestUpdateInputStatus[keyof typeof PhotographerRequestUpdateInputStatus];
+
+
+export const PhotographerRequestUpdateInputStatus = {
+  contacted: 'contacted',
+  scheduled: 'scheduled',
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const;
+
+export interface PhotographerRequestUpdateInput {
+  status: PhotographerRequestUpdateInputStatus;
+  /** @maxLength 1000 */
+  notes?: string;
+}
+
+export interface ExamplePhoto {
+  id: string;
+  url: string;
+  /** @nullable */
+  caption?: string | null;
+  /** @nullable */
+  category?: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface ExamplePhotoListResponse {
+  photos: ExamplePhoto[];
+}
+
+export interface ExamplePhotoInput {
+  url: string;
+  /** @maxLength 500 */
+  caption?: string;
+  /** @maxLength 100 */
+  category?: string;
+  sortOrder?: number;
+  isActive?: boolean;
+}
+
+export interface CategoryInput {
+  name: string;
+  slug: string;
+  iconUrl?: string;
+  sortOrder?: number;
+}
+
+export interface AddOnInput {
+  name: string;
+  description?: string;
+  priceEgp: string;
+  isActive?: boolean;
+}
+
+export interface BookingTemplateInput {
+  name: string;
+  /** @minimum 1 */
+  durationHours: number;
+  description?: string;
+  isActive?: boolean;
+  sortOrder?: number;
+}
+
+export interface DeletedResponse {
+  deleted: boolean;
+}
+
 export type ListYachtsParams = {
 page?: number;
 limit?: number;
@@ -579,12 +685,35 @@ capacity?: number;
  */
 date?: string;
 templateId?: string;
+/**
+ * Minimum price in EGP (inclusive)
+ */
+minPrice?: number;
+/**
+ * Maximum price in EGP (inclusive)
+ */
+maxPrice?: number;
+/**
+ * Comma-separated list of required features e.g. "wifi,ac"
+ */
+features?: string;
+};
+
+export type GetYachtSlotsParams = {
+from: string;
+to: string;
+templateId?: string;
 };
 
 export type GetYachtAvailabilityParams = {
 yachtId: string;
 from: string;
 to: string;
+};
+
+export type GetMyBookingsParams = {
+status?: string;
+page?: number;
 };
 
 export type ListMyBookingsParams = {
@@ -605,6 +734,43 @@ export type ListNotificationsParams = {
 unreadOnly?: boolean;
 };
 
+export type RequestUploadUrlBody = {
+  name: string;
+  size: number;
+  contentType: string;
+};
+
+export type RequestUploadUrl200Metadata = {
+  name: string;
+  size: number;
+  contentType: string;
+};
+
+export type RequestUploadUrl200 = {
+  uploadURL: string;
+  objectPath: string;
+  metadata: RequestUploadUrl200Metadata;
+};
+
+export type FinalizeUploadBodyVisibility = typeof FinalizeUploadBodyVisibility[keyof typeof FinalizeUploadBodyVisibility];
+
+
+export const FinalizeUploadBodyVisibility = {
+  private: 'private',
+  public: 'public',
+} as const;
+
+export type FinalizeUploadBody = {
+  objectPath: string;
+  visibility?: FinalizeUploadBodyVisibility;
+};
+
+export type FinalizeUpload200 = {
+  objectPath: string;
+  owner: string;
+  visibility: string;
+};
+
 export type AdminListUsersParams = {
 page?: number;
 role?: string;
@@ -622,6 +788,25 @@ status?: string;
 export type AdminListAuditLogsParams = {
 entityType?: string;
 entityId?: string;
+page?: number;
+};
+
+export type AdminListDocumentsParams = {
+status?: AdminListDocumentsStatus;
+page?: number;
+};
+
+export type AdminListDocumentsStatus = typeof AdminListDocumentsStatus[keyof typeof AdminListDocumentsStatus];
+
+
+export const AdminListDocumentsStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export type AdminListPhotographerRequestsParams = {
+status?: string;
 page?: number;
 };
 

@@ -87,7 +87,10 @@ export const ListYachtsQueryParams = zod.object({
   "categoryId": zod.coerce.string().optional(),
   "capacity": zod.coerce.number().optional(),
   "date": zod.coerce.string().optional().describe('Filter by availability date (YYYY-MM-DD)'),
-  "templateId": zod.coerce.string().optional()
+  "templateId": zod.coerce.string().optional(),
+  "minPrice": zod.coerce.number().optional().describe('Minimum price in EGP (inclusive)'),
+  "maxPrice": zod.coerce.number().optional().describe('Maximum price in EGP (inclusive)'),
+  "features": zod.coerce.string().optional().describe('Comma-separated list of required features e.g. \"wifi,ac\"')
 })
 
 export const ListYachtsResponse = zod.object({
@@ -178,6 +181,31 @@ export const GetYachtResponse = zod.object({
 
 
 /**
+ * @summary Get available slots for a yacht (path-param version)
+ */
+export const GetYachtSlotsParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetYachtSlotsQueryParams = zod.object({
+  "from": zod.coerce.string(),
+  "to": zod.coerce.string(),
+  "templateId": zod.coerce.string().optional()
+})
+
+export const GetYachtSlotsResponse = zod.object({
+  "slots": zod.array(zod.object({
+  "id": zod.string(),
+  "yachtId": zod.string(),
+  "templateId": zod.string(),
+  "date": zod.string(),
+  "startTime": zod.string(),
+  "isAvailable": zod.boolean()
+}))
+})
+
+
+/**
  * @summary Get available slots for a yacht
  */
 export const GetYachtAvailabilityQueryParams = zod.object({
@@ -248,6 +276,43 @@ export const GetExchangeRateResponse = zod.object({
   "pair": zod.string(),
   "rate": zod.number(),
   "fetchedAt": zod.string()
+})
+
+
+/**
+ * @summary Get the current guest's bookings (dedicated alias)
+ */
+export const getMyBookingsQueryPageDefault = 1;
+
+export const GetMyBookingsQueryParams = zod.object({
+  "status": zod.coerce.string().optional(),
+  "page": zod.coerce.number().default(getMyBookingsQueryPageDefault)
+})
+
+export const GetMyBookingsResponse = zod.object({
+  "bookings": zod.array(zod.object({
+  "id": zod.string(),
+  "guestId": zod.string(),
+  "yachtId": zod.string(),
+  "templateId": zod.string(),
+  "bookingDate": zod.string(),
+  "startTime": zod.string(),
+  "guestCount": zod.number(),
+  "guestName": zod.string(),
+  "guestPhone": zod.string(),
+  "guestEmail": zod.string(),
+  "guestNationality": zod.string().nullish(),
+  "specialRequests": zod.string().nullish(),
+  "baseAmountEgp": zod.string(),
+  "totalAmountEgp": zod.string(),
+  "platformFeeEgp": zod.string(),
+  "hostEarningsEgp": zod.string(),
+  "status": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})),
+  "total": zod.number(),
+  "page": zod.number()
 })
 
 
@@ -582,6 +647,18 @@ export const UpdateYachtResponse = zod.object({
 
 
 /**
+ * @summary Delete a draft or changes_requested yacht
+ */
+export const DeleteHostYachtParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeleteHostYachtResponse = zod.object({
+  "deleted": zod.boolean()
+})
+
+
+/**
  * @summary Set availability slots for a yacht
  */
 export const SetYachtAvailabilityParams = zod.object({
@@ -662,7 +739,7 @@ export const SubmitYachtForReviewResponse = zod.object({
 
 
 /**
- * @summary Get host earnings summary
+ * @summary Get host earnings summary (includes totals and full ledger)
  */
 export const GetHostEarningsResponse = zod.object({
   "totalEarnedEgp": zod.string(),
@@ -677,6 +754,31 @@ export const GetHostEarningsResponse = zod.object({
   "status": zod.string(),
   "createdAt": zod.string()
 }))
+})
+
+
+/**
+ * @summary Get host earnings ledger entries
+ */
+export const GetHostEarningsLedgerResponse = zod.object({
+  "ledger": zod.array(zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "amountEgp": zod.string(),
+  "type": zod.string(),
+  "status": zod.string(),
+  "createdAt": zod.string()
+})),
+  "total": zod.number()
+})
+
+
+/**
+ * @summary Request a withdrawal (earnings-path alias)
+ */
+export const RequestWithdrawViaEarningsBody = zod.object({
+  "amountEgp": zod.string(),
+  "payoutMethod": zod.string()
 })
 
 
@@ -702,6 +804,22 @@ export const ListWithdrawalsResponse = zod.object({
 export const RequestWithdrawalBody = zod.object({
   "amountEgp": zod.string(),
   "payoutMethod": zod.string()
+})
+
+
+/**
+ * @summary List documents uploaded by the current host applicant
+ */
+export const ListHostDocumentsResponse = zod.object({
+  "documents": zod.array(zod.object({
+  "id": zod.string(),
+  "hostId": zod.string(),
+  "documentType": zod.string(),
+  "fileUrl": zod.string(),
+  "status": zod.string(),
+  "createdAt": zod.string()
+})),
+  "total": zod.number()
 })
 
 
@@ -765,6 +883,41 @@ export const MarkNotificationReadResponse = zod.object({
   "relatedEntityType": zod.string().nullish(),
   "relatedEntityId": zod.string().nullish(),
   "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Request a presigned upload URL for direct client-side upload
+ */
+export const RequestUploadUrlBody = zod.object({
+  "name": zod.string(),
+  "size": zod.number(),
+  "contentType": zod.string()
+})
+
+export const RequestUploadUrlResponse = zod.object({
+  "uploadURL": zod.string(),
+  "objectPath": zod.string(),
+  "metadata": zod.object({
+  "name": zod.string(),
+  "size": zod.number(),
+  "contentType": zod.string()
+})
+})
+
+
+/**
+ * @summary Set ACL ownership on an object after a direct presigned-URL upload
+ */
+export const FinalizeUploadBody = zod.object({
+  "objectPath": zod.string(),
+  "visibility": zod.enum(['private', 'public']).optional()
+})
+
+export const FinalizeUploadResponse = zod.object({
+  "objectPath": zod.string(),
+  "owner": zod.string(),
+  "visibility": zod.string()
 })
 
 
@@ -1104,6 +1257,447 @@ export const GetAdminStatsResponse = zod.object({
   "pendingHostApplications": zod.number(),
   "pendingYachtReviews": zod.number(),
   "pendingWithdrawals": zod.number()
+})
+
+
+/**
+ * @summary List host verification documents
+ */
+export const adminListDocumentsQueryPageDefault = 1;
+
+export const AdminListDocumentsQueryParams = zod.object({
+  "status": zod.enum(['pending', 'approved', 'rejected']).optional(),
+  "page": zod.coerce.number().default(adminListDocumentsQueryPageDefault)
+})
+
+export const AdminListDocumentsResponse = zod.object({
+  "documents": zod.array(zod.object({
+  "id": zod.string(),
+  "hostId": zod.string(),
+  "documentType": zod.string(),
+  "fileUrl": zod.string(),
+  "status": zod.string(),
+  "createdAt": zod.string()
+})),
+  "total": zod.number()
+})
+
+
+/**
+ * @summary Approve or reject a host verification document
+ */
+export const AdminReviewDocumentParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const adminReviewDocumentBodyReasonMax = 500;
+
+
+
+export const AdminReviewDocumentBody = zod.object({
+  "status": zod.enum(['approved', 'rejected']),
+  "reason": zod.string().max(adminReviewDocumentBodyReasonMax).optional()
+})
+
+export const AdminReviewDocumentResponse = zod.object({
+  "id": zod.string(),
+  "hostId": zod.string(),
+  "documentType": zod.string(),
+  "fileUrl": zod.string(),
+  "status": zod.string(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Send a listing back to the host for changes
+ */
+export const AdminRequestYachtChangesParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const adminRequestYachtChangesBodyFeedbackMin = 10;
+export const adminRequestYachtChangesBodyFeedbackMax = 2000;
+
+
+
+export const AdminRequestYachtChangesBody = zod.object({
+  "feedback": zod.string().min(adminRequestYachtChangesBodyFeedbackMin).max(adminRequestYachtChangesBodyFeedbackMax)
+})
+
+export const AdminRequestYachtChangesResponse = zod.object({
+  "id": zod.string(),
+  "hostId": zod.string(),
+  "categoryId": zod.string().nullish(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "location": zod.string(),
+  "city": zod.string(),
+  "capacity": zod.number(),
+  "lengthFt": zod.string().nullish(),
+  "yearBuilt": zod.number().nullish(),
+  "manufacturer": zod.string().nullish(),
+  "features": zod.array(zod.string()).optional(),
+  "status": zod.string(),
+  "avgRating": zod.string(),
+  "reviewCount": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Suspend a live yacht listing
+ */
+export const AdminSuspendYachtParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const AdminSuspendYachtBody = zod.object({
+  "reason": zod.string().optional()
+})
+
+export const AdminSuspendYachtResponse = zod.object({
+  "id": zod.string(),
+  "hostId": zod.string(),
+  "categoryId": zod.string().nullish(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "location": zod.string(),
+  "city": zod.string(),
+  "capacity": zod.number(),
+  "lengthFt": zod.string().nullish(),
+  "yearBuilt": zod.number().nullish(),
+  "manufacturer": zod.string().nullish(),
+  "features": zod.array(zod.string()).optional(),
+  "status": zod.string(),
+  "avgRating": zod.string(),
+  "reviewCount": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary List photographer requests
+ */
+export const adminListPhotographerRequestsQueryPageDefault = 1;
+
+export const AdminListPhotographerRequestsQueryParams = zod.object({
+  "status": zod.coerce.string().optional(),
+  "page": zod.coerce.number().default(adminListPhotographerRequestsQueryPageDefault)
+})
+
+export const AdminListPhotographerRequestsResponse = zod.object({
+  "requests": zod.array(zod.object({
+  "id": zod.string(),
+  "hostId": zod.string(),
+  "yachtId": zod.string().nullish(),
+  "preferredDate": zod.string().nullish(),
+  "preferredTime": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "status": zod.string(),
+  "createdAt": zod.string()
+})),
+  "total": zod.number()
+})
+
+
+/**
+ * @summary Update a photographer request status
+ */
+export const AdminUpdatePhotographerRequestParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const adminUpdatePhotographerRequestBodyNotesMax = 1000;
+
+
+
+export const AdminUpdatePhotographerRequestBody = zod.object({
+  "status": zod.enum(['contacted', 'scheduled', 'completed', 'cancelled']),
+  "notes": zod.string().max(adminUpdatePhotographerRequestBodyNotesMax).optional()
+})
+
+export const AdminUpdatePhotographerRequestResponse = zod.object({
+  "id": zod.string(),
+  "hostId": zod.string(),
+  "yachtId": zod.string().nullish(),
+  "preferredDate": zod.string().nullish(),
+  "preferredTime": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "status": zod.string(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary List example yacht photos (used in host onboarding)
+ */
+export const AdminListExamplePhotosResponse = zod.object({
+  "photos": zod.array(zod.object({
+  "id": zod.string(),
+  "url": zod.string(),
+  "caption": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "sortOrder": zod.number(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Add an example yacht photo
+ */
+export const adminCreateExamplePhotoBodyCaptionMax = 500;
+
+export const adminCreateExamplePhotoBodyCategoryMax = 100;
+
+export const adminCreateExamplePhotoBodySortOrderDefault = 0;
+export const adminCreateExamplePhotoBodyIsActiveDefault = true;
+
+export const AdminCreateExamplePhotoBody = zod.object({
+  "url": zod.string().url(),
+  "caption": zod.string().max(adminCreateExamplePhotoBodyCaptionMax).optional(),
+  "category": zod.string().max(adminCreateExamplePhotoBodyCategoryMax).optional(),
+  "sortOrder": zod.number().default(adminCreateExamplePhotoBodySortOrderDefault),
+  "isActive": zod.boolean().default(adminCreateExamplePhotoBodyIsActiveDefault)
+})
+
+
+/**
+ * @summary Update an example yacht photo
+ */
+export const AdminUpdateExamplePhotoParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const adminUpdateExamplePhotoBodyCaptionMax = 500;
+
+export const adminUpdateExamplePhotoBodyCategoryMax = 100;
+
+export const adminUpdateExamplePhotoBodySortOrderDefault = 0;
+export const adminUpdateExamplePhotoBodyIsActiveDefault = true;
+
+export const AdminUpdateExamplePhotoBody = zod.object({
+  "url": zod.string().url(),
+  "caption": zod.string().max(adminUpdateExamplePhotoBodyCaptionMax).optional(),
+  "category": zod.string().max(adminUpdateExamplePhotoBodyCategoryMax).optional(),
+  "sortOrder": zod.number().default(adminUpdateExamplePhotoBodySortOrderDefault),
+  "isActive": zod.boolean().default(adminUpdateExamplePhotoBodyIsActiveDefault)
+})
+
+export const AdminUpdateExamplePhotoResponse = zod.object({
+  "id": zod.string(),
+  "url": zod.string(),
+  "caption": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "sortOrder": zod.number(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete an example yacht photo
+ */
+export const AdminDeleteExamplePhotoParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const AdminDeleteExamplePhotoResponse = zod.object({
+  "deleted": zod.boolean()
+})
+
+
+/**
+ * @summary List yacht categories
+ */
+export const AdminListCategoriesResponse = zod.object({
+  "categories": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "slug": zod.string(),
+  "iconUrl": zod.string().nullish(),
+  "sortOrder": zod.number()
+}))
+})
+
+
+/**
+ * @summary Create a yacht category
+ */
+export const AdminCreateCategoryBody = zod.object({
+  "name": zod.string(),
+  "slug": zod.string(),
+  "iconUrl": zod.string().optional(),
+  "sortOrder": zod.number().optional()
+})
+
+
+/**
+ * @summary Update a yacht category
+ */
+export const AdminUpdateCategoryParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const AdminUpdateCategoryBody = zod.object({
+  "name": zod.string(),
+  "slug": zod.string(),
+  "iconUrl": zod.string().optional(),
+  "sortOrder": zod.number().optional()
+})
+
+export const AdminUpdateCategoryResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "slug": zod.string(),
+  "iconUrl": zod.string().nullish(),
+  "sortOrder": zod.number()
+})
+
+
+/**
+ * @summary Delete a yacht category
+ */
+export const AdminDeleteCategoryParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const AdminDeleteCategoryResponse = zod.object({
+  "deleted": zod.boolean()
+})
+
+
+/**
+ * @summary List add-ons
+ */
+export const AdminListAddOnsResponse = zod.object({
+  "addOns": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "description": zod.string().nullish(),
+  "priceEgp": zod.string(),
+  "isActive": zod.boolean()
+}))
+})
+
+
+/**
+ * @summary Create an add-on
+ */
+export const AdminCreateAddOnBody = zod.object({
+  "name": zod.string(),
+  "description": zod.string().optional(),
+  "priceEgp": zod.string(),
+  "isActive": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Update an add-on
+ */
+export const AdminUpdateAddOnParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const AdminUpdateAddOnBody = zod.object({
+  "name": zod.string(),
+  "description": zod.string().optional(),
+  "priceEgp": zod.string(),
+  "isActive": zod.boolean().optional()
+})
+
+export const AdminUpdateAddOnResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "description": zod.string().nullish(),
+  "priceEgp": zod.string(),
+  "isActive": zod.boolean()
+})
+
+
+/**
+ * @summary Delete an add-on
+ */
+export const AdminDeleteAddOnParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const AdminDeleteAddOnResponse = zod.object({
+  "deleted": zod.boolean()
+})
+
+
+/**
+ * @summary List booking templates
+ */
+export const AdminListBookingTemplatesResponse = zod.object({
+  "templates": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "durationHours": zod.number(),
+  "description": zod.string().nullish(),
+  "isActive": zod.boolean(),
+  "sortOrder": zod.number()
+}))
+})
+
+
+/**
+ * @summary Create a booking template
+ */
+
+
+
+export const AdminCreateBookingTemplateBody = zod.object({
+  "name": zod.string(),
+  "durationHours": zod.number().min(1),
+  "description": zod.string().optional(),
+  "isActive": zod.boolean().optional(),
+  "sortOrder": zod.number().optional()
+})
+
+
+/**
+ * @summary Update a booking template
+ */
+export const AdminUpdateBookingTemplateParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+
+
+
+export const AdminUpdateBookingTemplateBody = zod.object({
+  "name": zod.string(),
+  "durationHours": zod.number().min(1),
+  "description": zod.string().optional(),
+  "isActive": zod.boolean().optional(),
+  "sortOrder": zod.number().optional()
+})
+
+export const AdminUpdateBookingTemplateResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "durationHours": zod.number(),
+  "description": zod.string().nullish(),
+  "isActive": zod.boolean(),
+  "sortOrder": zod.number()
+})
+
+
+/**
+ * @summary Delete a booking template
+ */
+export const AdminDeleteBookingTemplateParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const AdminDeleteBookingTemplateResponse = zod.object({
+  "deleted": zod.boolean()
 })
 
 

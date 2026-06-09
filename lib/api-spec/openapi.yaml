@@ -874,11 +874,13 @@ paths:
             schema:
               type: object
               properties:
-                fileName:
+                name:
                   type: string
+                size:
+                  type: number
                 contentType:
                   type: string
-              required: [fileName, contentType]
+              required: [name, size, contentType]
       responses:
         "200":
           description: Presigned upload URL
@@ -887,11 +889,21 @@ paths:
               schema:
                 type: object
                 properties:
-                  uploadUrl:
+                  uploadURL:
                     type: string
                   objectPath:
                     type: string
-                required: [uploadUrl, objectPath]
+                  metadata:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      size:
+                        type: number
+                      contentType:
+                        type: string
+                    required: [name, size, contentType]
+                required: [uploadURL, objectPath, metadata]
         "401":
           description: Unauthorized
           content:

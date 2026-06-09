@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "codegen": "orval --config ./orval.config.ts && pnpm -w run typecheck:libs"
+    "codegen": "orval --config ./orval.config.ts && node -e \"const fs=require('fs'),p=require('path');const idx=p.resolve(__dirname,'../api-zod/src/index.ts');fs.writeFileSync(idx,'// Zod validators generated from openapi.yaml.\\n// Only re-export Zod schemas (generated/api.ts). The generated/types/ barrel\\n// is intentionally excluded: orval emits identically-named exports from both\\n// api.ts and types/, causing TS2308 ambiguity errors.\\nexport * from \\\"./generated/api\\\";\\n');\" && pnpm -w run typecheck:libs"
   },
   "devDependencies": {
     "orval": "^8.9.1"

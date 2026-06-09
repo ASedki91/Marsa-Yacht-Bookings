@@ -16,4 +16,16 @@ capacity?: number;
  */
 date?: string;
 templateId?: string;
+/**
+ * Minimum price in EGP (inclusive)
+ */
+minPrice?: number;
+/**
+ * Maximum price in EGP (inclusive)
+ */
+maxPrice?: number;
+/**
+ * Comma-separated list of required features e.g. "wifi,ac"
+ */
+features?: string;
 };
