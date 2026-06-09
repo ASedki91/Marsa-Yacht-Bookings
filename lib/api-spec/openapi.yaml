@@ -3,13 +3,30 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: MARSA Yacht Booking API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication and user account sync
+  - name: yachts
+    description: Yacht listing and discovery
+  - name: bookings
+    description: Booking management
+  - name: host
+    description: Host management
+  - name: admin
+    description: Admin operations
+  - name: reviews
+    description: Reviews
+  - name: notifications
+    description: Notifications
+  - name: finance
+    description: Earnings and withdrawals
+
 paths:
   /healthz:
     get:
@@ -24,6 +41,946 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ── Auth ────────────────────────────────────────────────────────────────────
+  /auth/sync:
+    post:
+      operationId: syncUser
+      tags: [auth]
+      summary: Sync Clerk user to local database
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserSyncInput"
+      responses:
+        "200":
+          description: User synced
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSyncResponse"
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSyncResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user profile
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Discovery ──────────────────────────────────────────────────────────────
+  /yachts:
+    get:
+      operationId: listYachts
+      tags: [yachts]
+      summary: List live yachts
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: categoryId
+          in: query
+          schema: { type: string }
+        - name: capacity
+          in: query
+          schema: { type: integer }
+        - name: date
+          in: query
+          description: Filter by availability date (YYYY-MM-DD)
+          schema: { type: string }
+        - name: templateId
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: List of yachts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YachtListResponse"
+
+  /yachts/{id}:
+    get:
+      operationId: getYacht
+      tags: [yachts]
+      summary: Get yacht details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Yacht detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YachtDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /yachts/availability:
+    get:
+      operationId: getYachtAvailability
+      tags: [yachts]
+      summary: Get available slots for a yacht
+      parameters:
+        - name: yachtId
+          in: query
+          required: true
+          schema: { type: string }
+        - name: from
+          in: query
+          required: true
+          schema: { type: string }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Available slots
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvailabilityListResponse"
+
+  /categories:
+    get:
+      operationId: listCategories
+      tags: [yachts]
+      summary: List yacht categories
+      responses:
+        "200":
+          description: Categories
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryListResponse"
+
+  /booking-templates:
+    get:
+      operationId: listBookingTemplates
+      tags: [yachts]
+      summary: List all booking duration templates
+      responses:
+        "200":
+          description: Templates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingTemplateListResponse"
+
+  /add-ons:
+    get:
+      operationId: listAddOns
+      tags: [yachts]
+      summary: List all available add-ons
+      responses:
+        "200":
+          description: Add-ons
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddOnListResponse"
+
+  /exchange-rate:
+    get:
+      operationId: getExchangeRate
+      tags: [yachts]
+      summary: Get current USD/EGP exchange rate
+      responses:
+        "200":
+          description: Exchange rate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExchangeRateResponse"
+
+  # ── Bookings ────────────────────────────────────────────────────────────────
+  /bookings:
+    post:
+      operationId: createBooking
+      tags: [bookings]
+      summary: Create a booking and get Stripe PaymentIntent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookingInput"
+      responses:
+        "201":
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingCreateResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      operationId: listMyBookings
+      tags: [bookings]
+      summary: List the current user's bookings
+      parameters:
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [guest, host]
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+      responses:
+        "200":
+          description: Bookings list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingListResponse"
+
+  /bookings/{id}:
+    get:
+      operationId: getBooking
+      tags: [bookings]
+      summary: Get booking details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Booking detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bookings/{id}/cancel:
+    post:
+      operationId: cancelBooking
+      tags: [bookings]
+      summary: Request booking cancellation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancellationInput"
+      responses:
+        "200":
+          description: Cancellation requested
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  /bookings/{id}/confirm:
+    post:
+      operationId: confirmBooking
+      tags: [bookings]
+      summary: Host confirms a booking
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  /bookings/{id}/reject:
+    post:
+      operationId: rejectBooking
+      tags: [bookings]
+      summary: Host rejects a booking (triggers refund)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectionInput"
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  /bookings/{id}/review:
+    post:
+      operationId: submitReview
+      tags: [reviews]
+      summary: Submit a review for a completed booking
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewInput"
+      responses:
+        "201":
+          description: Review submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+
+  # ── Host ───────────────────────────────────────────────────────────────────
+  /host/apply:
+    post:
+      operationId: applyAsHost
+      tags: [host]
+      summary: Apply to become a host
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HostApplicationInput"
+      responses:
+        "201":
+          description: Application submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostProfile"
+
+  /host/profile:
+    get:
+      operationId: getHostProfile
+      tags: [host]
+      summary: Get authenticated host's profile
+      responses:
+        "200":
+          description: Host profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostProfile"
+    put:
+      operationId: updateHostProfile
+      tags: [host]
+      summary: Update host profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HostProfileUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostProfile"
+
+  /host/yachts:
+    get:
+      operationId: listHostYachts
+      tags: [host]
+      summary: List the host's own yachts
+      responses:
+        "200":
+          description: Host yachts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YachtListResponse"
+    post:
+      operationId: createYacht
+      tags: [host]
+      summary: Create a new yacht listing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/YachtInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Yacht"
+
+  /host/yachts/{id}:
+    patch:
+      operationId: updateYacht
+      tags: [host]
+      summary: Update a yacht listing
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/YachtUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Yacht"
+
+  /host/yachts/{id}/availability:
+    post:
+      operationId: setYachtAvailability
+      tags: [host]
+      summary: Set availability slots for a yacht
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AvailabilityBatchInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvailabilityListResponse"
+
+  /host/yachts/{id}/pricing:
+    put:
+      operationId: setYachtPricing
+      tags: [host]
+      summary: Set pricing for a yacht's booking templates
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PricingBatchInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PricingListResponse"
+
+  /host/yachts/{id}/submit:
+    post:
+      operationId: submitYachtForReview
+      tags: [host]
+      summary: Submit a yacht for admin review
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Yacht"
+
+  /host/earnings:
+    get:
+      operationId: getHostEarnings
+      tags: [finance]
+      summary: Get host earnings summary
+      responses:
+        "200":
+          description: Earnings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EarningsSummary"
+
+  /host/withdrawals:
+    get:
+      operationId: listWithdrawals
+      tags: [finance]
+      summary: List withdrawal requests
+      responses:
+        "200":
+          description: Withdrawals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WithdrawalListResponse"
+    post:
+      operationId: requestWithdrawal
+      tags: [finance]
+      summary: Request a withdrawal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WithdrawalInput"
+      responses:
+        "201":
+          description: Submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Withdrawal"
+
+  /host/documents:
+    post:
+      operationId: uploadHostDocument
+      tags: [host]
+      summary: Upload a verification document
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DocumentInput"
+      responses:
+        "201":
+          description: Recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostDocument"
+
+  /host/photographer-request:
+    post:
+      operationId: requestPhotographer
+      tags: [host]
+      summary: Request a MARSA photographer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PhotographerRequestInput"
+      responses:
+        "201":
+          description: Submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotographerRequest"
+
+  # ── Notifications ──────────────────────────────────────────────────────────
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List notifications for the current user
+      parameters:
+        - name: unreadOnly
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationListResponse"
+
+  /notifications/{id}/read:
+    post:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Marked read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+
+  # ── Admin ───────────────────────────────────────────────────────────────────
+  /admin/users:
+    get:
+      operationId: adminListUsers
+      tags: [admin]
+      summary: List all users
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer }
+        - name: role
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+
+  /admin/users/{id}/role:
+    patch:
+      operationId: adminSetUserRole
+      tags: [admin]
+      summary: Change a user's role
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /admin/yachts:
+    get:
+      operationId: adminListYachts
+      tags: [admin]
+      summary: List all yachts (any status)
+      responses:
+        "200":
+          description: Yachts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YachtListResponse"
+
+  /admin/yachts/{id}/approve:
+    post:
+      operationId: adminApproveYacht
+      tags: [admin]
+      summary: Approve a yacht listing
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Yacht"
+
+  /admin/yachts/{id}/reject:
+    post:
+      operationId: adminRejectYacht
+      tags: [admin]
+      summary: Reject a yacht listing
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectionInput"
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Yacht"
+
+  /admin/bookings:
+    get:
+      operationId: adminListBookings
+      tags: [admin]
+      summary: List all bookings
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Bookings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingListResponse"
+
+  /admin/hosts:
+    get:
+      operationId: adminListHosts
+      tags: [admin]
+      summary: List all host applications
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Hosts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostProfileListResponse"
+
+  /admin/hosts/{id}/verify:
+    post:
+      operationId: adminVerifyHost
+      tags: [admin]
+      summary: Approve or reject a host application
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HostVerificationInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostProfile"
+
+  /admin/withdrawals:
+    get:
+      operationId: adminListWithdrawals
+      tags: [admin]
+      summary: List all withdrawal requests
+      responses:
+        "200":
+          description: Withdrawals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WithdrawalListResponse"
+
+  /admin/withdrawals/{id}/process:
+    post:
+      operationId: adminProcessWithdrawal
+      tags: [admin]
+      summary: Mark a withdrawal as paid or rejected
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WithdrawalProcessInput"
+      responses:
+        "200":
+          description: Processed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Withdrawal"
+
+  /admin/reviews:
+    get:
+      operationId: adminListReviews
+      tags: [admin]
+      summary: List all reviews for moderation
+      responses:
+        "200":
+          description: Reviews
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewListResponse"
+
+  /admin/reviews/{id}/moderate:
+    post:
+      operationId: adminModerateReview
+      tags: [admin]
+      summary: Approve or hide a review
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewModerationInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+
+  /admin/audit-logs:
+    get:
+      operationId: adminListAuditLogs
+      tags: [admin]
+      summary: List audit logs
+      parameters:
+        - name: entityType
+          in: query
+          schema: { type: string }
+        - name: entityId
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogListResponse"
+
+  /admin/stats:
+    get:
+      operationId: getAdminStats
+      tags: [admin]
+      summary: Dashboard statistics
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+
+  /webhooks/stripe:
+    post:
+      operationId: stripeWebhook
+      tags: [bookings]
+      summary: Stripe payment webhook
+      responses:
+        "200":
+          description: Acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +991,1056 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    # ── Users ──────────────────────────────────────────────────────────────────
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        clerkId:
+          type: string
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        fullName:
+          type: ["string", "null"]
+        nationality:
+          type: ["string", "null"]
+        avatarUrl:
+          type: ["string", "null"]
+        role:
+          type: string
+          enum: [guest, host, admin]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - clerkId
+        - email
+        - role
+        - createdAt
+        - updatedAt
+
+    UserSyncInput:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+        avatarUrl:
+          type: string
+        phone:
+          type: string
+        nationality:
+          type: string
+      required:
+        - email
+
+    UserSyncResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        created:
+          type: boolean
+      required:
+        - user
+        - created
+
+    MeResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - user
+
+    UserListResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        total:
+          type: integer
+      required:
+        - users
+        - total
+
+    RoleUpdate:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [guest, host, admin]
+      required:
+        - role
+
+    # ── Categories ─────────────────────────────────────────────────────────────
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        iconUrl:
+          type: ["string", "null"]
+        sortOrder:
+          type: integer
+      required:
+        - id
+        - name
+        - slug
+        - sortOrder
+
+    CategoryListResponse:
+      type: object
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
+      required:
+        - categories
+
+    BookingTemplate:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        durationHours:
+          type: integer
+        description:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        sortOrder:
+          type: integer
+      required:
+        - id
+        - name
+        - durationHours
+        - isActive
+        - sortOrder
+
+    BookingTemplateListResponse:
+      type: object
+      properties:
+        templates:
+          type: array
+          items:
+            $ref: "#/components/schemas/BookingTemplate"
+      required:
+        - templates
+
+    AddOn:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        priceEgp:
+          type: string
+        isActive:
+          type: boolean
+      required:
+        - id
+        - name
+        - priceEgp
+        - isActive
+
+    AddOnListResponse:
+      type: object
+      properties:
+        addOns:
+          type: array
+          items:
+            $ref: "#/components/schemas/AddOn"
+      required:
+        - addOns
+
+    ExchangeRateResponse:
+      type: object
+      properties:
+        pair:
+          type: string
+        rate:
+          type: number
+        fetchedAt:
+          type: string
+      required:
+        - pair
+        - rate
+        - fetchedAt
+
+    # ── Yachts ─────────────────────────────────────────────────────────────────
+    Yacht:
+      type: object
+      properties:
+        id:
+          type: string
+        hostId:
+          type: string
+        categoryId:
+          type: ["string", "null"]
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        location:
+          type: string
+        city:
+          type: string
+        capacity:
+          type: integer
+        lengthFt:
+          type: ["string", "null"]
+        yearBuilt:
+          type: ["integer", "null"]
+        manufacturer:
+          type: ["string", "null"]
+        features:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        avgRating:
+          type: string
+        reviewCount:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - hostId
+        - title
+        - location
+        - city
+        - capacity
+        - status
+        - avgRating
+        - reviewCount
+        - createdAt
+        - updatedAt
+
+    YachtDetail:
+      type: object
+      properties:
+        yacht:
+          $ref: "#/components/schemas/Yacht"
+        photos:
+          type: array
+          items:
+            $ref: "#/components/schemas/YachtPhoto"
+        pricing:
+          type: array
+          items:
+            $ref: "#/components/schemas/YachtPricing"
+        reviews:
+          type: array
+          items:
+            $ref: "#/components/schemas/Review"
+        host:
+          $ref: "#/components/schemas/HostPublic"
+      required:
+        - yacht
+        - photos
+        - pricing
+        - reviews
+
+    YachtPhoto:
+      type: object
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+        isPrimary:
+          type: boolean
+        sortOrder:
+          type: integer
+      required:
+        - id
+        - url
+        - isPrimary
+        - sortOrder
+
+    YachtPricing:
+      type: object
+      properties:
+        templateId:
+          type: string
+        templateName:
+          type: string
+        durationHours:
+          type: integer
+        priceEgp:
+          type: string
+      required:
+        - templateId
+        - templateName
+        - durationHours
+        - priceEgp
+
+    YachtListResponse:
+      type: object
+      properties:
+        yachts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Yacht"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+        - yachts
+        - total
+        - page
+        - limit
+
+    YachtInput:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 3
+        description:
+          type: string
+        location:
+          type: string
+        categoryId:
+          type: string
+        capacity:
+          type: integer
+          minimum: 1
+        lengthFt:
+          type: number
+        yearBuilt:
+          type: integer
+        manufacturer:
+          type: string
+        features:
+          type: array
+          items:
+            type: string
+      required:
+        - title
+        - location
+        - capacity
+
+    YachtUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        location:
+          type: string
+        categoryId:
+          type: string
+        capacity:
+          type: integer
+        features:
+          type: array
+          items:
+            type: string
+
+    # ── Availability ───────────────────────────────────────────────────────────
+    AvailabilitySlot:
+      type: object
+      properties:
+        id:
+          type: string
+        yachtId:
+          type: string
+        templateId:
+          type: string
+        date:
+          type: string
+        startTime:
+          type: string
+        isAvailable:
+          type: boolean
+      required:
+        - id
+        - yachtId
+        - templateId
+        - date
+        - startTime
+        - isAvailable
+
+    AvailabilityListResponse:
+      type: object
+      properties:
+        slots:
+          type: array
+          items:
+            $ref: "#/components/schemas/AvailabilitySlot"
+      required:
+        - slots
+
+    AvailabilityBatchInput:
+      type: object
+      properties:
+        slots:
+          type: array
+          items:
+            type: object
+            properties:
+              templateId:
+                type: string
+              date:
+                type: string
+              startTime:
+                type: string
+              isAvailable:
+                type: boolean
+            required:
+              - templateId
+              - date
+              - startTime
+              - isAvailable
+      required:
+        - slots
+
+    PricingItem:
+      type: object
+      properties:
+        templateId:
+          type: string
+        priceEgp:
+          type: string
+      required:
+        - templateId
+        - priceEgp
+
+    PricingBatchInput:
+      type: object
+      properties:
+        pricing:
+          type: array
+          items:
+            $ref: "#/components/schemas/PricingItem"
+      required:
+        - pricing
+
+    PricingListResponse:
+      type: object
+      properties:
+        pricing:
+          type: array
+          items:
+            $ref: "#/components/schemas/YachtPricing"
+      required:
+        - pricing
+
+    # ── Bookings ────────────────────────────────────────────────────────────────
+    Booking:
+      type: object
+      properties:
+        id:
+          type: string
+        guestId:
+          type: string
+        yachtId:
+          type: string
+        templateId:
+          type: string
+        bookingDate:
+          type: string
+        startTime:
+          type: string
+        guestCount:
+          type: integer
+        guestName:
+          type: string
+        guestPhone:
+          type: string
+        guestEmail:
+          type: string
+        guestNationality:
+          type: ["string", "null"]
+        specialRequests:
+          type: ["string", "null"]
+        baseAmountEgp:
+          type: string
+        totalAmountEgp:
+          type: string
+        platformFeeEgp:
+          type: string
+        hostEarningsEgp:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - guestId
+        - yachtId
+        - templateId
+        - bookingDate
+        - startTime
+        - guestCount
+        - guestName
+        - guestPhone
+        - guestEmail
+        - baseAmountEgp
+        - totalAmountEgp
+        - platformFeeEgp
+        - hostEarningsEgp
+        - status
+        - createdAt
+        - updatedAt
+
+    BookingInput:
+      type: object
+      properties:
+        yachtId:
+          type: string
+        templateId:
+          type: string
+        bookingDate:
+          type: string
+        startTime:
+          type: string
+        guestCount:
+          type: integer
+          minimum: 1
+        guestName:
+          type: string
+        guestPhone:
+          type: string
+        guestEmail:
+          type: string
+          format: email
+        guestNationality:
+          type: string
+        specialRequests:
+          type: string
+        addOnIds:
+          type: array
+          items:
+            type: string
+      required:
+        - yachtId
+        - templateId
+        - bookingDate
+        - startTime
+        - guestCount
+        - guestName
+        - guestPhone
+        - guestEmail
+
+    BookingCreateResponse:
+      type: object
+      properties:
+        booking:
+          $ref: "#/components/schemas/Booking"
+        clientSecret:
+          type: string
+        paymentIntentId:
+          type: string
+      required:
+        - booking
+        - clientSecret
+        - paymentIntentId
+
+    BookingListResponse:
+      type: object
+      properties:
+        bookings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Booking"
+        total:
+          type: integer
+        page:
+          type: integer
+      required:
+        - bookings
+        - total
+        - page
+
+    CancellationInput:
+      type: object
+      properties:
+        reason:
+          type: string
+
+    RejectionInput:
+      type: object
+      properties:
+        reason:
+          type: string
+
+    # ── Reviews ─────────────────────────────────────────────────────────────────
+    Review:
+      type: object
+      properties:
+        id:
+          type: string
+        bookingId:
+          type: string
+        reviewerId:
+          type: string
+        revieweeId:
+          type: string
+        yachtId:
+          type: ["string", "null"]
+        rating:
+          type: integer
+        comment:
+          type: ["string", "null"]
+        type:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - bookingId
+        - reviewerId
+        - revieweeId
+        - rating
+        - type
+        - status
+        - createdAt
+
+    ReviewInput:
+      type: object
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+        type:
+          type: string
+          enum: [guest_to_host, host_to_guest]
+      required:
+        - rating
+        - type
+
+    ReviewListResponse:
+      type: object
+      properties:
+        reviews:
+          type: array
+          items:
+            $ref: "#/components/schemas/Review"
+        total:
+          type: integer
+      required:
+        - reviews
+        - total
+
+    ReviewModerationInput:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected, hidden]
+        reason:
+          type: string
+      required:
+        - status
+
+    # ── Host ───────────────────────────────────────────────────────────────────
+    HostProfile:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        bio:
+          type: ["string", "null"]
+        verificationStatus:
+          type: string
+          enum: [pending, verified, rejected]
+        stripeConnectId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - userId
+        - verificationStatus
+        - createdAt
+
+    HostPublic:
+      type: object
+      properties:
+        id:
+          type: string
+        fullName:
+          type: ["string", "null"]
+        avatarUrl:
+          type: ["string", "null"]
+        bio:
+          type: ["string", "null"]
+        memberSince:
+          type: string
+      required:
+        - id
+        - memberSince
+
+    HostApplicationInput:
+      type: object
+      properties:
+        bio:
+          type: string
+      required:
+        - bio
+
+    HostProfileUpdate:
+      type: object
+      properties:
+        bio:
+          type: string
+
+    HostProfileListResponse:
+      type: object
+      properties:
+        hosts:
+          type: array
+          items:
+            $ref: "#/components/schemas/HostProfile"
+        total:
+          type: integer
+      required:
+        - hosts
+        - total
+
+    HostVerificationInput:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [verified, rejected]
+        reason:
+          type: string
+      required:
+        - status
+
+    HostDocument:
+      type: object
+      properties:
+        id:
+          type: string
+        hostId:
+          type: string
+        documentType:
+          type: string
+        fileUrl:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - hostId
+        - documentType
+        - fileUrl
+        - status
+        - createdAt
+
+    DocumentInput:
+      type: object
+      properties:
+        documentType:
+          type: string
+          enum: [national_id, yacht_ownership, yacht_license, insurance]
+        fileUrl:
+          type: string
+      required:
+        - documentType
+        - fileUrl
+
+    PhotographerRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        hostId:
+          type: string
+        yachtId:
+          type: ["string", "null"]
+        preferredDate:
+          type: ["string", "null"]
+        preferredTime:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        status:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - hostId
+        - status
+        - createdAt
+
+    PhotographerRequestInput:
+      type: object
+      properties:
+        yachtId:
+          type: string
+        preferredDate:
+          type: string
+        preferredTime:
+          type: string
+        notes:
+          type: string
+
+    # ── Finance ─────────────────────────────────────────────────────────────────
+    Withdrawal:
+      type: object
+      properties:
+        id:
+          type: string
+        hostId:
+          type: string
+        amountEgp:
+          type: string
+        status:
+          type: string
+        requestedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - hostId
+        - amountEgp
+        - status
+        - createdAt
+
+    WithdrawalInput:
+      type: object
+      properties:
+        amountEgp:
+          type: string
+        payoutMethod:
+          type: string
+      required:
+        - amountEgp
+        - payoutMethod
+
+    WithdrawalListResponse:
+      type: object
+      properties:
+        withdrawals:
+          type: array
+          items:
+            $ref: "#/components/schemas/Withdrawal"
+        total:
+          type: integer
+      required:
+        - withdrawals
+        - total
+
+    WithdrawalProcessInput:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [paid, rejected]
+        payoutReference:
+          type: string
+        notes:
+          type: string
+      required:
+        - status
+
+    EarningsSummary:
+      type: object
+      properties:
+        totalEarnedEgp:
+          type: string
+        availableEgp:
+          type: string
+        pendingEgp:
+          type: string
+        withdrawnEgp:
+          type: string
+        ledger:
+          type: array
+          items:
+            $ref: "#/components/schemas/EarningsLedgerItem"
+      required:
+        - totalEarnedEgp
+        - availableEgp
+        - pendingEgp
+        - withdrawnEgp
+        - ledger
+
+    EarningsLedgerItem:
+      type: object
+      properties:
+        id:
+          type: string
+        bookingId:
+          type: string
+        amountEgp:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - bookingId
+        - amountEgp
+        - type
+        - status
+        - createdAt
+
+    # ── Notifications ──────────────────────────────────────────────────────────
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        isRead:
+          type: boolean
+        relatedEntityType:
+          type: ["string", "null"]
+        relatedEntityId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - userId
+        - type
+        - title
+        - message
+        - isRead
+        - createdAt
+
+    NotificationListResponse:
+      type: object
+      properties:
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+        unreadCount:
+          type: integer
+      required:
+        - notifications
+        - unreadCount
+
+    # ── Audit Logs ─────────────────────────────────────────────────────────────
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: ["string", "null"]
+        action:
+          type: string
+        entityType:
+          type: string
+        entityId:
+          type: ["string", "null"]
+        ipAddress:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - action
+        - entityType
+        - createdAt
+
+    AuditLogListResponse:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLog"
+        total:
+          type: integer
+      required:
+        - logs
+        - total
+
+    # ── Admin Stats ────────────────────────────────────────────────────────────
+    AdminStats:
+      type: object
+      properties:
+        totalUsers:
+          type: integer
+        totalHosts:
+          type: integer
+        totalYachts:
+          type: integer
+        totalBookings:
+          type: integer
+        totalRevenueEgp:
+          type: string
+        pendingHostApplications:
+          type: integer
+        pendingYachtReviews:
+          type: integer
+        pendingWithdrawals:
+          type: integer
+      required:
+        - totalUsers
+        - totalHosts
+        - totalYachts
+        - totalBookings
+        - totalRevenueEgp
+        - pendingHostApplications
+        - pendingYachtReviews
+        - pendingWithdrawals

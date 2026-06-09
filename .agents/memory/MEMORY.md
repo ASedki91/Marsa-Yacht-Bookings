@@ -1,0 +1,3 @@
+- [Orval params collision](orval-params-collision.md) — endpoints with BOTH path params AND query params cause TS2308; use query-params-only layout to avoid.
+- [Express trust proxy](express-trust-proxy.md) — must set `app.set("trust proxy", 1)` when running behind Replit's reverse proxy for rate-limiter to work.
+- [Zod import in api-server](zod-import.md) — api-server must declare `zod` as an explicit dependency (not transitive) or `zod/v4` imports fail at typecheck.
