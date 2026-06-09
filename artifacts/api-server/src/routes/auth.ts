@@ -3,16 +3,27 @@ import { getAuth } from "@clerk/express";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import rateLimit from "express-rate-limit";
 
 const router: IRouter = Router();
+
+// Tighter rate limit for auth operations to protect against brute-force
+const authRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many auth requests, please try again later" },
+  // trust proxy is set to 1, so req.ip is already the real client IP
+  skip: () => false,
+});
 
 /**
  * POST /auth/sync
  * Called by the mobile/web app after Clerk sign-in to ensure a local user record exists.
  * Creates the user on first sign-in (JIT provisioning), returns the existing record on repeat calls.
- * Body: { email, fullName?, avatarUrl? }
  */
-router.post("/auth/sync", async (req: Request, res: Response): Promise<void> => {
+router.post("/auth/sync", authRateLimit, async (req: Request, res: Response): Promise<void> => {
   const auth = getAuth(req);
   const clerkUserId = auth?.userId;
 
@@ -34,7 +45,6 @@ router.post("/auth/sync", async (req: Request, res: Response): Promise<void> => 
     return;
   }
 
-  // Try to find existing user
   const [existing] = await db
     .select()
     .from(usersTable)
@@ -42,7 +52,6 @@ router.post("/auth/sync", async (req: Request, res: Response): Promise<void> => 
     .limit(1);
 
   if (existing) {
-    // Update mutable profile fields if provided
     const updates: Partial<typeof existing> = {};
     if (fullName && fullName !== existing.fullName) updates.fullName = fullName;
     if (avatarUrl && avatarUrl !== existing.avatarUrl) updates.avatarUrl = avatarUrl;
@@ -63,7 +72,6 @@ router.post("/auth/sync", async (req: Request, res: Response): Promise<void> => 
     return;
   }
 
-  // Create new user (JIT provisioning)
   const [created] = await db
     .insert(usersTable)
     .values({
@@ -86,7 +94,7 @@ router.post("/auth/sync", async (req: Request, res: Response): Promise<void> => 
  * GET /auth/me
  * Returns the current user's local record. Requires Clerk auth.
  */
-router.get("/auth/me", async (req: Request, res: Response): Promise<void> => {
+router.get("/auth/me", authRateLimit, async (req: Request, res: Response): Promise<void> => {
   const auth = getAuth(req);
   const clerkUserId = auth?.userId;
 

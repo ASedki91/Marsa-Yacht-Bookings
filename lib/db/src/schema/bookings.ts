@@ -10,6 +10,10 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { usersTable } from "./users";
+import { yachtsTable } from "./yachts";
+import { bookingTemplatesTable } from "./bookingTemplates";
+import { availabilitySlotsTable } from "./availabilitySlots";
 
 export const bookingStatusEnum = pgEnum("booking_status", [
   "pending_payment",
@@ -24,10 +28,17 @@ export const bookingStatusEnum = pgEnum("booking_status", [
 
 export const bookingsTable = pgTable("bookings", {
   id: text("id").primaryKey(),
-  guestId: text("guest_id").notNull(),
-  yachtId: text("yacht_id").notNull(),
-  templateId: text("template_id").notNull(),
-  slotId: text("slot_id"),
+  guestId: text("guest_id")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "restrict" }),
+  yachtId: text("yacht_id")
+    .notNull()
+    .references(() => yachtsTable.id, { onDelete: "restrict" }),
+  templateId: text("template_id")
+    .notNull()
+    .references(() => bookingTemplatesTable.id, { onDelete: "restrict" }),
+  slotId: text("slot_id")
+    .references(() => availabilitySlotsTable.id, { onDelete: "set null" }),
   bookingDate: date("booking_date", { mode: "string" }).notNull(),
   startTime: time("start_time").notNull(),
   guestCount: integer("guest_count").notNull(),
@@ -43,7 +54,7 @@ export const bookingsTable = pgTable("bookings", {
   hostEarningsEgp: decimal("host_earnings_egp", { precision: 12, scale: 2 }).notNull(),
   totalAmountEgp: decimal("total_amount_egp", { precision: 12, scale: 2 }).notNull(),
   status: bookingStatusEnum("status").notNull().default("pending_payment"),
-  confirmedBy: text("confirmed_by"),
+  confirmedBy: text("confirmed_by").references(() => usersTable.id, { onDelete: "set null" }),
   confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

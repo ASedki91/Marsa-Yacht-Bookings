@@ -9,6 +9,28 @@ export interface HealthStatus {
   status: string;
 }
 
+export type DeepHealthStatusStatus = typeof DeepHealthStatusStatus[keyof typeof DeepHealthStatusStatus];
+
+
+export const DeepHealthStatusStatus = {
+  healthy: 'healthy',
+  unhealthy: 'unhealthy',
+} as const;
+
+export type DeepHealthStatusDb = typeof DeepHealthStatusDb[keyof typeof DeepHealthStatusDb];
+
+
+export const DeepHealthStatusDb = {
+  ok: 'ok',
+  error: 'error',
+} as const;
+
+export interface DeepHealthStatus {
+  status: DeepHealthStatusStatus;
+  db: DeepHealthStatusDb;
+  uptime: number;
+}
+
 export interface ErrorResponse {
   error: string;
 }

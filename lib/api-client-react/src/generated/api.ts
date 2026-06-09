@@ -36,6 +36,7 @@ import type {
   BookingTemplateListResponse,
   CancellationInput,
   CategoryListResponse,
+  DeepHealthStatus,
   DocumentInput,
   EarningsSummary,
   ErrorResponse,
@@ -100,8 +101,8 @@ export const getHealthCheckUrl = () => {
 }
 
 /**
- * Returns server health status
- * @summary Health check
+ * Returns server liveness status (no DB probe)
+ * @summary Liveness check
  */
 export const healthCheck = async ( options?: RequestInit): Promise<HealthStatus> => {
 
@@ -148,7 +149,7 @@ export type HealthCheckQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Health check
+ * @summary Liveness check
  */
 
 export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>(
@@ -157,6 +158,84 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getHealthCheckQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getHealthCheckDeepUrl = () => {
+
+
+
+
+  return `/api/health`
+}
+
+/**
+ * Validates DB connectivity. Returns 503 if unhealthy.
+ * @summary Deep health check
+ */
+export const healthCheckDeep = async ( options?: RequestInit): Promise<DeepHealthStatus> => {
+
+  return customFetch<DeepHealthStatus>(getHealthCheckDeepUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getHealthCheckDeepQueryKey = () => {
+    return [
+    `/api/health`
+    ] as const;
+    }
+
+
+export const getHealthCheckDeepQueryOptions = <TData = Awaited<ReturnType<typeof healthCheckDeep>>, TError = ErrorType<DeepHealthStatus>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheckDeep>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getHealthCheckDeepQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof healthCheckDeep>>> = ({ signal }) => healthCheckDeep({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof healthCheckDeep>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type HealthCheckDeepQueryResult = NonNullable<Awaited<ReturnType<typeof healthCheckDeep>>>
+export type HealthCheckDeepQueryError = ErrorType<DeepHealthStatus>
+
+
+/**
+ * @summary Deep health check
+ */
+
+export function useHealthCheckDeep<TData = Awaited<ReturnType<typeof healthCheckDeep>>, TError = ErrorType<DeepHealthStatus>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheckDeep>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getHealthCheckDeepQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

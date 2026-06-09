@@ -1,6 +1,8 @@
 import { pgTable, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { hostProfilesTable } from "./hostProfiles";
+import { usersTable } from "./users";
 
 export const documentTypeEnum = pgEnum("document_type", [
   "national_id",
@@ -17,11 +19,13 @@ export const documentStatusEnum = pgEnum("document_status", [
 
 export const hostDocumentsTable = pgTable("host_documents", {
   id: text("id").primaryKey(),
-  hostId: text("host_id").notNull(),
+  hostId: text("host_id")
+    .notNull()
+    .references(() => hostProfilesTable.id, { onDelete: "cascade" }),
   documentType: documentTypeEnum("document_type").notNull(),
   fileUrl: text("file_url").notNull(),
   status: documentStatusEnum("status").notNull().default("pending"),
-  reviewedBy: text("reviewed_by"),
+  reviewedBy: text("reviewed_by").references(() => usersTable.id, { onDelete: "set null" }),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

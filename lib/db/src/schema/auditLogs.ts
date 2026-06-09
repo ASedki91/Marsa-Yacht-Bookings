@@ -1,10 +1,11 @@
 import { pgTable, text, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { usersTable } from "./users";
 
 export const auditLogsTable = pgTable("audit_logs", {
   id: text("id").primaryKey(),
-  userId: text("user_id"),
+  userId: text("user_id").references(() => usersTable.id, { onDelete: "set null" }),
   action: text("action").notNull(),
   entityType: text("entity_type").notNull(),
   entityId: text("entity_id"),

@@ -1,6 +1,7 @@
 import { pgTable, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { usersTable } from "./users";
 
 export const verificationStatusEnum = pgEnum("verification_status", [
   "pending",
@@ -10,7 +11,10 @@ export const verificationStatusEnum = pgEnum("verification_status", [
 
 export const hostProfilesTable = pgTable("host_profiles", {
   id: text("id").primaryKey(),
-  userId: text("user_id").notNull().unique(),
+  userId: text("user_id")
+    .notNull()
+    .unique()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
   bio: text("bio"),
   verificationStatus: verificationStatusEnum("verification_status")
     .notNull()

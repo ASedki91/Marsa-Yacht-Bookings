@@ -32,15 +32,35 @@ paths:
     get:
       operationId: healthCheck
       tags: [health]
-      summary: Health check
-      description: Returns server health status
+      summary: Liveness check
+      description: Returns server liveness status (no DB probe)
+      responses:
+        "200":
+          description: Server is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /health:
+    get:
+      operationId: healthCheckDeep
+      tags: [health]
+      summary: Deep health check
+      description: Validates DB connectivity. Returns 503 if unhealthy.
       responses:
         "200":
           description: Healthy
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HealthStatus"
+                $ref: "#/components/schemas/DeepHealthStatus"
+        "503":
+          description: Unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeepHealthStatus"
 
   # ── Auth ────────────────────────────────────────────────────────────────────
   /auth/sync:
@@ -990,6 +1010,22 @@ components:
           type: string
       required:
         - status
+
+    DeepHealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+        db:
+          type: string
+          enum: [ok, error]
+        uptime:
+          type: integer
+      required:
+        - status
+        - db
+        - uptime
 
     ErrorResponse:
       type: object

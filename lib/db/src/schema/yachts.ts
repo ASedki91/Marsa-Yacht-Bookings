@@ -9,6 +9,8 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { hostProfilesTable } from "./hostProfiles";
+import { categoriesTable } from "./categories";
 
 export const yachtStatusEnum = pgEnum("yacht_status", [
   "draft",
@@ -22,8 +24,11 @@ export const yachtStatusEnum = pgEnum("yacht_status", [
 
 export const yachtsTable = pgTable("yachts", {
   id: text("id").primaryKey(),
-  hostId: text("host_id").notNull(),
-  categoryId: text("category_id"),
+  hostId: text("host_id")
+    .notNull()
+    .references(() => hostProfilesTable.id, { onDelete: "cascade" }),
+  categoryId: text("category_id")
+    .references(() => categoriesTable.id, { onDelete: "set null" }),
   title: text("title").notNull(),
   description: text("description"),
   location: text("location").notNull(),

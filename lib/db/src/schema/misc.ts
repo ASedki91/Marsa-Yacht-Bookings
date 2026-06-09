@@ -1,6 +1,9 @@
 import { pgTable, text, integer, boolean, decimal, date, time, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { hostProfilesTable } from "./hostProfiles";
+import { yachtsTable } from "./yachts";
+import { usersTable } from "./users";
 
 export const photographerRequestStatusEnum = pgEnum("photographer_request_status", [
   "pending",
@@ -12,8 +15,11 @@ export const photographerRequestStatusEnum = pgEnum("photographer_request_status
 
 export const photographerRequestsTable = pgTable("photographer_requests", {
   id: text("id").primaryKey(),
-  hostId: text("host_id").notNull(),
-  yachtId: text("yacht_id"),
+  hostId: text("host_id")
+    .notNull()
+    .references(() => hostProfilesTable.id, { onDelete: "cascade" }),
+  yachtId: text("yacht_id")
+    .references(() => yachtsTable.id, { onDelete: "set null" }),
   preferredDate: date("preferred_date", { mode: "string" }),
   preferredTime: time("preferred_time"),
   notes: text("notes"),
@@ -24,9 +30,12 @@ export const photographerRequestsTable = pgTable("photographer_requests", {
 
 export const referralCodesTable = pgTable("referral_codes", {
   id: text("id").primaryKey(),
-  userId: text("user_id").notNull().unique(),
+  userId: text("user_id")
+    .notNull()
+    .unique()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
   code: text("code").notNull().unique(),
-  referredBy: text("referred_by"),
+  referredBy: text("referred_by").references(() => usersTable.id, { onDelete: "set null" }),
   usesCount: integer("uses_count").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -35,7 +44,7 @@ export const exampleYachtPhotosTable = pgTable("example_yacht_photos", {
   id: text("id").primaryKey(),
   url: text("url").notNull(),
   caption: text("caption"),
-  category: text("category"), // 'exterior', 'interior', 'deck', 'sunset', 'group'
+  category: text("category"),
   sortOrder: integer("sort_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -43,7 +52,7 @@ export const exampleYachtPhotosTable = pgTable("example_yacht_photos", {
 
 export const exchangeRatesTable = pgTable("exchange_rates", {
   id: text("id").primaryKey(),
-  currencyPair: text("currency_pair").notNull().unique(), // e.g. "USD_EGP"
+  currencyPair: text("currency_pair").notNull().unique(),
   rate: decimal("rate", { precision: 12, scale: 6 }).notNull(),
   fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
 });

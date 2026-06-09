@@ -1,6 +1,9 @@
 import { pgTable, text, decimal, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { hostProfilesTable } from "./hostProfiles";
+import { bookingsTable } from "./bookings";
+import { usersTable } from "./users";
 
 export const withdrawalStatusEnum = pgEnum("withdrawal_status", [
   "not_eligible",
@@ -26,12 +29,14 @@ export const earningsStatusEnum = pgEnum("earnings_status", [
 
 export const withdrawalRequestsTable = pgTable("withdrawal_requests", {
   id: text("id").primaryKey(),
-  hostId: text("host_id").notNull(),
+  hostId: text("host_id")
+    .notNull()
+    .references(() => hostProfilesTable.id, { onDelete: "restrict" }),
   amountEgp: decimal("amount_egp", { precision: 12, scale: 2 }).notNull(),
   status: withdrawalStatusEnum("status").notNull().default("not_eligible"),
   eligibleAt: timestamp("eligible_at", { withTimezone: true }),
   requestedAt: timestamp("requested_at", { withTimezone: true }),
-  reviewedBy: text("reviewed_by"),
+  reviewedBy: text("reviewed_by").references(() => usersTable.id, { onDelete: "set null" }),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
   payoutMethod: text("payout_method"),
   payoutReference: text("payout_reference"),
@@ -42,8 +47,12 @@ export const withdrawalRequestsTable = pgTable("withdrawal_requests", {
 
 export const earningsLedgerTable = pgTable("earnings_ledger", {
   id: text("id").primaryKey(),
-  hostId: text("host_id").notNull(),
-  bookingId: text("booking_id").notNull(),
+  hostId: text("host_id")
+    .notNull()
+    .references(() => hostProfilesTable.id, { onDelete: "restrict" }),
+  bookingId: text("booking_id")
+    .notNull()
+    .references(() => bookingsTable.id, { onDelete: "restrict" }),
   amountEgp: decimal("amount_egp", { precision: 12, scale: 2 }).notNull(),
   type: earningsTypeEnum("type").notNull(),
   status: earningsStatusEnum("status").notNull().default("pending"),

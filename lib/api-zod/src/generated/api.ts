@@ -9,11 +9,22 @@ import * as zod from 'zod';
 
 
 /**
- * Returns server health status
- * @summary Health check
+ * Returns server liveness status (no DB probe)
+ * @summary Liveness check
  */
 export const HealthCheckResponse = zod.object({
   "status": zod.string()
+})
+
+
+/**
+ * Validates DB connectivity. Returns 503 if unhealthy.
+ * @summary Deep health check
+ */
+export const HealthCheckDeepResponse = zod.object({
+  "status": zod.enum(['healthy', 'unhealthy']),
+  "db": zod.enum(['ok', 'error']),
+  "uptime": zod.number()
 })
 
 
