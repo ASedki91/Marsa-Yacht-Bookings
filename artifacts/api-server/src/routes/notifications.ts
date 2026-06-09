@@ -47,6 +47,7 @@ router.get(
 
 // ── POST /notifications/:id/read ──────────────────────────────────────────────
 // Client generated code and OpenAPI spec both define this as POST.
+// PATCH alias retained for backward-compat with consumers built before spec alignment.
 router.post(
   "/notifications/:id/read",
   requireAuth,
@@ -68,6 +69,19 @@ router.post(
     res.json(notification);
   },
 );
+
+// Backward-compatible alias — some consumers were built expecting PATCH.
+router.patch("/notifications/:id/read", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const user = (req as any).localUser;
+  const id = String(req.params.id);
+  const [notification] = await db
+    .update(notificationsTable)
+    .set({ isRead: true })
+    .where(and(eq(notificationsTable.id, id), eq(notificationsTable.userId, user.id)))
+    .returning();
+  if (!notification) { res.status(404).json({ error: "Notification not found" }); return; }
+  res.json(notification);
+});
 
 // ── PATCH /notifications/read-all ─────────────────────────────────────────────
 router.patch(

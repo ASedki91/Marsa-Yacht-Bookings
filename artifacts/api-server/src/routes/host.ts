@@ -181,8 +181,10 @@ const photographerSchema = z.object({
   notes: z.string().max(1000).optional(),
 });
 
+// Both paths registered: `/host/photographer-request` is the canonical spec path;
+// `/host/photographer` is the backward-compatible alias for pre-spec consumers.
 router.post(
-  "/host/photographer-request",
+  ["/host/photographer-request", "/host/photographer"],
   validateBody(photographerSchema),
   async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).localUser;

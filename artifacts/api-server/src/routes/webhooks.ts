@@ -245,8 +245,11 @@ router.post("/webhooks/stripe", async (req: Request, res: Response): Promise<voi
     }
   } catch (err) {
     logger.error({ err, eventType: event.type }, "Error processing Stripe webhook event");
-    // Respond 200 so Stripe doesn't retry on our processing bugs;
-    // the event is already verified so retrying won't help.
+    // Return 500 so Stripe retries on transient failures (DB outages, etc.).
+    // Signature is already verified so this is safe — Stripe will re-deliver
+    // only until the event is acknowledged with 2xx.
+    res.status(500).json({ error: "Internal error processing webhook event" });
+    return;
   }
 
   res.json({ received: true });
