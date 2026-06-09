@@ -1,17 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  StyleSheet,
-  ScrollView,
-  Platform,
-  KeyboardAvoidingView,
-  ActivityIndicator,
-  Alert,
+  View, Text, TextInput, Pressable, StyleSheet, ScrollView,
+  Platform, KeyboardAvoidingView, ActivityIndicator, Alert,
 } from "react-native";
-import { useSignIn, useSSO } from "@clerk/expo";
+import { useSignIn, useClerk, useAuth, useSSO } from "@clerk/expo";
 import * as WebBrowser from "expo-web-browser";
 import * as AuthSession from "expo-auth-session";
 import { Link, useRouter } from "expo-router";
@@ -35,8 +27,13 @@ export default function SignInScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { signIn, setActive, isLoaded } = useSignIn();
+
+  const { signIn: signInResource } = useSignIn();
+  const { setActive } = useClerk();
+  const { isLoaded } = useAuth();
   const { startSSOFlow } = useSSO();
+
+  const signIn = signInResource as any;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -50,19 +47,15 @@ export default function SignInScreen() {
     if (!isLoaded) return;
     setLoading(true);
     try {
-      const result = await signIn!.create({
-        identifier: email,
-        password,
-      });
+      const result = await signIn.create({ identifier: email, password });
       if (result.status === "complete") {
-        await setActive!({ session: result.createdSessionId });
+        await setActive({ session: result.createdSessionId });
         router.replace("/(home)/(tabs)/explore");
       } else if (result.status === "needs_second_factor") {
         setPendingVerification(true);
       }
     } catch (err: any) {
-      const msg = err?.errors?.[0]?.longMessage ?? err?.message ?? "Sign in failed.";
-      Alert.alert("Sign In Error", msg);
+      Alert.alert("Sign In Error", err?.errors?.[0]?.longMessage ?? err?.message ?? "Sign in failed.");
     } finally {
       setLoading(false);
     }
@@ -72,12 +65,9 @@ export default function SignInScreen() {
     if (!isLoaded) return;
     setLoading(true);
     try {
-      const result = await signIn!.attemptSecondFactor({
-        strategy: "phone_code",
-        code,
-      });
+      const result = await signIn.attemptSecondFactor({ strategy: "phone_code", code });
       if (result.status === "complete") {
-        await setActive!({ session: result.createdSessionId });
+        await setActive({ session: result.createdSessionId });
         router.replace("/(home)/(tabs)/explore");
       }
     } catch (err: any) {
@@ -106,8 +96,9 @@ export default function SignInScreen() {
   }, [startSSOFlow, router]);
 
   if (pendingVerification) {
+    const topPad2 = Platform.OS === "web" ? 67 : insets.top;
     return (
-      <View style={[styles.container, { backgroundColor: c.background, paddingTop: insets.top + 60, paddingHorizontal: 24 }]}>
+      <View style={[styles.container, { backgroundColor: c.background, paddingTop: topPad2 + 60, paddingHorizontal: 24 }]}>
         <View style={[styles.logoBox, { backgroundColor: colors.light.navy }]}>
           <Ionicons name="shield-checkmark-outline" size={28} color={colors.light.gold} />
         </View>
@@ -148,9 +139,7 @@ export default function SignInScreen() {
             <Ionicons name="boat" size={28} color={colors.light.gold} />
           </View>
           <Text style={[styles.brand, { color: c.foreground }]}>MARSA</Text>
-          <Text style={[styles.tagline, { color: c.mutedForeground }]}>
-            El Gouna's Premier Yacht Marketplace
-          </Text>
+          <Text style={[styles.tagline, { color: c.mutedForeground }]}>El Gouna's Premier Yacht Marketplace</Text>
         </View>
 
         <Text style={[styles.title, { color: c.foreground }]}>Welcome back</Text>

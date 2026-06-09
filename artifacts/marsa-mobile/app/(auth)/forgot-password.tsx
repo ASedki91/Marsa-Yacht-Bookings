@@ -3,7 +3,7 @@ import {
   View, Text, TextInput, Pressable, StyleSheet,
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
 } from "react-native";
-import { useSignIn } from "@clerk/expo";
+import { useSignIn, useClerk, useAuth } from "@clerk/expo";
 import { Link, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,7 +16,12 @@ export default function ForgotPasswordScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { signIn, setActive, isLoaded } = useSignIn();
+
+  const { signIn: signInResource } = useSignIn();
+  const { setActive } = useClerk();
+  const { isLoaded } = useAuth();
+
+  const signIn = signInResource as any;
 
   const [stage, setStage] = useState<Stage>("email");
   const [email, setEmail] = useState("");
@@ -29,7 +34,7 @@ export default function ForgotPasswordScreen() {
     if (!isLoaded || !email) return;
     setLoading(true);
     try {
-      await signIn!.create({ strategy: "reset_password_email_code", identifier: email });
+      await signIn.create({ strategy: "reset_password_email_code", identifier: email });
       setStage("code");
     } catch (err: any) {
       Alert.alert("Error", err?.errors?.[0]?.longMessage ?? "Could not send reset email.");
@@ -42,13 +47,13 @@ export default function ForgotPasswordScreen() {
     if (!isLoaded || !code || !newPassword) return;
     setLoading(true);
     try {
-      const result = await signIn!.attemptFirstFactor({
+      const result = await signIn.attemptFirstFactor({
         strategy: "reset_password_email_code",
         code,
         password: newPassword,
       });
       if (result.status === "complete") {
-        await setActive!({ session: result.createdSessionId });
+        await setActive({ session: result.createdSessionId });
         router.replace("/(home)/(tabs)/explore");
       }
     } catch (err: any) {

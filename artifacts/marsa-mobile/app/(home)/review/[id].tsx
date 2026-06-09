@@ -6,7 +6,7 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useSubmitReview } from "@workspace/api-client-react";
+import { useSubmitReview, ReviewInputType } from "@workspace/api-client-react";
 import { useColors } from "@/hooks/useColors";
 import colors from "@/constants/colors";
 
@@ -32,7 +32,7 @@ export default function ReviewScreen() {
     try {
       await submitReview.mutateAsync({
         id: id!,
-        data: { rating, comment: comment.trim() || undefined, type: "guest" },
+        data: { rating, comment: comment.trim() || undefined, type: ReviewInputType.guest_to_host },
       });
       setSubmitted(true);
     } catch (err: any) {

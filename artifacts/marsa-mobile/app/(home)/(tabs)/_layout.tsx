@@ -16,7 +16,7 @@ function NativeTabLayout({ isHost }: { isHost: boolean }) {
         <Label>Explore</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="bookings">
-        <Icon sf={{ default: "calendar", selected: "calendar.fill" }} />
+        <Icon sf={{ default: "calendar", selected: "calendar" }} />
         <Label>Bookings</Label>
       </NativeTabs.Trigger>
       {isHost && (

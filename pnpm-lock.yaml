@@ -244,6 +244,10 @@ importers:
         version: 4.1.8(@types/node@25.6.2)(@vitest/coverage-v8@4.1.8)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)
 
   artifacts/marsa-mobile:
+    dependencies:
+      '@clerk/react':
+        specifier: ^6.7.3
+        version: 6.7.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
     devDependencies:
       '@babel/core':
         specifier: ^7.25.2

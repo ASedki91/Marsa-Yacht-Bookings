@@ -1,17 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  StyleSheet,
-  ScrollView,
-  Platform,
-  KeyboardAvoidingView,
-  ActivityIndicator,
-  Alert,
+  View, Text, TextInput, Pressable, StyleSheet, ScrollView,
+  Platform, KeyboardAvoidingView, ActivityIndicator, Alert,
 } from "react-native";
-import { useSignUp, useSSO } from "@clerk/expo";
+import { useSignUp, useClerk, useAuth, useSSO } from "@clerk/expo";
 import * as WebBrowser from "expo-web-browser";
 import * as AuthSession from "expo-auth-session";
 import { Link, useRouter } from "expo-router";
@@ -26,8 +18,13 @@ export default function SignUpScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { signUp, setActive, isLoaded } = useSignUp();
+
+  const { signUp: signUpResource } = useSignUp();
+  const { setActive } = useClerk();
+  const { isLoaded } = useAuth();
   const { startSSOFlow } = useSSO();
+
+  const signUp = signUpResource as any;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -43,17 +40,16 @@ export default function SignUpScreen() {
     setLoading(true);
     try {
       const [firstName, ...rest] = name.trim().split(" ");
-      await signUp!.create({
+      await signUp.create({
         emailAddress: email,
         password,
         firstName: firstName || "",
         lastName: rest.join(" ") || undefined,
       });
-      await signUp!.prepareEmailAddressVerification({ strategy: "email_code" });
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setPendingVerification(true);
     } catch (err: any) {
-      const msg = err?.errors?.[0]?.longMessage ?? err?.message ?? "Sign up failed.";
-      Alert.alert("Sign Up Error", msg);
+      Alert.alert("Sign Up Error", err?.errors?.[0]?.longMessage ?? err?.message ?? "Sign up failed.");
     } finally {
       setLoading(false);
     }
@@ -63,9 +59,9 @@ export default function SignUpScreen() {
     if (!isLoaded) return;
     setLoading(true);
     try {
-      const result = await signUp!.attemptEmailAddressVerification({ code });
+      const result = await signUp.attemptEmailAddressVerification({ code });
       if (result.status === "complete") {
-        await setActive!({ session: result.createdSessionId });
+        await setActive({ session: result.createdSessionId });
         router.replace("/(home)/(tabs)/explore");
       }
     } catch (err: any) {
@@ -94,15 +90,14 @@ export default function SignUpScreen() {
   }, [startSSOFlow, router]);
 
   if (pendingVerification) {
+    const topPad2 = Platform.OS === "web" ? 67 : insets.top;
     return (
-      <View style={[styles.verifyContainer, { backgroundColor: c.background, paddingTop: insets.top + 60 }]}>
+      <View style={[styles.verifyContainer, { backgroundColor: c.background, paddingTop: topPad2 + 60 }]}>
         <View style={[styles.logoBox, { backgroundColor: colors.light.navy }]}>
           <Ionicons name="mail-outline" size={28} color={colors.light.gold} />
         </View>
         <Text style={[styles.title, { color: c.foreground }]}>Verify your email</Text>
-        <Text style={[styles.subtitle, { color: c.mutedForeground }]}>
-          We sent a 6-digit code to {email}
-        </Text>
+        <Text style={[styles.subtitle, { color: c.mutedForeground }]}>We sent a 6-digit code to {email}</Text>
         <TextInput
           style={[styles.input, { backgroundColor: c.input, color: c.foreground, borderColor: c.border, width: "100%" }]}
           value={code}
@@ -120,7 +115,7 @@ export default function SignUpScreen() {
         >
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Verify & Create Account</Text>}
         </Pressable>
-        <Pressable onPress={() => signUp!.prepareEmailAddressVerification({ strategy: "email_code" })}>
+        <Pressable onPress={() => signUp.prepareEmailAddressVerification({ strategy: "email_code" })}>
           <Text style={[styles.linkText, { color: c.primary }]}>Resend code</Text>
         </Pressable>
       </View>
@@ -144,9 +139,7 @@ export default function SignUpScreen() {
         </View>
 
         <Text style={[styles.title, { color: c.foreground }]}>Create account</Text>
-        <Text style={[styles.subtitle, { color: c.mutedForeground }]}>
-          Join El Gouna's premier yacht marketplace
-        </Text>
+        <Text style={[styles.subtitle, { color: c.mutedForeground }]}>Join El Gouna's premier yacht marketplace</Text>
 
         <Pressable
           style={[styles.socialBtn, { backgroundColor: c.card, borderColor: c.border, opacity: ssoLoading ? 0.7 : 1 }]}

@@ -104,7 +104,7 @@ export default function BookScreen() {
   const { data: slotsData, isLoading: slotsLoading } = useGetYachtSlots(
     id!,
     { from: fromDate, to: toDate, templateId: selectedTemplate?.id },
-    { query: { enabled: step === 1 && !!selectedTemplate } }
+    { query: { enabled: step === 1 && !!selectedTemplate } as any }
   );
   const slots = (slotsData as any)?.slots ?? [];
 

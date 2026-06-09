@@ -1,3 +1,1 @@
-- [Host router auth scoping](host-router-auth-scope.md) — router.use(requireAuth) with no path bleeds into all downstream routers; always scope to a path prefix.
-- [Clerk Expo v3 setup](clerk-expo-v3.md) — ClerkProvider needs publishableKey prop + tokenCache imported from @clerk/expo directly. useSSO (not useOAuth) for Google OAuth. signIn.create({identifier,password}), setActive({session}).
-- [MARSA project overview](marsa-overview.md) — El Gouna yacht marketplace: Expo mobile + Express API + planned admin dashboard. Colors: navy #1B2A4A, ocean #3B82F6, gold #F59E0B. 15% platform fee, EGP prices, Stripe USD.
+- [Clerk Expo v3 API](clerk-expo-v3-api.md) — useSignIn/useSignUp return SignalValue types; get setActive from useClerk(), isLoaded from useAuth(), cast resource as any for old methods; tokenCache must be built with expo-secure-store.

@@ -5,7 +5,9 @@ import {
   Inter_700Bold,
   useFonts,
 } from "@expo-google-fonts/inter";
-import { ClerkProvider, tokenCache } from "@clerk/expo";
+import { ClerkProvider } from "@clerk/expo";
+import type { TokenCache } from "@clerk/expo";
+import * as SecureStore from "expo-secure-store";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -17,6 +19,12 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 SplashScreen.preventAutoHideAsync();
+
+const tokenCache: TokenCache = {
+  getToken: (key: string) => SecureStore.getItemAsync(key),
+  saveToken: (key: string, token: string) => SecureStore.setItemAsync(key, token),
+  clearToken: (key: string) => SecureStore.deleteItemAsync(key),
+};
 
 const queryClient = new QueryClient();
 
