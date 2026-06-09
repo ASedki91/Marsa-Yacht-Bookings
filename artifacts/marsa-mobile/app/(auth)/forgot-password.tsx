@@ -3,7 +3,7 @@ import {
   View, Text, TextInput, Pressable, StyleSheet,
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
 } from "react-native";
-import { useSignIn, useClerk, useAuth } from "@clerk/expo";
+import { useSignIn } from "@clerk/expo/legacy";
 import { Link, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,11 +17,7 @@ export default function ForgotPasswordScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const { signIn: signInResource } = useSignIn();
-  const { setActive } = useClerk();
-  const { isLoaded } = useAuth();
-
-  const signIn = signInResource as any;
+  const { isLoaded, signIn, setActive } = useSignIn();
 
   const [stage, setStage] = useState<Stage>("email");
   const [email, setEmail] = useState("");

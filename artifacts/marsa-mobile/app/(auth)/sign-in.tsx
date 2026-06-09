@@ -3,7 +3,8 @@ import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView,
   Platform, KeyboardAvoidingView, ActivityIndicator, Alert,
 } from "react-native";
-import { useSignIn, useClerk, useAuth, useSSO } from "@clerk/expo";
+import { useSignIn } from "@clerk/expo/legacy";
+import { useSSO } from "@clerk/expo";
 import * as WebBrowser from "expo-web-browser";
 import * as AuthSession from "expo-auth-session";
 import { Link, useRouter } from "expo-router";
@@ -28,12 +29,8 @@ export default function SignInScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const { signIn: signInResource } = useSignIn();
-  const { setActive } = useClerk();
-  const { isLoaded } = useAuth();
+  const { isLoaded, signIn, setActive } = useSignIn();
   const { startSSOFlow } = useSSO();
-
-  const signIn = signInResource as any;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

@@ -3,7 +3,8 @@ import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView,
   Platform, KeyboardAvoidingView, ActivityIndicator, Alert,
 } from "react-native";
-import { useSignUp, useClerk, useAuth, useSSO } from "@clerk/expo";
+import { useSignUp } from "@clerk/expo/legacy";
+import { useSSO } from "@clerk/expo";
 import * as WebBrowser from "expo-web-browser";
 import * as AuthSession from "expo-auth-session";
 import { Link, useRouter } from "expo-router";
@@ -19,12 +20,8 @@ export default function SignUpScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const { signUp: signUpResource } = useSignUp();
-  const { setActive } = useClerk();
-  const { isLoaded } = useAuth();
+  const { isLoaded, signUp, setActive } = useSignUp();
   const { startSSOFlow } = useSSO();
-
-  const signUp = signUpResource as any;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -115,7 +112,7 @@ export default function SignUpScreen() {
         >
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Verify & Create Account</Text>}
         </Pressable>
-        <Pressable onPress={() => signUp.prepareEmailAddressVerification({ strategy: "email_code" })}>
+        <Pressable onPress={() => signUp?.prepareEmailAddressVerification({ strategy: "email_code" })}>
           <Text style={[styles.linkText, { color: c.primary }]}>Resend code</Text>
         </Pressable>
       </View>
