@@ -8,7 +8,7 @@ import {
   hostProfilesTable,
   auditLogsTable,
 } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { stripe } from "../lib/stripe";
 import { notify } from "../lib/notify";
@@ -190,16 +190,43 @@ router.post("/webhooks/stripe", async (req: Request, res: Response): Promise<voi
 
         const stripeRefundId = charge.refunds?.data?.[0]?.id ?? null;
 
-        await db
+        const [refundedPayment] = await db
           .update(paymentsTable)
           .set({ status: "refunded" })
-          .where(eq(paymentsTable.stripePaymentIntentId, piId));
+          .where(eq(paymentsTable.stripePaymentIntentId, piId))
+          .returning();
 
         if (stripeRefundId) {
           await db
             .update(refundsTable)
             .set({ status: "succeeded" })
             .where(eq(refundsTable.stripeRefundId, stripeRefundId));
+        }
+
+        // Also move the booking to the terminal refunded state
+        if (refundedPayment) {
+          const [refundedBooking] = await db
+            .update(bookingsTable)
+            .set({ status: "rejected_refunded" })
+            .where(
+              and(
+                eq(bookingsTable.id, refundedPayment.bookingId),
+                // Only transition from states where a refund is expected
+                sql`${bookingsTable.status} NOT IN ('confirmed','completed','closed')`,
+              ),
+            )
+            .returning();
+
+          if (refundedBooking) {
+            notify({
+              userId: refundedBooking.guestId,
+              type: "payment.refunded",
+              title: "Refund processed",
+              message: "Your refund has been processed and should arrive within 5–10 business days.",
+              relatedEntityType: "booking",
+              relatedEntityId: refundedBooking.id,
+            });
+          }
         }
         break;
       }

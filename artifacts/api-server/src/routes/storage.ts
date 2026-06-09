@@ -96,14 +96,28 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
  * GET /storage/objects/*
  *
  * Serve private object entities from PRIVATE_OBJECT_DIR.
- * Requires authentication — unauthenticated requests are rejected.
+ * Requires authentication + object-level ACL (canAccessObjectEntity).
+ * Admins can access any private object; other users only objects they own.
  */
 router.get("/storage/objects/*path", requireAuth, async (req: Request, res: Response) => {
   try {
+    const user = (req as any).localUser;
     const raw = req.params.path;
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
     const objectPath = `/objects/${wildcardPath}`;
     const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+
+    // Enforce object-level ACL — admin bypasses, others need explicit READ permission
+    if (user.role !== "admin") {
+      const canAccess = await objectStorageService.canAccessObjectEntity({
+        userId: user.id,
+        objectFile,
+      });
+      if (!canAccess) {
+        res.status(403).json({ error: "Forbidden: insufficient object permissions" });
+        return;
+      }
+    }
 
     const response = await objectStorageService.downloadObject(objectFile);
 

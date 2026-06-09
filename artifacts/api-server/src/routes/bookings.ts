@@ -208,6 +208,42 @@ router.post(
   },
 );
 
+// ── GET /bookings/me — dedicated guest-centric alias ────────────────────────
+// Must be registered BEFORE /bookings/:id so "me" isn't treated as a booking ID.
+const meBookingsQuery = z.object({
+  status: z.string().optional(),
+  page: z.coerce.number().int().positive().optional().default(1),
+});
+
+router.get(
+  "/bookings/me",
+  requireAuth,
+  validateQuery(meBookingsQuery),
+  async (req: Request, res: Response): Promise<void> => {
+    const user = (req as any).localUser;
+    const { status, page } = req.query as unknown as z.infer<typeof meBookingsQuery>;
+    const limit = 20;
+    const offset = (page - 1) * limit;
+
+    const where = status
+      ? and(eq(bookingsTable.guestId, user.id), eq(bookingsTable.status, status as any))
+      : eq(bookingsTable.guestId, user.id);
+
+    const [bookings, [countRow]] = await Promise.all([
+      db
+        .select()
+        .from(bookingsTable)
+        .where(where)
+        .orderBy(desc(bookingsTable.createdAt))
+        .limit(limit)
+        .offset(offset),
+      db.select({ count: sql<number>`count(*)::int` }).from(bookingsTable).where(where),
+    ]);
+
+    res.json({ bookings, total: countRow?.count ?? 0, page });
+  },
+);
+
 // ── List My Bookings ────────────────────────────────────────────────────────
 const listBookingsQuery = z.object({
   role: z.enum(["guest", "host"]).optional().default("guest"),

@@ -13,7 +13,7 @@ import {
   usersTable,
   hostProfilesTable,
 } from "@workspace/db";
-import { and, eq, gte, lte, inArray, sql, desc, asc } from "drizzle-orm";
+import { and, eq, gte, lte, inArray, sql, desc, asc, between } from "drizzle-orm";
 import { getEgpUsdRate } from "../lib/exchange";
 import { validateQuery } from "../middlewares/index";
 
@@ -89,18 +89,32 @@ const listYachtsQuerySchema = z.object({
   capacity: z.coerce.number().int().positive().optional(),
   date: z.string().optional(),
   templateId: z.string().optional(),
+  minPrice: z.coerce.number().positive().optional(),
+  maxPrice: z.coerce.number().positive().optional(),
+  features: z.string().optional(), // comma-separated list e.g. "wifi,ac"
 });
 
 router.get(
   "/yachts",
   validateQuery(listYachtsQuerySchema),
   async (req: Request, res: Response): Promise<void> => {
-    const { page, limit, categoryId, capacity, date, templateId } =
+    const { page, limit, categoryId, capacity, date, templateId, minPrice, maxPrice, features } =
       req.query as unknown as z.infer<typeof listYachtsQuerySchema>;
 
     const conditions: ReturnType<typeof eq>[] = [eq(yachtsTable.status, "live")];
     if (categoryId) conditions.push(eq(yachtsTable.categoryId, categoryId) as any);
     if (capacity) conditions.push(gte(yachtsTable.capacity, capacity) as any);
+
+    // Features filter: yachts whose features JSONB array contains ALL requested features
+    if (features) {
+      const featureList = features.split(",").map((f) => f.trim()).filter(Boolean);
+      if (featureList.length > 0) {
+        // Use @> (contains) operator on JSONB
+        conditions.push(
+          sql`${yachtsTable.features} @> ${JSON.stringify(featureList)}::jsonb` as any,
+        );
+      }
+    }
 
     // Date filter: only yachts with an available slot on that date
     if (date) {
@@ -120,6 +134,25 @@ router.get(
         return;
       }
       conditions.push(inArray(yachtsTable.id, yachtIds) as any);
+    }
+
+    // Price filter: only yachts that have at least one active pricing entry in range
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      const priceSubs = db
+        .selectDistinct({ yachtId: yachtTemplatePricingTable.yachtId })
+        .from(yachtTemplatePricingTable)
+        .where(
+          and(
+            eq(yachtTemplatePricingTable.isActive, true),
+            minPrice !== undefined
+              ? sql`CAST(${yachtTemplatePricingTable.price} AS numeric) >= ${minPrice}`
+              : sql`true`,
+            maxPrice !== undefined
+              ? sql`CAST(${yachtTemplatePricingTable.price} AS numeric) <= ${maxPrice}`
+              : sql`true`,
+          ),
+        );
+      conditions.push(sql`${yachtsTable.id} IN (${priceSubs})` as any);
     }
 
     const offset = (page - 1) * limit;
@@ -217,5 +250,38 @@ router.get("/yachts/:id", async (req: Request, res: Response): Promise<void> => 
     host: hostProfile[0] ?? null,
   });
 });
+
+// ── GET /yachts/:id/slots ────────────────────────────────────────────────────
+// Path-param based availability lookup (complement to /yachts/availability).
+const slotsQuerySchema = z.object({
+  from: z.string().min(1),
+  to: z.string().min(1),
+  templateId: z.string().optional(),
+});
+
+router.get(
+  "/yachts/:id/slots",
+  validateQuery(slotsQuerySchema),
+  async (req: Request, res: Response): Promise<void> => {
+    const yachtId = String(req.params.id);
+    const { from, to, templateId } = req.query as unknown as z.infer<typeof slotsQuerySchema>;
+
+    const conditions = [
+      eq(availabilitySlotsTable.yachtId, yachtId),
+      eq(availabilitySlotsTable.isAvailable, true),
+      gte(availabilitySlotsTable.date, from),
+      lte(availabilitySlotsTable.date, to),
+    ];
+    if (templateId) conditions.push(eq(availabilitySlotsTable.templateId, templateId) as any);
+
+    const slots = await db
+      .select()
+      .from(availabilitySlotsTable)
+      .where(and(...conditions))
+      .orderBy(asc(availabilitySlotsTable.date), asc(availabilitySlotsTable.startTime));
+
+    res.json({ slots });
+  },
+);
 
 export default router;

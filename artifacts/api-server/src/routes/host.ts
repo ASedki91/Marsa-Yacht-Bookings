@@ -97,7 +97,7 @@ const hostProfileUpdateSchema = z.object({
   bio: z.string().min(10).max(2000).optional(),
 });
 
-router.put(
+router.patch(
   "/host/profile",
   validateBody(hostProfileUpdateSchema),
   async (req: Request, res: Response): Promise<void> => {
@@ -117,6 +117,27 @@ router.put(
 
 // ── Host Documents ────────────────────────────────────────────────────────────
 // NOTE: No requireRole — applicants must be able to upload docs before approval.
+router.get(
+  "/host/documents",
+  async (req: Request, res: Response): Promise<void> => {
+    const user = (req as any).localUser;
+    const [profile] = await db
+      .select()
+      .from(hostProfilesTable)
+      .where(eq(hostProfilesTable.userId, user.id))
+      .limit(1);
+    if (!profile) {
+      res.status(404).json({ error: "No host application found. Submit one via POST /host/apply" });
+      return;
+    }
+    const documents = await db
+      .select()
+      .from(hostDocumentsTable)
+      .where(eq(hostDocumentsTable.hostId, profile.id))
+      .orderBy(asc(hostDocumentsTable.createdAt));
+    res.json({ documents });
+  },
+);
 const documentSchema = z.object({
   documentType: z.enum(["national_id", "yacht_ownership", "yacht_license", "insurance"]),
   fileUrl: z.string().url(),

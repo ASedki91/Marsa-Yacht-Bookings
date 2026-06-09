@@ -4,6 +4,7 @@ import {
   db,
   usersTable,
   hostProfilesTable,
+  hostDocumentsTable,
   yachtsTable,
   bookingsTable,
   reviewsTable,
@@ -13,6 +14,8 @@ import {
   categoriesTable,
   addOnsTable,
   bookingTemplatesTable,
+  photographerRequestsTable,
+  exampleYachtPhotosTable,
 } from "@workspace/db";
 import { and, eq, sql, desc, asc } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -615,6 +618,298 @@ router.delete(
       .where(eq(addOnsTable.id, id))
       .returning();
     if (!deleted) { res.status(404).json({ error: "Add-on not found" }); return; }
+    res.json({ deleted: true });
+  },
+);
+
+// ── Host Document Review Queue ────────────────────────────────────────────────
+const documentListQuery = z.object({
+  status: z.enum(["pending", "approved", "rejected"]).optional(),
+  page: z.coerce.number().int().positive().optional().default(1),
+});
+
+router.get(
+  "/admin/documents",
+  validateQuery(documentListQuery),
+  async (req: Request, res: Response): Promise<void> => {
+    const { status, page } = req.query as unknown as z.infer<typeof documentListQuery>;
+    const limit = 50;
+    const offset = (page - 1) * limit;
+    const where = status ? eq(hostDocumentsTable.status, status) : sql`true`;
+
+    const [documents, [countRow]] = await Promise.all([
+      db
+        .select()
+        .from(hostDocumentsTable)
+        .where(where)
+        .orderBy(desc(hostDocumentsTable.createdAt))
+        .limit(limit)
+        .offset(offset),
+      db.select({ count: sql<number>`count(*)::int` }).from(hostDocumentsTable).where(where),
+    ]);
+    res.json({ documents, total: countRow?.count ?? 0 });
+  },
+);
+
+const documentReviewSchema = z.object({
+  status: z.enum(["approved", "rejected"]),
+  reason: z.string().max(500).optional(),
+});
+
+router.post(
+  "/admin/documents/:id/review",
+  validateBody(documentReviewSchema),
+  auditLog({
+    action: "admin.review_document",
+    entityType: "host_document",
+    getEntityId: (r) => String(r.params.id),
+  }),
+  async (req: Request, res: Response): Promise<void> => {
+    const adminUser = (req as any).localUser;
+    const id = String(req.params.id);
+    const { status, reason } = req.body as z.infer<typeof documentReviewSchema>;
+
+    const [document] = await db
+      .update(hostDocumentsTable)
+      .set({ status, reviewedBy: adminUser.id, reviewedAt: new Date() })
+      .where(eq(hostDocumentsTable.id, id))
+      .returning();
+
+    if (!document) { res.status(404).json({ error: "Document not found" }); return; }
+
+    const [profile] = await db
+      .select()
+      .from(hostProfilesTable)
+      .where(eq(hostProfilesTable.id, document.hostId))
+      .limit(1);
+
+    if (profile) {
+      notify({
+        userId: profile.userId,
+        type: `document.${status}`,
+        title: status === "approved" ? "Document approved" : "Document rejected",
+        message:
+          reason ??
+          (status === "approved"
+            ? "Your document has been verified."
+            : "Your document was rejected. Please resubmit a clearer copy."),
+        relatedEntityType: "host_document",
+        relatedEntityId: id,
+      });
+    }
+    res.json(document);
+  },
+);
+
+// ── Listing Moderation (request-changes / suspend) ────────────────────────────
+const requestChangesSchema = z.object({
+  feedback: z.string().min(10).max(2000),
+});
+
+router.post(
+  "/admin/yachts/:id/request-changes",
+  validateBody(requestChangesSchema),
+  auditLog({
+    action: "admin.request_changes",
+    entityType: "yacht",
+    getEntityId: (r) => String(r.params.id),
+  }),
+  async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id);
+    const { feedback } = req.body as z.infer<typeof requestChangesSchema>;
+
+    const [yacht] = await db
+      .update(yachtsTable)
+      .set({ status: "changes_requested" })
+      .where(eq(yachtsTable.id, id))
+      .returning();
+
+    if (!yacht) { res.status(404).json({ error: "Yacht not found" }); return; }
+
+    const [profile] = await db
+      .select()
+      .from(hostProfilesTable)
+      .where(eq(hostProfilesTable.id, yacht.hostId))
+      .limit(1);
+
+    if (profile) {
+      notify({
+        userId: profile.userId,
+        type: "yacht.changes_requested",
+        title: "Changes requested for your listing",
+        message: feedback,
+        relatedEntityType: "yacht",
+        relatedEntityId: id,
+      });
+    }
+    res.json(yacht);
+  },
+);
+
+router.post(
+  "/admin/yachts/:id/suspend",
+  validateBody(z.object({ reason: z.string().max(500).optional() })),
+  auditLog({
+    action: "admin.suspend_yacht",
+    entityType: "yacht",
+    getEntityId: (r) => String(r.params.id),
+  }),
+  async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id);
+
+    const [yacht] = await db
+      .update(yachtsTable)
+      .set({ status: "suspended" as any })
+      .where(eq(yachtsTable.id, id))
+      .returning();
+
+    if (!yacht) { res.status(404).json({ error: "Yacht not found" }); return; }
+
+    const [profile] = await db
+      .select()
+      .from(hostProfilesTable)
+      .where(eq(hostProfilesTable.id, yacht.hostId))
+      .limit(1);
+
+    if (profile) {
+      notify({
+        userId: profile.userId,
+        type: "yacht.suspended",
+        title: "Listing suspended",
+        message:
+          (req.body as any).reason ??
+          `Your yacht "${yacht.title}" has been suspended. Please contact support.`,
+        relatedEntityType: "yacht",
+        relatedEntityId: id,
+      });
+    }
+    res.json(yacht);
+  },
+);
+
+// ── Photographer Request Queue ─────────────────────────────────────────────────
+const photographerListQuery = z.object({
+  status: z
+    .enum(["pending", "contacted", "scheduled", "completed", "cancelled"])
+    .optional(),
+  page: z.coerce.number().int().positive().optional().default(1),
+});
+
+router.get(
+  "/admin/photographer-requests",
+  validateQuery(photographerListQuery),
+  async (req: Request, res: Response): Promise<void> => {
+    const { status, page } = req.query as unknown as z.infer<typeof photographerListQuery>;
+    const limit = 50;
+    const offset = (page - 1) * limit;
+    const where = status ? eq(photographerRequestsTable.status, status) : sql`true`;
+
+    const [requests, [countRow]] = await Promise.all([
+      db
+        .select()
+        .from(photographerRequestsTable)
+        .where(where)
+        .orderBy(desc(photographerRequestsTable.createdAt))
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(photographerRequestsTable)
+        .where(where),
+    ]);
+    res.json({ requests, total: countRow?.count ?? 0 });
+  },
+);
+
+const photographerUpdateSchema = z.object({
+  status: z.enum(["contacted", "scheduled", "completed", "cancelled"]),
+  notes: z.string().max(1000).optional(),
+});
+
+router.patch(
+  "/admin/photographer-requests/:id",
+  validateBody(photographerUpdateSchema),
+  auditLog({
+    action: "admin.update_photographer_request",
+    entityType: "photographer_request",
+    getEntityId: (r) => String(r.params.id),
+  }),
+  async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id);
+    const { status } = req.body as z.infer<typeof photographerUpdateSchema>;
+
+    const [updated] = await db
+      .update(photographerRequestsTable)
+      .set({ status })
+      .where(eq(photographerRequestsTable.id, id))
+      .returning();
+
+    if (!updated) { res.status(404).json({ error: "Photographer request not found" }); return; }
+    res.json(updated);
+  },
+);
+
+// ── Example Yacht Photos CRUD ─────────────────────────────────────────────────
+const examplePhotoSchema = z.object({
+  url: z.string().url(),
+  caption: z.string().max(500).optional(),
+  category: z.string().max(100).optional(),
+  sortOrder: z.number().int().optional().default(0),
+  isActive: z.boolean().optional().default(true),
+});
+
+router.get("/admin/example-photos", async (_req: Request, res: Response): Promise<void> => {
+  const photos = await db
+    .select()
+    .from(exampleYachtPhotosTable)
+    .orderBy(asc(exampleYachtPhotosTable.sortOrder));
+  res.json({ photos });
+});
+
+router.post(
+  "/admin/example-photos",
+  validateBody(examplePhotoSchema),
+  async (req: Request, res: Response): Promise<void> => {
+    const body = req.body as z.infer<typeof examplePhotoSchema>;
+    const [photo] = await db
+      .insert(exampleYachtPhotosTable)
+      .values({
+        id: randomUUID(),
+        url: body.url,
+        caption: body.caption ?? null,
+        category: body.category ?? null,
+        sortOrder: body.sortOrder,
+        isActive: body.isActive,
+      })
+      .returning();
+    res.status(201).json(photo);
+  },
+);
+
+router.patch(
+  "/admin/example-photos/:id",
+  validateBody(examplePhotoSchema.partial()),
+  async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id);
+    const [photo] = await db
+      .update(exampleYachtPhotosTable)
+      .set(req.body)
+      .where(eq(exampleYachtPhotosTable.id, id))
+      .returning();
+    if (!photo) { res.status(404).json({ error: "Photo not found" }); return; }
+    res.json(photo);
+  },
+);
+
+router.delete(
+  "/admin/example-photos/:id",
+  async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id);
+    const [deleted] = await db
+      .delete(exampleYachtPhotosTable)
+      .where(eq(exampleYachtPhotosTable.id, id))
+      .returning();
+    if (!deleted) { res.status(404).json({ error: "Photo not found" }); return; }
     res.json({ deleted: true });
   },
 );
