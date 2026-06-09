@@ -45,8 +45,9 @@ router.get(
   },
 );
 
-// ── PATCH /notifications/:id/read ─────────────────────────────────────────────
-router.patch(
+// ── POST /notifications/:id/read ──────────────────────────────────────────────
+// Client generated code and OpenAPI spec both define this as POST.
+router.post(
   "/notifications/:id/read",
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {

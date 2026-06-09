@@ -59,6 +59,48 @@ router.post(
 );
 
 /**
+ * POST /storage/uploads/finalize
+ *
+ * Called by the client AFTER a direct presigned-URL upload completes.
+ * Sets the ACL ownership metadata on the newly uploaded object so that
+ * canAccessObjectEntity() works correctly for future access checks.
+ *
+ * Body: { objectPath: string, visibility?: "private" | "public" }
+ */
+const FinalizeUploadBody = z.object({
+  objectPath: z.string().min(1),
+  visibility: z.enum(["private", "public"]).optional().default("private"),
+});
+
+router.post(
+  "/storage/uploads/finalize",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    const parsed = FinalizeUploadBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "objectPath is required" });
+      return;
+    }
+
+    try {
+      const user = (req as any).localUser;
+      const { objectPath, visibility } = parsed.data;
+
+      const normalizedPath = await objectStorageService.trySetObjectEntityAclPolicy(objectPath, {
+        owner: user.id,
+        visibility,
+        aclRules: [],
+      });
+
+      res.json({ objectPath: normalizedPath, owner: user.id, visibility });
+    } catch (error) {
+      req.log.error({ err: error }, "Error finalizing upload ACL");
+      res.status(500).json({ error: "Failed to set object access policy" });
+    }
+  },
+);
+
+/**
  * GET /storage/public-objects/*
  *
  * Serve public assets from PUBLIC_OBJECT_SEARCH_PATHS.

@@ -699,7 +699,7 @@ paths:
     get:
       operationId: getHostEarnings
       tags: [finance]
-      summary: Get host earnings summary
+      summary: Get host earnings summary (includes totals and full ledger)
       responses:
         "200":
           description: Earnings
@@ -707,6 +707,44 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EarningsSummary"
+
+  /host/earnings/ledger:
+    get:
+      operationId: getHostEarningsLedger
+      tags: [finance]
+      summary: Get host earnings ledger entries
+      responses:
+        "200":
+          description: Ledger
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EarningsLedgerListResponse"
+
+  /host/earnings/withdraw:
+    post:
+      operationId: requestWithdrawViaEarnings
+      tags: [finance]
+      summary: Request a withdrawal (earnings-path alias)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WithdrawalInput"
+      responses:
+        "201":
+          description: Submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Withdrawal"
+        "400":
+          description: Insufficient available balance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /host/withdrawals:
     get:
@@ -822,6 +860,90 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Notification"
+
+  # ── Storage ─────────────────────────────────────────────────────────────────
+  /storage/uploads/request-url:
+    post:
+      operationId: requestUploadUrl
+      tags: [storage]
+      summary: Request a presigned upload URL for direct client-side upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fileName:
+                  type: string
+                contentType:
+                  type: string
+              required: [fileName, contentType]
+      responses:
+        "200":
+          description: Presigned upload URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uploadUrl:
+                    type: string
+                  objectPath:
+                    type: string
+                required: [uploadUrl, objectPath]
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /storage/uploads/finalize:
+    post:
+      operationId: finalizeUpload
+      tags: [storage]
+      summary: Set ACL ownership on an object after a direct presigned-URL upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                objectPath:
+                  type: string
+                visibility:
+                  type: string
+                  enum: [private, public]
+              required: [objectPath]
+      responses:
+        "200":
+          description: ACL set successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  objectPath:
+                    type: string
+                  owner:
+                    type: string
+                  visibility:
+                    type: string
+                required: [objectPath, owner, visibility]
+        "400":
+          description: Missing objectPath
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   # ── Admin ───────────────────────────────────────────────────────────────────
   /admin/users:
@@ -2491,6 +2613,19 @@ components:
         - type
         - status
         - createdAt
+
+    EarningsLedgerListResponse:
+      type: object
+      properties:
+        ledger:
+          type: array
+          items:
+            $ref: "#/components/schemas/EarningsLedgerItem"
+        total:
+          type: integer
+      required:
+        - ledger
+        - total
 
     # ── Notifications ──────────────────────────────────────────────────────────
     Notification:

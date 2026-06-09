@@ -182,7 +182,7 @@ const photographerSchema = z.object({
 });
 
 router.post(
-  "/host/photographer",
+  "/host/photographer-request",
   validateBody(photographerSchema),
   async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).localUser;
@@ -745,6 +745,92 @@ router.get(
   },
 );
 
+const withdrawalInputSchema = z.object({
+  amountEgp: z.string().regex(/^\d+(\.\d{1,2})?$/),
+  payoutMethod: z.string().min(1),
+});
+
+// ── GET /host/earnings/ledger ─────────────────────────────────────────────────
+// Dedicated ledger endpoint (spec: GET /host/earnings/ledger).
+// Must be registered BEFORE the parameterised /host/earnings/:anything routes.
+router.get(
+  "/host/earnings/ledger",
+  requireRole("host", "admin"),
+  async (req: Request, res: Response): Promise<void> => {
+    const user = (req as any).localUser;
+    const [profile] = await db
+      .select()
+      .from(hostProfilesTable)
+      .where(eq(hostProfilesTable.userId, user.id))
+      .limit(1);
+    if (!profile) { res.status(404).json({ error: "Host profile not found" }); return; }
+
+    const ledger = await db
+      .select()
+      .from(earningsLedgerTable)
+      .where(eq(earningsLedgerTable.hostId, profile.id))
+      .orderBy(desc(earningsLedgerTable.createdAt))
+      .limit(200);
+
+    res.json({ ledger, total: ledger.length });
+  },
+);
+
+// ── POST /host/earnings/withdraw ──────────────────────────────────────────────
+// Spec-aligned alias for POST /host/withdrawals.
+router.post(
+  "/host/earnings/withdraw",
+  requireRole("host", "admin"),
+  validateBody(withdrawalInputSchema),
+  async (req: Request, res: Response): Promise<void> => {
+    const user = (req as any).localUser;
+    const [profile] = await db
+      .select()
+      .from(hostProfilesTable)
+      .where(eq(hostProfilesTable.userId, user.id))
+      .limit(1);
+    if (!profile) { res.status(404).json({ error: "Host profile not found" }); return; }
+
+    const body = req.body as z.infer<typeof withdrawalInputSchema>;
+
+    const [available] = await db
+      .select({
+        total: sql<string>`COALESCE(SUM(${earningsLedgerTable.amountEgp}), 0)::text`,
+      })
+      .from(earningsLedgerTable)
+      .where(
+        and(
+          eq(earningsLedgerTable.hostId, profile.id),
+          eq(earningsLedgerTable.status, "available"),
+        ),
+      );
+
+    const availableAmount = parseFloat(available?.total ?? "0");
+    const requestedAmount = parseFloat(body.amountEgp);
+
+    if (requestedAmount > availableAmount) {
+      res.status(400).json({
+        error: `Requested amount (${body.amountEgp} EGP) exceeds available balance (${available?.total ?? "0"} EGP)`,
+      });
+      return;
+    }
+
+    const [withdrawal] = await db
+      .insert(withdrawalRequestsTable)
+      .values({
+        id: randomUUID(),
+        hostId: profile.id,
+        amountEgp: body.amountEgp,
+        payoutMethod: body.payoutMethod,
+        status: "withdrawal_requested",
+        requestedAt: new Date(),
+      })
+      .returning();
+
+    res.status(201).json(withdrawal);
+  },
+);
+
 // ── Withdrawals ───────────────────────────────────────────────────────────────
 router.get(
   "/host/withdrawals",
@@ -766,11 +852,6 @@ router.get(
     res.json({ withdrawals, total: withdrawals.length });
   },
 );
-
-const withdrawalInputSchema = z.object({
-  amountEgp: z.string().regex(/^\d+(\.\d{1,2})?$/),
-  payoutMethod: z.string().min(1),
-});
 
 router.post(
   "/host/withdrawals",
