@@ -20,6 +20,12 @@ function NativeTabLayout({ isHost }: { isHost: boolean }) {
         <Label>Bookings</Label>
       </NativeTabs.Trigger>
       {isHost && (
+        <NativeTabs.Trigger name="dashboard">
+          <Icon sf={{ default: "chart.bar", selected: "chart.bar.fill" }} />
+          <Label>Dashboard</Label>
+        </NativeTabs.Trigger>
+      )}
+      {isHost && (
         <NativeTabs.Trigger name="yachts">
           <Icon sf={{ default: "ferry", selected: "ferry.fill" }} />
           <Label>My Yachts</Label>
@@ -111,6 +117,20 @@ function ClassicTabLayout({ isHost }: { isHost: boolean }) {
             ) : (
               <Feather name="calendar" size={22} color={color} />
             ),
+        }}
+      />
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: "Dashboard",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="chart.bar.fill" tintColor={color} size={24} />
+            ) : (
+              <Ionicons name="grid-outline" size={22} color={color} />
+            ),
+          tabBarButton: isHost ? undefined : () => null,
+          tabBarItemStyle: isHost ? {} : { display: "none", width: 0 },
         }}
       />
       <Tabs.Screen
