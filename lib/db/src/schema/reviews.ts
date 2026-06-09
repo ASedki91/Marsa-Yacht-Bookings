@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, pgEnum, check } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, pgEnum, check, unique } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -24,7 +24,7 @@ export const reviewsTable = pgTable(
     id: text("id").primaryKey(),
     bookingId: text("booking_id")
       .notNull()
-      .unique()
+      // No .unique() here — both directions (guest_to_host + host_to_guest) need separate rows
       .references(() => bookingsTable.id, { onDelete: "restrict" }),
     reviewerId: text("reviewer_id")
       .notNull()
@@ -42,6 +42,8 @@ export const reviewsTable = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    // One review per direction per booking — allows guest_to_host AND host_to_guest
+    unique("uq_review_booking_type").on(t.bookingId, t.type),
     check("rating_range", sql`${t.rating} >= 1 AND ${t.rating} <= 5`),
   ],
 );
