@@ -4,6 +4,7 @@ import {
   bookingsTable,
   paymentsTable,
   refundsTable,
+  availabilitySlotsTable,
   yachtsTable,
   hostProfilesTable,
   auditLogsTable,
@@ -166,6 +167,14 @@ router.post("/webhooks/stripe", async (req: Request, res: Response): Promise<voi
             .returning();
 
           if (booking) {
+            // Release the reserved slot so it becomes bookable again.
+            if (booking.slotId) {
+              await db
+                .update(availabilitySlotsTable)
+                .set({ isAvailable: true })
+                .where(eq(availabilitySlotsTable.id, booking.slotId));
+            }
+
             notify({
               userId: booking.guestId,
               type: "payment.failed",

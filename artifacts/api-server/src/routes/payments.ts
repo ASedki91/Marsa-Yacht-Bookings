@@ -7,7 +7,8 @@ import {
   yachtsTable,
 } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
-import { requireAuth } from "../middlewares/index";
+import { z } from "zod/v4";
+import { requireAuth, validateBody } from "../middlewares/index";
 import { stripe } from "../lib/stripe";
 
 const router: IRouter = Router();
@@ -75,17 +76,17 @@ router.get(
  * Retrieve the client secret for an existing booking's PaymentIntent.
  * Used when the client needs to resume a payment (e.g. app restart, retry).
  */
+const paymentIntentBodySchema = z.object({
+  bookingId: z.string().min(1),
+});
+
 router.post(
   "/payments/intent",
   requireAuth,
+  validateBody(paymentIntentBodySchema),
   async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).localUser;
-    const { bookingId } = req.body as { bookingId?: string };
-
-    if (!bookingId) {
-      res.status(400).json({ error: "bookingId is required" });
-      return;
-    }
+    const { bookingId } = req.body as z.infer<typeof paymentIntentBodySchema>;
 
     const [booking] = await db
       .select()

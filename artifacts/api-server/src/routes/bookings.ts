@@ -565,7 +565,10 @@ router.post(
       return;
     }
 
-    // Stripe refund if payment succeeded
+    // Stripe refund if payment succeeded.
+    // IMPORTANT: we must only transition to rejected_refunded AFTER the refund
+    // is successfully created. If Stripe fails, return 502 and leave the booking
+    // in its current status so the operation can be safely retried.
     const [payment] = await db
       .select()
       .from(paymentsTable)
@@ -591,7 +594,12 @@ router.post(
           })
           .catch(() => {});
       } catch (err) {
+        // Refund creation failed — do NOT change booking status; let caller retry.
         req.log.error({ err }, "Stripe refund failed during booking rejection");
+        res.status(502).json({
+          error: "Refund could not be initiated with Stripe. Booking status unchanged — please retry.",
+        });
+        return;
       }
     }
 

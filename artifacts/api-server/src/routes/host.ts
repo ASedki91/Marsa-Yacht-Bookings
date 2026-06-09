@@ -339,6 +339,45 @@ router.patch(
   },
 );
 
+// ── Delete Yacht ──────────────────────────────────────────────────────────────
+// Only draft or changes_requested yachts can be deleted — any live or
+// pending_review yacht has potential or actual payment history and must
+// be suspended or rejected by an admin instead.
+router.delete(
+  "/host/yachts/:id",
+  requireRole("host", "admin"),
+  async (req: Request, res: Response): Promise<void> => {
+    const user = (req as any).localUser;
+    const id = String(req.params.id);
+
+    const [profile] = await db
+      .select()
+      .from(hostProfilesTable)
+      .where(eq(hostProfilesTable.userId, user.id))
+      .limit(1);
+    if (!profile) { res.status(404).json({ error: "Host profile not found" }); return; }
+
+    const [yacht] = await db
+      .select()
+      .from(yachtsTable)
+      .where(and(eq(yachtsTable.id, id), eq(yachtsTable.hostId, profile.id)))
+      .limit(1);
+    if (!yacht) { res.status(404).json({ error: "Yacht not found" }); return; }
+
+    if (!["draft", "changes_requested"].includes(yacht.status)) {
+      res.status(400).json({
+        error:
+          "Only draft or changes_requested yachts can be deleted. " +
+          "Contact support to remove a listing that is live or under review.",
+      });
+      return;
+    }
+
+    await db.delete(yachtsTable).where(eq(yachtsTable.id, id));
+    res.json({ deleted: true });
+  },
+);
+
 // ── Yacht Photos ──────────────────────────────────────────────────────────────
 
 const photoSchema = z.object({

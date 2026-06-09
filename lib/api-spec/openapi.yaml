@@ -600,6 +600,34 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Yacht"
+    delete:
+      operationId: deleteHostYacht
+      tags: [host]
+      summary: Delete a draft or changes_requested yacht
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletedResponse"
+        "400":
+          description: Yacht cannot be deleted in current status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /host/yachts/{id}/availability:
     post:
