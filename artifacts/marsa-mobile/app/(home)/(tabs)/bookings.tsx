@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -23,14 +23,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { SkeletonBookingCard } from "@/components/SkeletonCard";
 import colors from "@/constants/colors";
 
-const STATUSES: Array<{ label: string; value: string }> = [
-  { label: "All",             value: "all" },
-  { label: "Pending Payment", value: "pending_payment" },
-  { label: "Under Review",    value: "paid_under_review" },
-  { label: "Confirmed",       value: "confirmed" },
-  { label: "Completed",       value: "completed" },
-  { label: "Cancelled",       value: "cancelled" },
-];
+const UPCOMING_STATUSES = ["pending_payment", "paid_under_review", "confirmed"];
+const PAST_STATUSES = ["completed", "cancelled", "rejected_refunded", "cancel_requested"];
 
 export default function BookingsScreen() {
   const c = useColors();
@@ -38,109 +32,169 @@ export default function BookingsScreen() {
   const router = useRouter();
   const { isHost, user } = useUser();
 
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [view, setView] = useState(isHost ? "incoming" : "upcoming");
   const [refreshing, setRefreshing] = useState(false);
 
-  // Hosts see all their bookings (as guest + incoming) in one unified list
-  const role = isHost ? ListMyBookingsRole.all : ListMyBookingsRole.guest;
+  const guestQuery = useListMyBookings({ role: ListMyBookingsRole.guest });
+  const hostQuery = useListMyBookings({ role: ListMyBookingsRole.host });
 
-  const { data, isLoading, error, refetch } = useListMyBookings({
-    role,
-    status: statusFilter !== "all" ? statusFilter : undefined,
-    page: 1,
-  });
+  const allGuestBookings: any[] = (guestQuery.data as any)?.bookings ?? [];
+  const allHostBookings: any[] = (hostQuery.data as any)?.bookings ?? [];
 
-  const bookings = (data as any)?.bookings ?? [];
+  const displayBookings = useMemo(() => {
+    if (!isHost) {
+      if (view === "upcoming") {
+        return allGuestBookings.filter((b) => UPCOMING_STATUSES.includes(b.status));
+      }
+      return allGuestBookings.filter((b) => PAST_STATUSES.includes(b.status));
+    }
+    if (view === "incoming") return allHostBookings;
+    return allGuestBookings;
+  }, [view, allGuestBookings, allHostBookings, isHost]);
+
+  const isLoading =
+    view === "incoming" ? hostQuery.isLoading : guestQuery.isLoading;
 
   const confirm = useConfirmBooking();
   const reject = useRejectBooking();
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refetch();
+    await Promise.all([guestQuery.refetch(), hostQuery.refetch()]);
     setRefreshing(false);
-  }, [refetch]);
+  }, [guestQuery, hostQuery]);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
+  const TABS = isHost
+    ? [
+        { key: "incoming", label: "Incoming" },
+        { key: "my_trips", label: "My Trips" },
+      ]
+    : [
+        { key: "upcoming", label: "Upcoming" },
+        { key: "past", label: "Past" },
+      ];
+
+  const emptyTitle = (() => {
+    if (view === "upcoming") return "No upcoming bookings";
+    if (view === "past") return "No past bookings";
+    if (view === "incoming") return "No incoming bookings";
+    return "No trips yet";
+  })();
+
+  const emptySubtitle =
+    view === "upcoming" || view === "past"
+      ? "Explore yachts and make your first booking"
+      : undefined;
+
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: c.background }]}>
+      <View
+        style={[
+          styles.header,
+          {
+            paddingTop: topPad + 12,
+            backgroundColor: c.background,
+            borderBottomColor: c.border,
+          },
+        ]}
+      >
         <Text style={[styles.title, { color: c.foreground }]}>My Bookings</Text>
 
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={STATUSES}
-          keyExtractor={(s) => s.value}
-          renderItem={({ item }) => (
+        <View style={[styles.segmented, { backgroundColor: c.muted }]}>
+          {TABS.map((tab) => (
             <Pressable
+              key={tab.key}
               style={[
-                styles.statusChip,
-                statusFilter === item.value
-                  ? { backgroundColor: colors.light.navy }
-                  : { backgroundColor: c.muted, borderColor: c.border, borderWidth: 1 },
+                styles.segTab,
+                view === tab.key && {
+                  backgroundColor: c.card,
+                  shadowColor: "#000",
+                  shadowOpacity: 0.08,
+                  shadowRadius: 4,
+                  elevation: 2,
+                },
               ]}
-              onPress={() => setStatusFilter(item.value)}
+              onPress={() => setView(tab.key)}
             >
               <Text
                 style={[
-                  styles.statusChipText,
-                  { color: statusFilter === item.value ? "#fff" : c.mutedForeground },
+                  styles.segTabText,
+                  {
+                    color: view === tab.key ? c.foreground : c.mutedForeground,
+                  },
                 ]}
               >
-                {item.label}
+                {tab.label}
               </Text>
             </Pressable>
-          )}
-          contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
-          style={{ marginTop: 4 }}
-        />
+          ))}
+        </View>
       </View>
 
       {isLoading ? (
         <View style={styles.list}>
-          {[1, 2, 3].map((i) => <SkeletonBookingCard key={i} />)}
+          {[1, 2, 3].map((i) => (
+            <SkeletonBookingCard key={i} />
+          ))}
         </View>
-      ) : error ? (
-        <EmptyState
-          icon="alert-circle-outline"
-          title="Could not load bookings"
-          actionLabel="Retry"
-          onAction={() => refetch()}
-        />
-      ) : bookings.length === 0 ? (
+      ) : displayBookings.length === 0 ? (
         <EmptyState
           icon="calendar-outline"
-          title="No bookings yet"
-          subtitle="Explore yachts and make your first booking"
-          actionLabel="Explore Yachts"
-          onAction={() => router.replace("/(home)/(tabs)/explore")}
+          title={emptyTitle}
+          subtitle={emptySubtitle}
+          actionLabel={view === "upcoming" ? "Explore Yachts" : undefined}
+          onAction={
+            view === "upcoming"
+              ? () => router.replace("/(home)/(tabs)/explore")
+              : undefined
+          }
         />
       ) : (
         <FlatList
-          data={bookings}
+          data={displayBookings}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => {
-            // For hosts: show quick actions on incoming bookings (where user is not the guest)
-            const isIncoming = isHost && item.guestId !== user?.id;
+            const isIncoming = view === "incoming";
+            const isPastGuest = !isHost && view === "past";
             return (
               <BookingCard
                 booking={item}
                 onPress={() => router.push(`/(home)/booking/${item.id}`)}
                 showActions={isIncoming}
                 onConfirm={() =>
-                  confirm.mutateAsync({ id: item.id }).catch(() => {}).then(() => refetch())
+                  confirm
+                    .mutateAsync({ id: item.id })
+                    .catch(() => {})
+                    .then(() =>
+                      Promise.all([guestQuery.refetch(), hostQuery.refetch()])
+                    )
                 }
                 onReject={() =>
-                  reject.mutateAsync({ id: item.id }).catch(() => {}).then(() => refetch())
+                  reject
+                    .mutateAsync({ id: item.id })
+                    .catch(() => {})
+                    .then(() =>
+                      Promise.all([guestQuery.refetch(), hostQuery.refetch()])
+                    )
                 }
+                showLeaveReview={
+                  isPastGuest &&
+                  item.status === "completed" &&
+                  !item.hasReview &&
+                  item.guestId === user?.id
+                }
+                onLeaveReview={() => router.push(`/(home)/review/${item.id}`)}
               />
             );
           }}
           contentContainerStyle={[
             styles.list,
-            { paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 80 },
+            {
+              paddingBottom:
+                Platform.OS === "web" ? 34 : insets.bottom + 80,
+            },
           ]}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -160,15 +214,23 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingBottom: 14,
     gap: 12,
+    borderBottomWidth: 1,
   },
   title: { fontSize: 24, fontFamily: "Inter_700Bold" },
-  statusChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 100,
+  segmented: {
+    flexDirection: "row",
+    borderRadius: 12,
+    padding: 3,
+    gap: 2,
   },
-  statusChipText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  segTab: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  segTabText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   list: { padding: 16 },
 });

@@ -21,6 +21,7 @@ import {
   useGetYachtSlots,
   useCreateBooking,
 } from "@workspace/api-client-react";
+import { useStripe } from "@stripe/stripe-react-native";
 import { useColors } from "@/hooks/useColors";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import colors from "@/constants/colors";
@@ -80,6 +81,7 @@ export default function BookScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [step, setStep] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
@@ -145,7 +147,6 @@ export default function BookScreen() {
 
   const handlePay = async () => {
     try {
-      const addOnsForRequest = selectedAddOns.map((id) => ({ addOnId: id }));
       const result = await createBooking.mutateAsync({
         yachtId: id!,
         templateId: selectedTemplate.id,
@@ -153,15 +154,40 @@ export default function BookScreen() {
         endTime: selectedSlot.endTime,
         guestCount,
         specialRequests: specialNote || undefined,
-        addOns: addOnsForRequest,
+        addOns: selectedAddOns.map((aoId) => ({ addOnId: aoId })),
       } as any);
-      setBooking(result);
+
+      const { booking: createdBooking, clientSecret } = result as any;
+      setBooking(createdBooking);
+
+      if (clientSecret) {
+        const { error: initError } = await initPaymentSheet({
+          merchantDisplayName: "MARSA Charter",
+          paymentIntentClientSecret: clientSecret,
+          defaultBillingDetails: { name: "" },
+          returnURL: "marsa://payment-complete",
+        });
+
+        if (initError) {
+          Alert.alert("Payment Setup Failed", initError.message);
+          return;
+        }
+
+        const { error: payError } = await presentPaymentSheet();
+
+        if (payError) {
+          if (payError.code === "Canceled") return;
+          Alert.alert("Payment Failed", payError.message);
+          return;
+        }
+      }
+
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setStep(5);
     } catch (err: any) {
       Alert.alert(
         "Booking Failed",
-        err?.message ?? "Could not create booking. Please try again.",
+        (err as any)?.errors?.[0]?.message ?? (err as any)?.message ?? "Could not create booking. Please try again.",
       );
     }
   };

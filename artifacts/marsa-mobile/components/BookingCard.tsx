@@ -32,6 +32,8 @@ interface BookingCardProps {
   showActions?: boolean;
   onConfirm?: () => void;
   onReject?: () => void;
+  showLeaveReview?: boolean;
+  onLeaveReview?: () => void;
 }
 
 export function BookingCard({
@@ -40,6 +42,8 @@ export function BookingCard({
   showActions,
   onConfirm,
   onReject,
+  showLeaveReview,
+  onLeaveReview,
 }: BookingCardProps) {
   const c = useColors();
   const cfg = STATUS_CONFIG[booking.status] ?? {
@@ -110,6 +114,16 @@ export function BookingCard({
           </View>
         )}
       </View>
+
+      {showLeaveReview && (
+        <Pressable
+          style={[styles.reviewBtn, { backgroundColor: colors.light.gold }]}
+          onPress={onLeaveReview}
+        >
+          <Ionicons name="star-outline" size={14} color="#fff" />
+          <Text style={styles.reviewBtnText}>Leave Review</Text>
+        </Pressable>
+      )}
 
       {showActions && booking.status === "paid_under_review" && (
         <View style={styles.actions}>
@@ -205,5 +219,19 @@ const styles = StyleSheet.create({
   actionBtnText: {
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
+  },
+  reviewBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  reviewBtnText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: "#fff",
   },
 });
