@@ -11,6 +11,7 @@ import notificationsRouter from "./notifications";
 import paymentsRouter from "./payments";
 import adminRouter from "./admin";
 import webhooksRouter from "./webhooks";
+import devRouter from "./dev";
 
 const router: IRouter = Router();
 
@@ -33,5 +34,10 @@ router.use(reviewsRouter);
 router.use(notificationsRouter);
 router.use(paymentsRouter);
 router.use(adminRouter);
+
+// Dev-only shortcuts (not mounted in production)
+if (process.env.NODE_ENV !== "production") {
+  router.use(devRouter);
+}
 
 export default router;

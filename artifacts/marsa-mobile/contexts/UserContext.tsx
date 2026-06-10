@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { useAuth } from "@clerk/expo";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth, useUser as useClerkUser } from "@clerk/expo";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface UserProfile {
   id: string;
@@ -34,36 +34,58 @@ async function fetchMe(token: string | null): Promise<UserProfile> {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) throw new Error("Failed to fetch user");
-  return res.json();
+  const data = await res.json();
+  const raw = data.user ?? data;
+  return {
+    id: raw.id,
+    clerkId: raw.clerkId,
+    email: raw.email,
+    name: raw.fullName ?? raw.name ?? undefined,
+    role: raw.role ?? "guest",
+    avatarUrl: raw.avatarUrl ?? undefined,
+  };
 }
 
-async function syncUser(token: string | null): Promise<void> {
+async function syncUser(
+  token: string | null,
+  payload: { email: string; fullName?: string; avatarUrl?: string },
+): Promise<void> {
   await fetch(`${BASE_URL}/api/auth/sync`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({}),
+    body: JSON.stringify(payload),
   });
 }
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const { isSignedIn, getToken } = useAuth();
+  const { user: clerkUser } = useClerkUser();
   const [synced, setSynced] = useState(false);
   const qc = useQueryClient();
 
   useEffect(() => {
     if (!isSignedIn || synced) return;
+    if (!clerkUser) return;
+
+    const email = clerkUser.emailAddresses?.[0]?.emailAddress;
+    if (!email) return;
+
     getToken().then((token) => {
-      syncUser(token)
+      syncUser(token, {
+        email,
+        fullName: clerkUser.fullName ?? undefined,
+        avatarUrl: clerkUser.imageUrl ?? undefined,
+      })
         .catch(() => {})
         .finally(() => {
           setSynced(true);
           qc.invalidateQueries({ queryKey: ["me"] });
         });
     });
-  }, [isSignedIn, synced]);
+  }, [isSignedIn, clerkUser, synced]);
 
   const { data: user, isLoading, refetch } = useQuery<UserProfile | null>({
     queryKey: ["me"],
