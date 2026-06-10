@@ -10,7 +10,7 @@ description: Key business rules, design tokens, and architecture decisions for t
 ## Artifacts
 - `artifacts/marsa-mobile` — Expo React Native mobile app (guests + hosts)
 - `artifacts/api-server` — Express 5 + Postgres API
-- Admin dashboard — planned (Task #9)
+- Admin dashboard — planned (separate task)
 
 ## Business Rules
 - Platform fee: **15%** (host earns 85%)
