@@ -1,14 +1,17 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, Pressable, Platform, Alert,
+  ActivityIndicator,
 } from "react-native";
-import { useClerk } from "@clerk/expo";
+import { useClerk, useAuth } from "@clerk/expo";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useUser } from "@/contexts/UserContext";
 import colors from "@/constants/colors";
+
+const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
 interface SettingRowProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -53,8 +56,10 @@ export default function ProfileScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const { signOut } = useClerk();
+  const { getToken } = useAuth();
   const router = useRouter();
   const { user, isHost, isAdmin } = useUser();
+  const [hostLoading, setHostLoading] = useState(false);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
@@ -71,6 +76,29 @@ export default function ProfileScreen() {
         },
       },
     ]);
+  };
+
+  const handleBecomeHost = async () => {
+    setHostLoading(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${BASE_URL}/api/dev/become-host`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        Alert.alert("Error", data.error ?? "Failed to become host");
+        return;
+      }
+      Alert.alert("Success!", data.message ?? "You are now a host with demo data.", [
+        { text: "OK", onPress: () => router.replace("/(home)/(tabs)/explore") },
+      ]);
+    } catch (err: any) {
+      Alert.alert("Error", err.message ?? "Network error");
+    } finally {
+      setHostLoading(false);
+    }
   };
 
   const initials = user?.name
@@ -94,6 +122,22 @@ export default function ProfileScreen() {
           <View style={[styles.rolePill, { backgroundColor: roleBadgeColor + "30", borderColor: roleBadgeColor }]}>
             <Text style={[styles.roleText, { color: roleBadgeColor }]}>{roleBadge}</Text>
           </View>
+          {!isHost && (
+            <Pressable
+              onPress={handleBecomeHost}
+              disabled={hostLoading}
+              style={[styles.devBtn, { opacity: hostLoading ? 0.6 : 1 }]}
+            >
+              {hostLoading ? (
+                <ActivityIndicator size="small" color={colors.light.gold} />
+              ) : (
+                <>
+                  <Ionicons name="rocket-outline" size={14} color={colors.light.gold} />
+                  <Text style={styles.devBtnText}>Become a Host (Dev)</Text>
+                </>
+              )}
+            </Pressable>
+          )}
         </View>
 
         <Text style={[styles.sectionLabel, { color: c.mutedForeground }]}>ACCOUNT</Text>
@@ -110,6 +154,15 @@ export default function ProfileScreen() {
               badge="New"
               iconColor={colors.light.gold}
               onPress={() => router.push("/(home)/become-host")}
+            />
+          )}
+          {isHost && (
+            <SettingRow
+              icon="boat-outline"
+              label="Become a Host"
+              badge="Active"
+              iconColor={colors.light.ocean}
+              onPress={() => Alert.alert("You are already a host", "Go to your yachts or bookings tab to manage your listings.")}
             />
           )}
           {isAdmin && (
@@ -177,6 +230,13 @@ const styles = StyleSheet.create({
   avatarEmail: { fontSize: 13, fontFamily: "Inter_400Regular", color: "#CBD5E1" },
   rolePill: { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20, borderWidth: 1, marginTop: 4 },
   roleText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  devBtn: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    marginTop: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.light.gold,
+    paddingHorizontal: 14, paddingVertical: 8,
+    backgroundColor: colors.light.gold + "15",
+  },
+  devBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.light.gold },
   sectionLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 1, paddingHorizontal: 4, marginTop: 6 },
   settingsGroup: { gap: 2, borderRadius: 14, overflow: "hidden" },
   settingRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderBottomWidth: 0 },
