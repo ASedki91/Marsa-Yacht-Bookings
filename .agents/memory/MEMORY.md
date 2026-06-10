@@ -1,1 +1,3 @@
-- [Clerk Expo v3 API](clerk-expo-v3-api.md) — useSignIn/useSignUp return SignalValue types; get setActive from useClerk(), isLoaded from useAuth(), cast resource as any for old methods; tokenCache must be built with expo-secure-store.
+- [Express router guard scoping](express-router-guard-scoping.md) — path-less `router.use(requireAuth/requireRole)` in a path-less-mounted sub-router intercepts ALL requests; scope to a path.
+- [Clerk Expo legacy import](clerk-expo-v3-api.md) — import useSignIn/useSignUp from `@clerk/expo/legacy`; main export is Signal API with undefined resource methods at runtime.
+- [MARSA API response shapes](marsa-api-shapes.md) — yacht list/detail return nested/string fields; mobile screens must map them, not assume flat camelCase.

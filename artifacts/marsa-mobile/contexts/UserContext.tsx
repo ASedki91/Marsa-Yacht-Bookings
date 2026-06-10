@@ -74,9 +74,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (!email) return;
 
     getToken().then((token) => {
+      const metaName =
+        typeof clerkUser.unsafeMetadata?.fullName === "string"
+          ? (clerkUser.unsafeMetadata.fullName as string)
+          : undefined;
       syncUser(token, {
         email,
-        fullName: clerkUser.fullName ?? undefined,
+        fullName: clerkUser.fullName ?? metaName,
         avatarUrl: clerkUser.imageUrl ?? undefined,
       })
         .catch(() => {})

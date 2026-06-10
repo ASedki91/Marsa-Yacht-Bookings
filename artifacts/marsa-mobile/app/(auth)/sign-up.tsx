@@ -39,6 +39,7 @@ export default function SignUpScreen() {
       await signUp.create({
         emailAddress: email,
         password,
+        ...(name.trim() ? { unsafeMetadata: { fullName: name.trim() } } : {}),
       });
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setPendingVerification(true);

@@ -157,8 +157,8 @@ const fStyles = StyleSheet.create({
 function sortYachts(yachts: any[], sort: string): any[] {
   const arr = [...yachts];
   switch (sort) {
-    case "price_asc": return arr.sort((a, b) => Number(a.minPriceEgp ?? 0) - Number(b.minPriceEgp ?? 0));
-    case "price_desc": return arr.sort((a, b) => Number(b.minPriceEgp ?? 0) - Number(a.minPriceEgp ?? 0));
+    case "price_asc": return arr.sort((a, b) => Number(a.basePriceEgp ?? 0) - Number(b.basePriceEgp ?? 0));
+    case "price_desc": return arr.sort((a, b) => Number(b.basePriceEgp ?? 0) - Number(a.basePriceEgp ?? 0));
     case "capacity_asc": return arr.sort((a, b) => (a.capacity ?? 0) - (b.capacity ?? 0));
     case "capacity_desc": return arr.sort((a, b) => (b.capacity ?? 0) - (a.capacity ?? 0));
     default: return arr;
@@ -203,7 +203,7 @@ export default function ExploreScreen() {
     }
     if (filters.maxPriceEgp) {
       const max = Number(filters.maxPriceEgp);
-      arr = arr.filter((y: any) => Number(y.minPriceEgp ?? 0) <= max);
+      arr = arr.filter((y: any) => Number(y.basePriceEgp ?? 0) <= max);
     }
     return sortYachts(arr, filters.sort);
   })();

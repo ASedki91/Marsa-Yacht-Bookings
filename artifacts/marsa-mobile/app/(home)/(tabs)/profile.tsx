@@ -101,9 +101,19 @@ export default function ProfileScreen() {
     }
   };
 
-  const initials = user?.name
-    ? user.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()
-    : user?.email?.slice(0, 2).toUpperCase() ?? "??";
+  const emailName = user?.email
+    ? user.email
+        .split("@")[0]
+        .split(/[._-]+/)
+        .filter(Boolean)
+        .map((p: string) => p.charAt(0).toUpperCase() + p.slice(1))
+        .join(" ")
+    : "";
+  const displayName = user?.name?.trim() || emailName || "MARSA User";
+
+  const initials = displayName
+    ? displayName.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()
+    : "??";
 
   const roleBadge = isAdmin ? "Admin" : isHost ? "Host" : "Guest";
   const roleBadgeColor = isAdmin ? "#7C3AED" : isHost ? colors.light.ocean : colors.light.gold;
@@ -117,7 +127,7 @@ export default function ProfileScreen() {
           <View style={styles.avatarCircle}>
             <Text style={styles.avatarInitials}>{initials}</Text>
           </View>
-          <Text style={styles.avatarName}>{user?.name ?? "MARSA User"}</Text>
+          <Text style={styles.avatarName}>{displayName}</Text>
           <Text style={styles.avatarEmail}>{user?.email ?? ""}</Text>
           <View style={[styles.rolePill, { backgroundColor: roleBadgeColor + "30", borderColor: roleBadgeColor }]}>
             <Text style={[styles.roleText, { color: roleBadgeColor }]}>{roleBadge}</Text>

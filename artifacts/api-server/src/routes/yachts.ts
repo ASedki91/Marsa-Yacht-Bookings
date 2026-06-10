@@ -172,7 +172,55 @@ router.get(
         .where(where),
     ]);
 
-    res.json({ yachts, total: countRow?.count ?? 0, page, limit });
+    // Attach photos + starting price so list cards can render fully
+    const ids = yachts.map((y) => y.id);
+    const [photoRows, priceRows] = ids.length
+      ? await Promise.all([
+          db
+            .select()
+            .from(yachtPhotosTable)
+            .where(inArray(yachtPhotosTable.yachtId, ids))
+            .orderBy(asc(yachtPhotosTable.sortOrder)),
+          db
+            .select({
+              yachtId: yachtTemplatePricingTable.yachtId,
+              price: yachtTemplatePricingTable.price,
+            })
+            .from(yachtTemplatePricingTable)
+            .where(
+              and(
+                inArray(yachtTemplatePricingTable.yachtId, ids),
+                eq(yachtTemplatePricingTable.isActive, true),
+              ),
+            ),
+        ])
+      : [[], []];
+
+    const photosByYacht = new Map<string, typeof photoRows>();
+    for (const p of photoRows) {
+      const arr = photosByYacht.get(p.yachtId) ?? [];
+      arr.push(p);
+      photosByYacht.set(p.yachtId, arr);
+    }
+    const minPriceByYacht = new Map<string, number>();
+    for (const r of priceRows) {
+      const val = Number(r.price);
+      const cur = minPriceByYacht.get(r.yachtId);
+      if (cur === undefined || val < cur) minPriceByYacht.set(r.yachtId, val);
+    }
+
+    const normalized = yachts.map((y) => ({
+      ...y,
+      name: y.title,
+      rating: y.avgRating != null ? Number(y.avgRating) : null,
+      photos: photosByYacht.get(y.id) ?? [],
+      basePriceEgp:
+        minPriceByYacht.get(y.id) !== undefined
+          ? minPriceByYacht.get(y.id)!.toFixed(2)
+          : null,
+    }));
+
+    res.json({ yachts: normalized, total: countRow?.count ?? 0, page, limit });
   },
 );
 
@@ -242,8 +290,17 @@ router.get("/yachts/:id", async (req: Request, res: Response): Promise<void> => 
       .limit(1),
   ]);
 
+  const minPrice = pricingRows.length
+    ? Math.min(...pricingRows.map((p) => Number(p.priceEgp)))
+    : null;
+
+  // Flatten yacht fields to the top level (UI expects name/rating/basePriceEgp
+  // alongside photos/pricing/reviews/host)
   res.json({
-    yacht,
+    ...yacht,
+    name: yacht.title,
+    rating: yacht.avgRating != null ? Number(yacht.avgRating) : null,
+    basePriceEgp: minPrice != null ? minPrice.toFixed(2) : null,
     photos,
     pricing: pricingRows,
     reviews: approvedReviews,

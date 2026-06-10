@@ -15,6 +15,7 @@ import {
   hostProfilesTable,
   yachtsTable,
   yachtPhotosTable,
+  yachtTemplatePricingTable,
   bookingsTable,
   bookingTemplatesTable,
   categoriesTable,
@@ -171,6 +172,32 @@ async function seed() {
     log(`Created host profile: ${hostProfileId}`);
   }
 
+  // ── Pricing backfill helper ──────────────────────────────────────────────
+  // Inserts per-template pricing for each yacht. Idempotent via the
+  // uq_yacht_template unique constraint, so it's safe to run on existing yachts.
+  const ensurePricing = async (
+    yachts: { id: string; capacity: number | null }[],
+  ): Promise<void> => {
+    // Price scales with capacity and trip duration so longer trips always cost
+    // more, regardless of how the templates are ordered.
+    const templates = await db.select().from(bookingTemplatesTable);
+    const rows = [];
+    for (const y of yachts) {
+      const cap = y.capacity ?? 10;
+      for (const t of templates) {
+        const hours = t.durationHours ?? 1;
+        const price = Math.round((cap * hours * 250) / 100) * 100;
+        rows.push({ id: randomUUID(), yachtId: y.id, templateId: t.id, price: String(price) });
+      }
+    }
+    if (rows.length > 0) {
+      await db
+        .insert(yachtTemplatePricingTable)
+        .values(rows)
+        .onConflictDoNothing({ target: [yachtTemplatePricingTable.yachtId, yachtTemplatePricingTable.templateId] });
+    }
+  };
+
   // ── Yachts ─────────────────────────────────────────────────────────────────
   const existingYachts = await db
     .select()
@@ -178,7 +205,9 @@ async function seed() {
     .where(eq(yachtsTable.hostId, hostProfileId));
 
   if (existingYachts.length > 0) {
-    log(`Yachts already exist (${existingYachts.length}), skipping yacht creation`);
+    log(`Yachts already exist (${existingYachts.length}), backfilling pricing…`);
+    await ensurePricing(existingYachts);
+    log("Pricing backfill complete ✓");
     log("Seed complete ✓");
     process.exit(0);
   }
@@ -287,6 +316,10 @@ async function seed() {
     }
   }
   log("Created yacht photos");
+
+  // ── Yacht pricing ──────────────────────────────────────────────────────────
+  await ensurePricing(createdYachts);
+  log("Created yacht pricing");
 
   // ── Bookings ───────────────────────────────────────────────────────────────
   const bookingsData = [

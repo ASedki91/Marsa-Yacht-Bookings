@@ -30,7 +30,10 @@ import { notify } from "../lib/notify";
 
 const router: IRouter = Router();
 
-router.use(requireAuth, requireRole("admin"));
+// Scope the admin guard to /admin paths only. Mounting it path-less would make
+// requireAuth/requireRole intercept EVERY request that reaches this router
+// (it's mounted before other routers), breaking unrelated routes like /dev/*.
+router.use("/admin", requireAuth, requireRole("admin"));
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 router.get("/admin/stats", async (_req: Request, res: Response): Promise<void> => {

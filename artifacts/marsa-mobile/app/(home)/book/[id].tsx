@@ -83,7 +83,13 @@ export default function BookScreen() {
   const [step, setStep] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
-  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  });
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
   const [guestCount, setGuestCount] = useState(2);
   const [specialNote, setSpecialNote] = useState("");
@@ -100,6 +106,26 @@ export default function BookScreen() {
 
   const fromDate = selectedDate || new Date().toISOString().split("T")[0];
   const toDate = fromDate;
+
+  const dateOptions = React.useMemo(() => {
+    const opts: { value: string; dow: string; day: string; mon: string }[] = [];
+    const base = new Date();
+    base.setHours(0, 0, 0, 0);
+    for (let i = 0; i < 21; i++) {
+      const d = new Date(base);
+      d.setDate(base.getDate() + i);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      opts.push({
+        value: `${year}-${month}-${day}`,
+        dow: d.toLocaleDateString("en-US", { weekday: "short" }),
+        day: String(d.getDate()),
+        mon: d.toLocaleDateString("en-US", { month: "short" }),
+      });
+    }
+    return opts;
+  }, []);
 
   const { data: slotsData, isLoading: slotsLoading } = useGetYachtSlots(
     id!,
@@ -261,13 +287,56 @@ export default function BookScreen() {
         {step === 1 && (
           <View style={styles.stepContent}>
             <Text style={[styles.stepLabel, { color: c.foreground }]}>Select Date</Text>
-            <TextInput
-              style={[styles.dateInput, { backgroundColor: c.input, borderColor: c.border, color: c.foreground }]}
-              value={selectedDate}
-              onChangeText={setSelectedDate}
-              placeholder="YYYY-MM-DD (e.g. 2025-08-15)"
-              placeholderTextColor={c.mutedForeground}
-            />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.dateRow}
+            >
+              {dateOptions.map((d) => {
+                const isSelected = selectedDate === d.value;
+                return (
+                  <Pressable
+                    key={d.value}
+                    style={[
+                      styles.dateChip,
+                      {
+                        backgroundColor: isSelected ? colors.light.navy : c.card,
+                        borderColor: isSelected ? colors.light.navy : c.border,
+                      },
+                    ]}
+                    onPress={() => {
+                      setSelectedDate(d.value);
+                      setSelectedSlot(null);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.dateChipDow,
+                        { color: isSelected ? "rgba(255,255,255,0.7)" : c.mutedForeground },
+                      ]}
+                    >
+                      {d.dow}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.dateChipDay,
+                        { color: isSelected ? "#fff" : c.foreground },
+                      ]}
+                    >
+                      {d.day}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.dateChipMon,
+                        { color: isSelected ? "rgba(255,255,255,0.7)" : c.mutedForeground },
+                      ]}
+                    >
+                      {d.mon}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
 
             {slotsLoading ? (
               <ActivityIndicator color={c.primary} style={{ marginTop: 16 }} />
@@ -555,14 +624,18 @@ const styles = StyleSheet.create({
   optionSub: { fontSize: 13, fontFamily: "Inter_400Regular", marginTop: 2 },
   addOnRight: { alignItems: "flex-end", gap: 6 },
   addOnPrice: { fontSize: 14, fontFamily: "Inter_700Bold" },
-  dateInput: {
-    borderRadius: 12,
+  dateRow: { gap: 10, paddingVertical: 2, paddingRight: 8 },
+  dateChip: {
+    width: 64,
+    borderRadius: 14,
     borderWidth: 1,
-    paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 15,
-    fontFamily: "Inter_400Regular",
+    alignItems: "center",
+    gap: 2,
   },
+  dateChipDow: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  dateChipDay: { fontSize: 20, fontFamily: "Inter_700Bold" },
+  dateChipMon: { fontSize: 11, fontFamily: "Inter_400Regular" },
   slotsLabel: { fontSize: 15, fontFamily: "Inter_700Bold", marginTop: 8 },
   noSlots: { alignItems: "center", padding: 24, borderRadius: 14, borderWidth: 1, gap: 10 },
   noSlotsText: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center" },
