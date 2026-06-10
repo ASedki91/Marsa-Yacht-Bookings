@@ -7,7 +7,10 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { useApplyAsHost, useRequestUploadUrl } from "@workspace/api-client-react";
+import {
+  useApplyAsHost, useRequestUploadUrl, useUploadHostDocument,
+  DocumentInputDocumentType,
+} from "@workspace/api-client-react";
 import { useColors } from "@/hooks/useColors";
 import colors from "@/constants/colors";
 
@@ -18,11 +21,18 @@ const PERKS = [
   { icon: "headset-outline", title: "24/7 Support", desc: "MARSA team available for host assistance" },
 ];
 
-const DOC_SLOTS = [
-  { key: "govId", label: "Government-Issued ID", icon: "card-outline", required: true, hint: "Passport or national ID" },
-  { key: "registration", label: "Boat Registration", icon: "document-text-outline", required: true, hint: "Official vessel registration certificate" },
-  { key: "ownership", label: "Ownership Certificate", icon: "ribbon-outline", required: true, hint: "Proof of yacht ownership" },
-  { key: "insurance", label: "Marine Insurance", icon: "shield-outline", required: false, hint: "Recommended — insurance policy document" },
+const DOC_SLOTS: {
+  key: DocKey;
+  label: string;
+  icon: string;
+  required: boolean;
+  hint: string;
+  documentType: (typeof DocumentInputDocumentType)[keyof typeof DocumentInputDocumentType];
+}[] = [
+  { key: "govId", label: "Government-Issued ID", icon: "card-outline", required: true, hint: "Passport or national ID", documentType: DocumentInputDocumentType.national_id },
+  { key: "registration", label: "Boat Registration / License", icon: "document-text-outline", required: true, hint: "Official vessel registration certificate", documentType: DocumentInputDocumentType.yacht_license },
+  { key: "ownership", label: "Ownership Certificate", icon: "ribbon-outline", required: true, hint: "Proof of yacht ownership", documentType: DocumentInputDocumentType.yacht_ownership },
+  { key: "insurance", label: "Marine Insurance", icon: "shield-outline", required: false, hint: "Recommended — insurance policy document", documentType: DocumentInputDocumentType.insurance },
 ];
 
 type DocKey = "govId" | "registration" | "ownership" | "insurance";
@@ -35,6 +45,7 @@ export default function BecomeHostScreen() {
   const router = useRouter();
   const applyAsHost = useApplyAsHost();
   const requestUploadUrl = useRequestUploadUrl();
+  const uploadHostDocument = useUploadHostDocument();
 
   const [step, setStep] = useState(0);
   const [bio, setBio] = useState("");
@@ -74,6 +85,11 @@ export default function BecomeHostScreen() {
 
       const blob = await fetch(asset.uri).then((r) => r.blob());
       await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": contentType }, body: blob });
+
+      const slot = DOC_SLOTS.find((s) => s.key === key)!;
+      await uploadHostDocument.mutateAsync({
+        data: { documentType: slot.documentType, fileUrl: publicUrl },
+      });
 
       setDocs((d) => ({ ...d, [key]: publicUrl }));
     } catch (err: any) {
