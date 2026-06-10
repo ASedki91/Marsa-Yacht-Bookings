@@ -23,6 +23,7 @@ import {
 } from "@workspace/api-client-react";
 import { useStripe } from "@stripe/stripe-react-native";
 import { useColors } from "@/hooks/useColors";
+import { useUser } from "@/contexts/UserContext";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import colors from "@/constants/colors";
 
@@ -82,6 +83,7 @@ export default function BookScreen() {
   const router = useRouter();
 
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const { user } = useUser();
   const [step, setStep] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
@@ -94,8 +96,16 @@ export default function BookScreen() {
   });
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
   const [guestCount, setGuestCount] = useState(2);
+  const [guestName, setGuestName] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
   const [specialNote, setSpecialNote] = useState("");
   const [booking, setBooking] = useState<any>(null);
+
+  React.useEffect(() => {
+    if (user?.name) setGuestName(user.name);
+    if (user?.email) setGuestEmail(user.email);
+  }, [user?.name, user?.email]);
 
   const { data: yachtData, isLoading: yachtLoading } = useGetYacht(id!);
   const { data: templatesData, isLoading: templatesLoading } = useListBookingTemplates();
@@ -148,14 +158,19 @@ export default function BookScreen() {
   const handlePay = async () => {
     try {
       const result = await createBooking.mutateAsync({
-        yachtId: id!,
-        templateId: selectedTemplate.id,
-        startTime: selectedSlot.startTime,
-        endTime: selectedSlot.endTime,
-        guestCount,
-        specialRequests: specialNote || undefined,
-        addOns: selectedAddOns.map((aoId) => ({ addOnId: aoId })),
-      } as any);
+        data: {
+          yachtId: id!,
+          templateId: selectedTemplate.id,
+          bookingDate: selectedDate,
+          startTime: selectedSlot.startTime,
+          guestCount,
+          guestName: guestName.trim(),
+          guestPhone: guestPhone.trim(),
+          guestEmail: guestEmail.trim(),
+          specialRequests: specialNote.trim() || undefined,
+          addOnIds: selectedAddOns.length > 0 ? selectedAddOns : undefined,
+        },
+      });
 
       const { booking: createdBooking, clientSecret } = result as any;
       setBooking(createdBooking);
@@ -214,7 +229,7 @@ export default function BookScreen() {
       case 0: return !!selectedTemplate;
       case 1: return !!selectedSlot;
       case 2: return true;
-      case 3: return guestCount > 0;
+      case 3: return guestCount > 0 && guestName.trim().length >= 2 && guestPhone.trim().length >= 6 && guestEmail.trim().includes("@");
       case 4: return true;
       default: return false;
     }
@@ -486,6 +501,52 @@ export default function BookScreen() {
 
             <View style={styles.field}>
               <Text style={[styles.fieldLabel, { color: c.foreground }]}>
+                Full Name <Text style={{ color: c.destructive }}>*</Text>
+              </Text>
+              <TextInput
+                style={[styles.textInput, { backgroundColor: c.input, borderColor: c.border, color: c.foreground }]}
+                value={guestName}
+                onChangeText={setGuestName}
+                placeholder="Your full name"
+                placeholderTextColor={c.mutedForeground}
+                autoCapitalize="words"
+                autoComplete="name"
+              />
+            </View>
+
+            <View style={styles.field}>
+              <Text style={[styles.fieldLabel, { color: c.foreground }]}>
+                Phone Number <Text style={{ color: c.destructive }}>*</Text>
+              </Text>
+              <TextInput
+                style={[styles.textInput, { backgroundColor: c.input, borderColor: c.border, color: c.foreground }]}
+                value={guestPhone}
+                onChangeText={setGuestPhone}
+                placeholder="+20 100 000 0000"
+                placeholderTextColor={c.mutedForeground}
+                keyboardType="phone-pad"
+                autoComplete="tel"
+              />
+            </View>
+
+            <View style={styles.field}>
+              <Text style={[styles.fieldLabel, { color: c.foreground }]}>
+                Email <Text style={{ color: c.destructive }}>*</Text>
+              </Text>
+              <TextInput
+                style={[styles.textInput, { backgroundColor: c.input, borderColor: c.border, color: c.foreground }]}
+                value={guestEmail}
+                onChangeText={setGuestEmail}
+                placeholder="you@example.com"
+                placeholderTextColor={c.mutedForeground}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+              />
+            </View>
+
+            <View style={styles.field}>
+              <Text style={[styles.fieldLabel, { color: c.foreground }]}>
                 Special Requests (Optional)
               </Text>
               <TextInput
@@ -495,7 +556,7 @@ export default function BookScreen() {
                 placeholder="Dietary requirements, celebrations, preferences..."
                 placeholderTextColor={c.mutedForeground}
                 multiline
-                numberOfLines={4}
+                numberOfLines={3}
                 textAlignVertical="top"
               />
             </View>
@@ -681,6 +742,14 @@ const styles = StyleSheet.create({
   capacityNote: { fontSize: 12, fontFamily: "Inter_400Regular" },
   field: { gap: 8 },
   fieldLabel: { fontSize: 14, fontFamily: "Inter_500Medium" },
+  textInput: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+  },
   noteInput: {
     borderRadius: 12,
     borderWidth: 1,
