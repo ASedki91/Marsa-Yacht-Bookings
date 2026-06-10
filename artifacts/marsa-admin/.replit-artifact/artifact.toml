@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/marsa-admin/"
+title = "MARSA Admin"
+version = "1.0.0"
+id = "artifacts/marsa-admin"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/marsa-admin/" ]
+localPort = 25344
+
+[services.development]
+run = "pnpm --filter @workspace/marsa-admin run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/marsa-admin", "run", "build" ]
+publicDir = "artifacts/marsa-admin/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25344"
+BASE_PATH = "/marsa-admin/"

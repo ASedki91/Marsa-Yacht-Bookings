@@ -1,0 +1,125 @@
+import { Link, useLocation } from "wouter";
+import { useClerk } from "@clerk/react";
+import {
+  LayoutDashboard, Users, Ship, CalendarCheck, Wallet,
+  Tag, Package, Clock, Star, FileText, Camera, Image,
+  ScrollText, ChevronRight, LogOut, ShieldCheck, Menu, X
+} from "lucide-react";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
+
+const navItems = [
+  { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { path: "/hosts", label: "Host Verification", icon: ShieldCheck },
+  { path: "/documents", label: "Documents", icon: FileText },
+  { path: "/yachts", label: "Yachts", icon: Ship },
+  { path: "/bookings", label: "Bookings", icon: CalendarCheck },
+  { path: "/withdrawals", label: "Withdrawals", icon: Wallet },
+  { path: "/users", label: "Users", icon: Users },
+  { path: "/reviews", label: "Reviews", icon: Star },
+  { path: "/categories", label: "Categories", icon: Tag },
+  { path: "/add-ons", label: "Add-ons", icon: Package },
+  { path: "/booking-templates", label: "Booking Templates", icon: Clock },
+  { path: "/photographer-requests", label: "Photographer Requests", icon: Camera },
+  { path: "/example-photos", label: "Example Photos", icon: Image },
+  { path: "/audit-log", label: "Audit Log", icon: ScrollText },
+];
+
+export function AdminLayout({ children }: { children: React.ReactNode }) {
+  const [location] = useLocation();
+  const { signOut } = useClerk();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  return (
+    <div className="flex h-screen bg-background dark overflow-hidden">
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-20 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-30 w-56 flex flex-col bg-sidebar border-r border-sidebar-border transition-transform duration-200",
+          "lg:relative lg:translate-x-0",
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        {/* Logo */}
+        <div className="flex items-center gap-2 px-4 py-4 border-b border-sidebar-border">
+          <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center shrink-0">
+            <Ship className="w-4 h-4 text-primary-foreground" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-sidebar-foreground leading-none">MARSA</p>
+            <p className="text-[10px] text-sidebar-foreground/50 tracking-widest uppercase leading-none mt-0.5">Admin</p>
+          </div>
+          <button
+            className="ml-auto lg:hidden text-sidebar-foreground/50 hover:text-sidebar-foreground"
+            onClick={() => setMobileOpen(false)}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Nav */}
+        <nav className="flex-1 overflow-y-auto py-2 px-2">
+          {navItems.map(({ path, label, icon: Icon }) => {
+            const active = location === path || location.startsWith(path + "/");
+            return (
+              <Link key={path} href={path}>
+                <a
+                  data-testid={`nav-${path.slice(1)}`}
+                  className={cn(
+                    "flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors mb-0.5",
+                    active
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                      : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+                  )}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{label}</span>
+                  {active && <ChevronRight className="w-3 h-3 ml-auto shrink-0" />}
+                </a>
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Sign out */}
+        <div className="p-2 border-t border-sidebar-border">
+          <button
+            data-testid="button-sign-out"
+            onClick={() => signOut()}
+            className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent w-full transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign Out
+          </button>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Mobile topbar */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-border lg:hidden">
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="text-foreground/70 hover:text-foreground"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <span className="text-sm font-semibold text-foreground">MARSA Admin</span>
+        </div>
+
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
