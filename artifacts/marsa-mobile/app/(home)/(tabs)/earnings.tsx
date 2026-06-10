@@ -14,6 +14,7 @@ import {
   Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import {
   useGetHostEarnings,
@@ -52,6 +53,7 @@ function StatCard({
 export default function EarningsScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
@@ -136,6 +138,20 @@ export default function EarningsScreen() {
             </Text>
           </Pressable>
         </View>
+
+        <Pressable
+          style={[styles.dashboardBanner, { backgroundColor: colors.light.navy }]}
+          onPress={() => router.push("/(home)/(tabs)/dashboard")}
+        >
+          <View style={styles.dashboardBannerLeft}>
+            <Ionicons name="grid-outline" size={20} color={colors.light.gold} />
+            <View>
+              <Text style={styles.dashboardBannerTitle}>Host Dashboard</Text>
+              <Text style={styles.dashboardBannerSub}>Bookings overview & quick actions</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+        </Pressable>
 
         <View style={styles.statsGrid}>
           <StatCard label="Total Earned" amount={earnings.totalEarnedEgp || "0"} color={colors.light.ocean} icon="trending-up-outline" />
@@ -275,6 +291,13 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   withdrawBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  dashboardBanner: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    borderRadius: 14, padding: 14, gap: 12,
+  },
+  dashboardBannerLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+  dashboardBannerTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
+  dashboardBannerSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#94A3B8", marginTop: 2 },
   statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   statCard: {
     flex: 1,

@@ -23,7 +23,14 @@ import { EmptyState } from "@/components/EmptyState";
 import { SkeletonBookingCard } from "@/components/SkeletonCard";
 import colors from "@/constants/colors";
 
-const STATUSES = ["all", "pending", "confirmed", "completed", "cancelled"];
+const STATUSES: Array<{ label: string; value: string }> = [
+  { label: "All",             value: "all" },
+  { label: "Pending Payment", value: "pending_payment" },
+  { label: "Under Review",    value: "paid_under_review" },
+  { label: "Confirmed",       value: "confirmed" },
+  { label: "Completed",       value: "completed" },
+  { label: "Cancelled",       value: "cancelled" },
+];
 
 export default function BookingsScreen() {
   const c = useColors();
@@ -65,24 +72,24 @@ export default function BookingsScreen() {
           horizontal
           showsHorizontalScrollIndicator={false}
           data={STATUSES}
-          keyExtractor={(s) => s}
+          keyExtractor={(s) => s.value}
           renderItem={({ item }) => (
             <Pressable
               style={[
                 styles.statusChip,
-                statusFilter === item
+                statusFilter === item.value
                   ? { backgroundColor: colors.light.navy }
                   : { backgroundColor: c.muted, borderColor: c.border, borderWidth: 1 },
               ]}
-              onPress={() => setStatusFilter(item)}
+              onPress={() => setStatusFilter(item.value)}
             >
               <Text
                 style={[
                   styles.statusChipText,
-                  { color: statusFilter === item ? "#fff" : c.mutedForeground },
+                  { color: statusFilter === item.value ? "#fff" : c.mutedForeground },
                 ]}
               >
-                {item.charAt(0).toUpperCase() + item.slice(1)}
+                {item.label}
               </Text>
             </Pressable>
           )}

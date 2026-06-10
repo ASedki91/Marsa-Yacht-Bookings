@@ -44,8 +44,13 @@ const sStyles = StyleSheet.create({
 function BookingRow({ booking, onPress }: { booking: any; onPress: () => void }) {
   const c = useColors();
   const statusColors: Record<string, string> = {
-    pending: "#F59E0B", confirmed: "#22C55E", completed: "#3B82F6",
-    cancelled: "#EF4444", rejected: "#6B7280",
+    pending_payment:   "#F59E0B",
+    paid_under_review: "#3B82F6",
+    confirmed:         "#22C55E",
+    completed:         "#3B82F6",
+    cancel_requested:  "#F97316",
+    cancelled:         "#EF4444",
+    rejected_refunded: "#6B7280",
   };
   const status = booking.status ?? "pending";
   return (

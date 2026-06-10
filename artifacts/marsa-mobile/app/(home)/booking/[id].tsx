@@ -16,22 +16,25 @@ import { EmptyState } from "@/components/EmptyState";
 import colors from "@/constants/colors";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: string }> = {
-  pending: { label: "Pending", color: "#92400E", bg: "#FEF3C7", icon: "time-outline" },
-  confirmed: { label: "Confirmed", color: "#065F46", bg: "#D1FAE5", icon: "checkmark-circle-outline" },
-  completed: { label: "Completed", color: "#1E40AF", bg: "#DBEAFE", icon: "trophy-outline" },
-  cancelled: { label: "Cancelled", color: "#991B1B", bg: "#FEE2E2", icon: "close-circle-outline" },
-  rejected: { label: "Rejected", color: "#991B1B", bg: "#FEE2E2", icon: "ban-outline" },
+  pending_payment:   { label: "Pending Payment",  color: "#92400E", bg: "#FEF3C7", icon: "card-outline" },
+  paid_under_review: { label: "Under Review",     color: "#1E40AF", bg: "#DBEAFE", icon: "search-outline" },
+  confirmed:         { label: "Confirmed",         color: "#065F46", bg: "#D1FAE5", icon: "checkmark-circle-outline" },
+  completed:         { label: "Completed",         color: "#1E40AF", bg: "#DBEAFE", icon: "trophy-outline" },
+  cancel_requested:  { label: "Cancel Requested", color: "#92400E", bg: "#FEF3C7", icon: "alert-outline" },
+  cancelled:         { label: "Cancelled",         color: "#991B1B", bg: "#FEE2E2", icon: "close-circle-outline" },
+  rejected_refunded: { label: "Rejected",          color: "#6B7280", bg: "#F1F5F9", icon: "ban-outline" },
 };
 
 const TIMELINE_STEPS = [
-  { key: "pending", label: "Booking Requested", sub: "Waiting for host confirmation" },
-  { key: "confirmed", label: "Booking Confirmed", sub: "Host has accepted your booking" },
-  { key: "completed", label: "Trip Completed", sub: "Your charter is complete" },
+  { key: "pending_payment",   label: "Booking Requested",  sub: "Waiting for payment confirmation" },
+  { key: "paid_under_review", label: "Payment Confirmed",  sub: "Waiting for host review" },
+  { key: "confirmed",         label: "Booking Confirmed",  sub: "Host has accepted your booking" },
+  { key: "completed",         label: "Trip Completed",     sub: "Your charter is complete" },
 ];
 
 function Timeline({ status }: { status: string }) {
   const c = useColors();
-  const cancelled = status === "cancelled" || status === "rejected";
+  const cancelled = status === "cancelled" || status === "rejected_refunded" || status === "cancel_requested";
 
   return (
     <View style={tlStyles.container}>
@@ -45,16 +48,10 @@ function Timeline({ status }: { status: string }) {
         </View>
       ) : (
         TIMELINE_STEPS.map((step, i) => {
-          const isDone =
-            status === "completed" ? true
-              : status === "confirmed" ? i <= 1
-                : i === 0;
-          const isCurrent =
-            status === "pending" && i === 0
-              ? true
-              : status === "confirmed" && i === 1
-                ? true
-                : status === "completed" && i === 2;
+          const ORDER = ["pending_payment", "paid_under_review", "confirmed", "completed"];
+          const currentIdx = ORDER.indexOf(status);
+          const isDone = currentIdx >= i + 1 || status === "completed";
+          const isCurrent = currentIdx === i;
 
           return (
             <View key={step.key} style={tlStyles.stepRow}>
@@ -184,13 +181,13 @@ export default function BookingDetailScreen() {
     return <EmptyState icon="alert-circle-outline" title="Booking not found" />;
   }
 
-  const status = booking.status ?? "pending";
-  const statusCfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
-  const canCancel = (status === "pending" || status === "confirmed") && booking.guestId === user?.id;
+  const status = booking.status ?? "pending_payment";
+  const statusCfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending_payment;
+  const canCancel = ["pending_payment", "paid_under_review", "confirmed"].includes(status) && booking.guestId === user?.id;
   const canReview = status === "completed" && booking.guestId === user?.id && !booking.hasReview;
 
-  const totalEgp = booking.totalPriceEgp ?? booking.totalEgp ?? booking.priceEgp ?? "—";
-  const totalUsd = booking.totalPriceUsd ?? booking.totalUsd ?? "—";
+  const totalEgp = booking.totalAmountEgp ?? booking.totalPriceEgp ?? booking.totalEgp ?? "—";
+  const totalUsd = booking.totalAmountUsd ?? booking.totalPriceUsd ?? booking.totalUsd ?? "—";
 
   return (
     <View style={[styles.screen, { backgroundColor: c.background }]}>

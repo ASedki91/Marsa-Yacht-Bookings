@@ -8,12 +8,13 @@ const STATUS_CONFIG: Record<
   string,
   { label: string; color: string; bg: string; icon: keyof typeof Ionicons.glyphMap }
 > = {
-  pending: { label: "Pending", color: "#92400E", bg: "#FEF3C7", icon: "time-outline" },
-  confirmed: { label: "Confirmed", color: "#065F46", bg: "#D1FAE5", icon: "checkmark-circle-outline" },
-  cancelled: { label: "Cancelled", color: "#991B1B", bg: "#FEE2E2", icon: "close-circle-outline" },
-  completed: { label: "Completed", color: "#1E40AF", bg: "#DBEAFE", icon: "checkmark-done-circle-outline" },
-  rejected: { label: "Rejected", color: "#991B1B", bg: "#FEE2E2", icon: "ban-outline" },
-  refunded: { label: "Refunded", color: "#7C3AED", bg: "#EDE9FE", icon: "return-down-back-outline" },
+  pending_payment:   { label: "Pending Payment",  color: "#92400E", bg: "#FEF3C7", icon: "card-outline" },
+  paid_under_review: { label: "Under Review",     color: "#1E40AF", bg: "#DBEAFE", icon: "search-outline" },
+  confirmed:         { label: "Confirmed",         color: "#065F46", bg: "#D1FAE5", icon: "checkmark-circle-outline" },
+  completed:         { label: "Completed",         color: "#1E40AF", bg: "#DBEAFE", icon: "checkmark-done-circle-outline" },
+  cancel_requested:  { label: "Cancel Requested", color: "#92400E", bg: "#FEF3C7", icon: "alert-outline" },
+  cancelled:         { label: "Cancelled",         color: "#991B1B", bg: "#FEE2E2", icon: "close-circle-outline" },
+  rejected_refunded: { label: "Rejected",          color: "#6B7280", bg: "#F1F5F9", icon: "ban-outline" },
 };
 
 interface BookingCardProps {
@@ -110,7 +111,7 @@ export function BookingCard({
         )}
       </View>
 
-      {showActions && booking.status === "pending" && (
+      {showActions && booking.status === "paid_under_review" && (
         <View style={styles.actions}>
           <Pressable
             style={[styles.actionBtn, { borderColor: c.destructive }]}
