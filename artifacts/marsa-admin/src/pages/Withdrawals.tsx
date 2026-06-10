@@ -65,7 +65,7 @@ export default function Withdrawals() {
               <CardContent className="flex items-center justify-between py-3 px-4">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-foreground text-sm">{formatEgp(w.amount ?? 0)}</span>
+                    <span className="font-semibold text-foreground text-sm">{formatEgp(w.amountEgp ?? 0)}</span>
                     {statusIcon[w.status]}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">

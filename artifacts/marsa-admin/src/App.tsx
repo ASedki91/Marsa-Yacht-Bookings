@@ -14,6 +14,7 @@ import Hosts from "./pages/Hosts";
 import Documents from "./pages/Documents";
 import Yachts from "./pages/Yachts";
 import Bookings from "./pages/Bookings";
+import Cancellations from "./pages/Cancellations";
 import Withdrawals from "./pages/Withdrawals";
 import Users from "./pages/Users";
 import Reviews from "./pages/Reviews";
@@ -195,6 +196,7 @@ function AdminApp() {
           <Route path="/documents" component={Documents} />
           <Route path="/yachts" component={Yachts} />
           <Route path="/bookings" component={Bookings} />
+          <Route path="/cancellations" component={Cancellations} />
           <Route path="/withdrawals" component={Withdrawals} />
           <Route path="/users" component={Users} />
           <Route path="/reviews" component={Reviews} />

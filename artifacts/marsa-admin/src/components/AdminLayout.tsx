@@ -3,7 +3,7 @@ import { useClerk } from "@clerk/react";
 import {
   LayoutDashboard, Users, Ship, CalendarCheck, Wallet,
   Tag, Package, Clock, Star, FileText, Camera, Image,
-  ScrollText, ChevronRight, LogOut, ShieldCheck, Menu, X
+  ScrollText, ChevronRight, LogOut, ShieldCheck, Menu, X, Ban
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,7 @@ const navItems = [
   { path: "/documents", label: "Documents", icon: FileText },
   { path: "/yachts", label: "Yachts", icon: Ship },
   { path: "/bookings", label: "Bookings", icon: CalendarCheck },
+  { path: "/cancellations", label: "Cancellations", icon: Ban },
   { path: "/withdrawals", label: "Withdrawals", icon: Wallet },
   { path: "/users", label: "Users", icon: Users },
   { path: "/reviews", label: "Reviews", icon: Star },

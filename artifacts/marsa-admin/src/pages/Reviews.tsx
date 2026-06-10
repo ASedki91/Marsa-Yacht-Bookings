@@ -15,7 +15,8 @@ import { Star, CheckCircle, EyeOff } from "lucide-react";
 const statusBadge: Record<string, React.ReactNode> = {
   pending: <Badge variant="outline" className="text-amber-400 border-amber-400/40 text-xs">Pending Review</Badge>,
   approved: <Badge variant="outline" className="text-green-400 border-green-400/40 text-xs">Approved</Badge>,
-  removed: <Badge variant="outline" className="text-muted-foreground border-muted/40 text-xs">Hidden</Badge>,
+  rejected: <Badge variant="outline" className="text-red-400 border-red-400/40 text-xs">Rejected</Badge>,
+  hidden: <Badge variant="outline" className="text-muted-foreground border-muted/40 text-xs">Hidden</Badge>,
 };
 
 export default function Reviews() {
@@ -40,10 +41,7 @@ export default function Reviews() {
   const allReviews = (data as any)?.reviews ?? [];
   const reviews = statusFilter === "all"
     ? allReviews
-    : allReviews.filter((r: any) => {
-        const s = r.status ?? "approved";
-        return s === statusFilter;
-      });
+    : allReviews.filter((r: any) => (r.status ?? "approved") === statusFilter);
 
   const pendingCount = allReviews.filter((r: any) => (r.status ?? "approved") === "pending").length;
 
@@ -64,7 +62,8 @@ export default function Reviews() {
             <SelectItem value="all">All</SelectItem>
             <SelectItem value="pending">Pending Review</SelectItem>
             <SelectItem value="approved">Approved</SelectItem>
-            <SelectItem value="removed">Hidden</SelectItem>
+            <SelectItem value="rejected">Rejected</SelectItem>
+            <SelectItem value="hidden">Hidden</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -112,12 +111,20 @@ export default function Reviews() {
                           <CheckCircle className="w-3 h-3 mr-1" />Approve
                         </Button>
                       )}
-                      {status !== "removed" && (
+                      {status !== "hidden" && (
                         <Button size="sm" variant="outline" className="text-muted-foreground border-muted/40 hover:bg-muted/20 h-7 text-xs"
                           data-testid={`button-hide-review-${r.id}`}
                           onClick={() => moderate.mutate({ id: r.id, data: { status: "hidden" } })}
                           disabled={moderate.isPending}>
                           <EyeOff className="w-3 h-3 mr-1" />Hide
+                        </Button>
+                      )}
+                      {status !== "rejected" && (
+                        <Button size="sm" variant="outline" className="text-red-400 border-red-400/40 hover:bg-red-400/10 h-7 text-xs"
+                          data-testid={`button-reject-review-${r.id}`}
+                          onClick={() => moderate.mutate({ id: r.id, data: { status: "rejected" } })}
+                          disabled={moderate.isPending}>
+                          Reject
                         </Button>
                       )}
                     </div>
