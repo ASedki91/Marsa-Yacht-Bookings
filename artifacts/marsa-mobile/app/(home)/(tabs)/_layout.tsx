@@ -20,12 +20,6 @@ function NativeTabLayout({ isHost }: { isHost: boolean }) {
         <Label>Bookings</Label>
       </NativeTabs.Trigger>
       {isHost && (
-        <NativeTabs.Trigger name="dashboard">
-          <Icon sf={{ default: "chart.bar", selected: "chart.bar.fill" }} />
-          <Label>Dashboard</Label>
-        </NativeTabs.Trigger>
-      )}
-      {isHost && (
         <NativeTabs.Trigger name="yachts">
           <Icon sf={{ default: "ferry", selected: "ferry.fill" }} />
           <Label>My Yachts</Label>
@@ -33,7 +27,7 @@ function NativeTabLayout({ isHost }: { isHost: boolean }) {
       )}
       {isHost && (
         <NativeTabs.Trigger name="earnings">
-          <Icon sf={{ default: "chart.bar.fill", selected: "chart.bar.fill" }} />
+          <Icon sf={{ default: "banknote", selected: "banknote.fill" }} />
           <Label>Earnings</Label>
         </NativeTabs.Trigger>
       )}
@@ -129,8 +123,8 @@ function ClassicTabLayout({ isHost }: { isHost: boolean }) {
             ) : (
               <Ionicons name="grid-outline" size={22} color={color} />
             ),
-          tabBarButton: isHost ? undefined : () => null,
-          tabBarItemStyle: isHost ? {} : { display: "none", width: 0 },
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: "none", width: 0 },
         }}
       />
       <Tabs.Screen

@@ -246,7 +246,7 @@ router.get(
 
 // ── List My Bookings ────────────────────────────────────────────────────────
 const listBookingsQuery = z.object({
-  role: z.enum(["guest", "host"]).optional().default("guest"),
+  role: z.enum(["guest", "host", "all"]).optional().default("guest"),
   status: z.string().optional(),
   page: z.coerce.number().int().positive().optional().default(1),
 });
@@ -263,7 +263,54 @@ router.get(
 
     let whereClause: any;
 
-    if (role === "host") {
+    if (role === "all") {
+      // Return both guest bookings and host (incoming) bookings merged
+      const guestWhere = status
+        ? and(eq(bookingsTable.guestId, user.id), eq(bookingsTable.status, status as any))
+        : eq(bookingsTable.guestId, user.id);
+
+      const [profile] = await db
+        .select()
+        .from(hostProfilesTable)
+        .where(eq(hostProfilesTable.userId, user.id))
+        .limit(1);
+
+      const hostYachts = profile
+        ? await db.select({ id: yachtsTable.id }).from(yachtsTable).where(eq(yachtsTable.hostId, profile.id))
+        : [];
+      const yachtIds = hostYachts.map((y) => y.id);
+
+      let allBookings: (typeof bookingsTable.$inferSelect)[];
+
+      if (yachtIds.length > 0) {
+        const hostWhere = status
+          ? and(sql`${bookingsTable.yachtId} = ANY(${yachtIds})`, eq(bookingsTable.status, status as any))
+          : sql`${bookingsTable.yachtId} = ANY(${yachtIds})`;
+
+        const [guestBookings, hostBookings] = await Promise.all([
+          db.select().from(bookingsTable).where(guestWhere),
+          db.select().from(bookingsTable).where(hostWhere),
+        ]);
+
+        // Merge, deduplicating by booking id (e.g. a host booked their own yacht)
+        const seen = new Set<string>();
+        allBookings = [];
+        for (const b of [...guestBookings, ...hostBookings]) {
+          if (!seen.has(b.id)) {
+            seen.add(b.id);
+            allBookings.push(b);
+          }
+        }
+      } else {
+        allBookings = await db.select().from(bookingsTable).where(guestWhere);
+      }
+
+      allBookings.sort((a, b) => new Date(String(b.createdAt)).getTime() - new Date(String(a.createdAt)).getTime());
+      const total = allBookings.length;
+      const bookings = allBookings.slice(offset, offset + limit);
+      res.json({ bookings, total, page });
+      return;
+    } else if (role === "host") {
       const [profile] = await db
         .select()
         .from(hostProfilesTable)

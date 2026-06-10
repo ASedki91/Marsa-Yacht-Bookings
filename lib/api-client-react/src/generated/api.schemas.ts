@@ -728,6 +728,7 @@ export type ListMyBookingsRole = typeof ListMyBookingsRole[keyof typeof ListMyBo
 export const ListMyBookingsRole = {
   guest: 'guest',
   host: 'host',
+  all: 'all',
 } as const;
 
 export type ListNotificationsParams = {

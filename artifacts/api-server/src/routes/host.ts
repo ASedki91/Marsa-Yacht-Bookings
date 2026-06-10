@@ -14,7 +14,7 @@ import {
   photographerRequestsTable,
   auditLogsTable,
 } from "@workspace/db";
-import { and, eq, sql, desc, asc } from "drizzle-orm";
+import { and, eq, sql, desc, asc, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { requireAuth, requireRole, validateBody } from "../middlewares/index";
 
@@ -232,7 +232,56 @@ router.get(
       .from(yachtsTable)
       .where(eq(yachtsTable.hostId, profile.id))
       .orderBy(desc(yachtsTable.createdAt));
-    res.json({ yachts, total: yachts.length, page: 1, limit: 100 });
+
+    // Normalize response: attach photos + min pricing so YachtCard renders fully
+    const ids = yachts.map((y) => y.id);
+    const [photoRows, priceRows] = ids.length
+      ? await Promise.all([
+          db
+            .select()
+            .from(yachtPhotosTable)
+            .where(inArray(yachtPhotosTable.yachtId, ids))
+            .orderBy(asc(yachtPhotosTable.sortOrder)),
+          db
+            .select({
+              yachtId: yachtTemplatePricingTable.yachtId,
+              price: yachtTemplatePricingTable.price,
+            })
+            .from(yachtTemplatePricingTable)
+            .where(
+              and(
+                inArray(yachtTemplatePricingTable.yachtId, ids),
+                eq(yachtTemplatePricingTable.isActive, true),
+              ),
+            ),
+        ])
+      : [[], []];
+
+    const photosByYacht = new Map<string, (typeof photoRows)>();
+    for (const p of photoRows) {
+      const arr = photosByYacht.get(p.yachtId) ?? [];
+      arr.push(p);
+      photosByYacht.set(p.yachtId, arr);
+    }
+    const minPriceByYacht = new Map<string, number>();
+    for (const r of priceRows) {
+      const val = Number(r.price);
+      const cur = minPriceByYacht.get(r.yachtId);
+      if (cur === undefined || val < cur) minPriceByYacht.set(r.yachtId, val);
+    }
+
+    const normalized = yachts.map((y) => ({
+      ...y,
+      name: y.title,
+      rating: y.avgRating != null ? Number(y.avgRating) : null,
+      photos: photosByYacht.get(y.id) ?? [],
+      basePriceEgp:
+        minPriceByYacht.get(y.id) !== undefined
+          ? minPriceByYacht.get(y.id)!.toFixed(2)
+          : null,
+    }));
+
+    res.json({ yachts: normalized, total: normalized.length, page: 1, limit: 100 });
   },
 );
 

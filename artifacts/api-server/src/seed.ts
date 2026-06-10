@@ -19,8 +19,9 @@ import {
   bookingsTable,
   bookingTemplatesTable,
   categoriesTable,
+  availabilitySlotsTable,
 } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 const log = (msg: string) => process.stdout.write(`[seed] ${msg}\n`);
 
@@ -172,6 +173,62 @@ async function seed() {
     log(`Created host profile: ${hostProfileId}`);
   }
 
+  // ── Availability slots helper ────────────────────────────────────────────
+  // Seeds 30 days of open slots for each yacht × template. Idempotent — skips
+  // if slots already exist. Start time is 17:00 for sunset trips, 09:00 otherwise.
+  const ensureAvailability = async (
+    yachts: { id: string }[],
+  ): Promise<void> => {
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(availabilitySlotsTable);
+    if (count > 0) {
+      log(`Availability slots already exist (${count}), skipping`);
+      return;
+    }
+
+    const templates = await db.select().from(bookingTemplatesTable);
+    const rows: {
+      id: string;
+      yachtId: string;
+      templateId: string;
+      date: string;
+      startTime: string;
+      isAvailable: boolean;
+    }[] = [];
+
+    const today = new Date();
+    for (const y of yachts) {
+      for (const t of templates) {
+        const startTime = (t.name ?? "").toLowerCase().includes("sunset")
+          ? "17:00:00"
+          : "09:00:00";
+        for (let d = 0; d < 30; d++) {
+          const date = new Date(today);
+          date.setDate(today.getDate() + d);
+          const dateStr = date.toISOString().split("T")[0];
+          rows.push({
+            id: randomUUID(),
+            yachtId: y.id,
+            templateId: t.id,
+            date: dateStr,
+            startTime,
+            isAvailable: true,
+          });
+        }
+      }
+    }
+
+    // Insert in batches of 100
+    for (let i = 0; i < rows.length; i += 100) {
+      await db
+        .insert(availabilitySlotsTable)
+        .values(rows.slice(i, i + 100))
+        .onConflictDoNothing();
+    }
+    log(`Created ${rows.length} availability slots`);
+  };
+
   // ── Pricing backfill helper ──────────────────────────────────────────────
   // Inserts per-template pricing for each yacht. Idempotent via the
   // uq_yacht_template unique constraint, so it's safe to run on existing yachts.
@@ -205,9 +262,10 @@ async function seed() {
     .where(eq(yachtsTable.hostId, hostProfileId));
 
   if (existingYachts.length > 0) {
-    log(`Yachts already exist (${existingYachts.length}), backfilling pricing…`);
+    log(`Yachts already exist (${existingYachts.length}), backfilling pricing + availability…`);
     await ensurePricing(existingYachts);
-    log("Pricing backfill complete ✓");
+    await ensureAvailability(existingYachts);
+    log("Backfill complete ✓");
     log("Seed complete ✓");
     process.exit(0);
   }
@@ -320,6 +378,10 @@ async function seed() {
   // ── Yacht pricing ──────────────────────────────────────────────────────────
   await ensurePricing(createdYachts);
   log("Created yacht pricing");
+
+  // ── Availability slots ─────────────────────────────────────────────────────
+  await ensureAvailability(createdYachts);
+  log("Created availability slots");
 
   // ── Bookings ───────────────────────────────────────────────────────────────
   const bookingsData = [

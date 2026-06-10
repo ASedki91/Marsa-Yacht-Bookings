@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -10,7 +10,12 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useListMyBookings, useConfirmBooking, useRejectBooking } from "@workspace/api-client-react";
+import {
+  useListMyBookings,
+  useConfirmBooking,
+  useRejectBooking,
+  ListMyBookingsRole,
+} from "@workspace/api-client-react";
 import { useColors } from "@/hooks/useColors";
 import { useUser } from "@/contexts/UserContext";
 import { BookingCard } from "@/components/BookingCard";
@@ -24,11 +29,13 @@ export default function BookingsScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { isHost } = useUser();
+  const { isHost, user } = useUser();
 
-  const [role, setRole] = useState<"guest" | "host">("guest");
   const [statusFilter, setStatusFilter] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
+
+  // Hosts see all their bookings (as guest + incoming) in one unified list
+  const role = isHost ? ListMyBookingsRole.all : ListMyBookingsRole.guest;
 
   const { data, isLoading, error, refetch } = useListMyBookings({
     role,
@@ -53,27 +60,6 @@ export default function BookingsScreen() {
     <View style={[styles.container, { backgroundColor: c.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: c.background }]}>
         <Text style={[styles.title, { color: c.foreground }]}>My Bookings</Text>
-
-        {isHost && (
-          <View style={[styles.roleToggle, { backgroundColor: c.muted }]}>
-            <Pressable
-              style={[styles.roleBtn, role === "guest" && { backgroundColor: c.card }]}
-              onPress={() => setRole("guest")}
-            >
-              <Text style={[styles.roleBtnText, { color: role === "guest" ? c.foreground : c.mutedForeground }]}>
-                As Guest
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.roleBtn, role === "host" && { backgroundColor: c.card }]}
-              onPress={() => setRole("host")}
-            >
-              <Text style={[styles.roleBtnText, { color: role === "host" ? c.foreground : c.mutedForeground }]}>
-                As Host
-              </Text>
-            </Pressable>
-          </View>
-        )}
 
         <FlatList
           horizontal
@@ -120,27 +106,31 @@ export default function BookingsScreen() {
         <EmptyState
           icon="calendar-outline"
           title="No bookings yet"
-          subtitle={role === "guest" ? "Explore yachts and make your first booking" : "You have no incoming bookings"}
-          actionLabel={role === "guest" ? "Explore Yachts" : undefined}
-          onAction={role === "guest" ? () => router.replace("/(home)/(tabs)/explore") : undefined}
+          subtitle="Explore yachts and make your first booking"
+          actionLabel="Explore Yachts"
+          onAction={() => router.replace("/(home)/(tabs)/explore")}
         />
       ) : (
         <FlatList
           data={bookings}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <BookingCard
-              booking={item}
-              onPress={() => router.push(`/(home)/booking/${item.id}`)}
-              showActions={role === "host"}
-              onConfirm={() =>
-                confirm.mutateAsync({ id: item.id }).catch(() => {}).then(() => refetch())
-              }
-              onReject={() =>
-                reject.mutateAsync({ id: item.id }).catch(() => {}).then(() => refetch())
-              }
-            />
-          )}
+          renderItem={({ item }) => {
+            // For hosts: show quick actions on incoming bookings (where user is not the guest)
+            const isIncoming = isHost && item.guestId !== user?.id;
+            return (
+              <BookingCard
+                booking={item}
+                onPress={() => router.push(`/(home)/booking/${item.id}`)}
+                showActions={isIncoming}
+                onConfirm={() =>
+                  confirm.mutateAsync({ id: item.id }).catch(() => {}).then(() => refetch())
+                }
+                onReject={() =>
+                  reject.mutateAsync({ id: item.id }).catch(() => {}).then(() => refetch())
+                }
+              />
+            );
+          }}
           contentContainerStyle={[
             styles.list,
             { paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 80 },
@@ -167,21 +157,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   title: { fontSize: 24, fontFamily: "Inter_700Bold" },
-  roleToggle: {
-    flexDirection: "row",
-    borderRadius: 10,
-    padding: 3,
-    alignSelf: "flex-start",
-  },
-  roleBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 8,
-  },
-  roleBtnText: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-  },
   statusChip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
