@@ -14,8 +14,8 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, Image } from "lucide-react";
 
-type FormState = { imageUrl: string; caption: string; yachtId: string };
-const empty: FormState = { imageUrl: "", caption: "", yachtId: "" };
+type FormState = { url: string; caption: string; category: string };
+const empty: FormState = { url: "", caption: "", category: "" };
 
 export default function ExamplePhotos() {
   const [dialog, setDialog] = useState<{ mode: "create" | "edit"; id?: string } | null>(null);
@@ -38,8 +38,12 @@ export default function ExamplePhotos() {
   const photos = (data as any)?.photos ?? [];
 
   const handleSave = () => {
-    if (!form.imageUrl.trim()) return;
-    const payload = { imageUrl: form.imageUrl, caption: form.caption, yachtId: form.yachtId || undefined };
+    if (!form.url.trim()) return;
+    const payload = {
+      url: form.url,
+      caption: form.caption || undefined,
+      category: form.category || undefined,
+    };
     if (dialog?.mode === "create") create.mutate({ data: payload });
     else if (dialog?.id) update.mutate({ id: dialog.id, data: payload });
   };
@@ -64,8 +68,8 @@ export default function ExamplePhotos() {
           {photos.map((p: any) => (
             <Card key={p.id} data-testid={`card-photo-${p.id}`} className="overflow-hidden">
               <div className="relative aspect-video bg-muted">
-                {p.imageUrl ? (
-                  <img src={p.imageUrl} alt={p.caption ?? "Example photo"} className="w-full h-full object-cover" />
+                {p.url ? (
+                  <img src={p.url} alt={p.caption ?? "Example photo"} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <Image className="w-8 h-8 text-muted-foreground" />
@@ -75,7 +79,7 @@ export default function ExamplePhotos() {
                   <button
                     data-testid={`button-edit-photo-${p.id}`}
                     className="w-7 h-7 rounded bg-background/80 backdrop-blur flex items-center justify-center hover:bg-background"
-                    onClick={() => { setForm({ imageUrl: p.imageUrl ?? "", caption: p.caption ?? "", yachtId: p.yachtId ?? "" }); setDialog({ mode: "edit", id: p.id }); }}>
+                    onClick={() => { setForm({ url: p.url ?? "", caption: p.caption ?? "", category: p.category ?? "" }); setDialog({ mode: "edit", id: p.id }); }}>
                     <Pencil className="w-3 h-3" />
                   </button>
                   <button
@@ -88,7 +92,7 @@ export default function ExamplePhotos() {
               </div>
               <CardContent className="py-2 px-3">
                 <p className="text-xs text-foreground truncate">{p.caption || "No caption"}</p>
-                {p.yachtId && <p className="text-xs text-muted-foreground">Yacht: {p.yachtId.slice(0, 8)}</p>}
+                {p.category && <p className="text-xs text-muted-foreground">Category: {p.category}</p>}
               </CardContent>
             </Card>
           ))}
@@ -99,13 +103,22 @@ export default function ExamplePhotos() {
         <DialogContent>
           <DialogHeader><DialogTitle>{dialog?.mode === "create" ? "Add Example Photo" : "Edit Photo"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>Image URL</Label><Input data-testid="input-photo-url" value={form.imageUrl} onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))} placeholder="https://..." className="mt-1" /></div>
-            <div><Label>Caption</Label><Input data-testid="input-photo-caption" value={form.caption} onChange={e => setForm(f => ({ ...f, caption: e.target.value }))} placeholder="Optional caption" className="mt-1" /></div>
-            <div><Label>Yacht ID (optional)</Label><Input data-testid="input-photo-yacht" value={form.yachtId} onChange={e => setForm(f => ({ ...f, yachtId: e.target.value }))} placeholder="Leave blank for generic" className="mt-1" /></div>
+            <div>
+              <Label>Image URL</Label>
+              <Input data-testid="input-photo-url" value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))} placeholder="https://..." className="mt-1" />
+            </div>
+            <div>
+              <Label>Caption <span className="text-muted-foreground text-xs">(optional)</span></Label>
+              <Input data-testid="input-photo-caption" value={form.caption} onChange={e => setForm(f => ({ ...f, caption: e.target.value }))} placeholder="E.g. Sunset deck view" className="mt-1" />
+            </div>
+            <div>
+              <Label>Category <span className="text-muted-foreground text-xs">(optional — e.g. deck, interior, exterior)</span></Label>
+              <Input data-testid="input-photo-category" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder="Leave blank for general" className="mt-1" />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button>
-            <Button data-testid="button-save-photo" disabled={!form.imageUrl.trim() || create.isPending || update.isPending} onClick={handleSave}>
+            <Button data-testid="button-save-photo" disabled={!form.url.trim() || create.isPending || update.isPending} onClick={handleSave}>
               {create.isPending || update.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>

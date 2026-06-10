@@ -7,7 +7,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useGetMe, useSyncUser } from "@workspace/api-client-react";
+import { useGetMe, useSyncUser, getGetMeQueryKey } from "@workspace/api-client-react";
 import { AdminLayout } from "./components/AdminLayout";
 import Dashboard from "./pages/Dashboard";
 import Hosts from "./pages/Hosts";
@@ -144,6 +144,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isSignedIn, isLoaded: clerkLoaded, user } = useUser();
   const { data: me, isLoading: meLoading } = useGetMe({
     query: {
+      queryKey: getGetMeQueryKey(),
       enabled: isSignedIn,
       retry: false,
     }

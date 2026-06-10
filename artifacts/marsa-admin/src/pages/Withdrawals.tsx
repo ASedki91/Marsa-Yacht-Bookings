@@ -100,7 +100,7 @@ export default function Withdrawals() {
           </DialogHeader>
           {dialog?.action === "paid" && (
             <div className="space-y-2">
-              <Label htmlFor="tx-ref">Transaction Reference (optional)</Label>
+              <Label htmlFor="tx-ref">Payout Reference (optional)</Label>
               <Input id="tx-ref" data-testid="input-tx-ref" value={txRef} onChange={e => setTxRef(e.target.value)} placeholder="Bank reference..." />
             </div>
           )}
@@ -110,7 +110,7 @@ export default function Withdrawals() {
               data-testid="button-confirm-withdrawal"
               variant={dialog?.action === "paid" ? "default" : "destructive"}
               disabled={process.isPending}
-              onClick={() => dialog && process.mutate({ id: dialog.id, data: { action: dialog.action, transactionRef: txRef || undefined } })}
+              onClick={() => dialog && process.mutate({ id: dialog.id, data: { status: dialog.action, payoutReference: txRef || undefined } })}
             >
               {process.isPending ? "Processing..." : "Confirm"}
             </Button>

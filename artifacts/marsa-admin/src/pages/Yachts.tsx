@@ -52,7 +52,7 @@ export default function Yachts() {
     if (!dialog) return;
     if (dialog.action === "approve") approve.mutate({ id: dialog.id });
     else if (dialog.action === "reject") reject.mutate({ id: dialog.id, data: { reason: reason || undefined } });
-    else if (dialog.action === "request-changes") requestChanges.mutate({ id: dialog.id, data: { reason: reason || "" } });
+    else if (dialog.action === "request-changes") requestChanges.mutate({ id: dialog.id, data: { feedback: reason || "" } });
     else if (dialog.action === "suspend") suspend.mutate({ id: dialog.id, data: { reason: reason || undefined } });
   };
 

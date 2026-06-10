@@ -107,7 +107,7 @@ export default function Reviews() {
                       {status !== "approved" && (
                         <Button size="sm" variant="outline" className="text-green-400 border-green-400/40 hover:bg-green-400/10 h-7 text-xs"
                           data-testid={`button-approve-review-${r.id}`}
-                          onClick={() => moderate.mutate({ id: r.id, data: { action: "approve" } })}
+                          onClick={() => moderate.mutate({ id: r.id, data: { status: "approved" } })}
                           disabled={moderate.isPending}>
                           <CheckCircle className="w-3 h-3 mr-1" />Approve
                         </Button>
@@ -115,7 +115,7 @@ export default function Reviews() {
                       {status !== "removed" && (
                         <Button size="sm" variant="outline" className="text-muted-foreground border-muted/40 hover:bg-muted/20 h-7 text-xs"
                           data-testid={`button-hide-review-${r.id}`}
-                          onClick={() => moderate.mutate({ id: r.id, data: { action: "remove" } })}
+                          onClick={() => moderate.mutate({ id: r.id, data: { status: "hidden" } })}
                           disabled={moderate.isPending}>
                           <EyeOff className="w-3 h-3 mr-1" />Hide
                         </Button>
