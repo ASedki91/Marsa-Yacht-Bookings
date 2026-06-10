@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { ClerkProvider, SignIn, SignUp, Show, useClerk, useUser } from '@clerk/react';
+import { ClerkProvider, SignIn, Show, useClerk, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from 'wouter';
@@ -71,7 +71,6 @@ const clerkAppearance = {
     footer: "!shadow-none !border-0 !bg-transparent !rounded-none",
     headerTitle: "text-2xl font-bold text-foreground",
     headerSubtitle: "text-muted-foreground",
-    socialButtonsBlockButtonText: "text-foreground font-medium",
     formFieldLabel: "text-foreground font-medium",
     footerActionLink: "text-primary font-medium hover:text-primary/90",
     footerActionText: "text-muted-foreground",
@@ -81,7 +80,9 @@ const clerkAppearance = {
     alertText: "text-destructive font-medium",
     logoBox: "h-12 flex items-center justify-center mb-6",
     logoImage: "h-8 object-contain",
-    socialButtonsBlockButton: "border-border hover:bg-muted/50 transition-colors",
+    socialButtonsBlockButton: "!bg-black !border-black text-white hover:!bg-gray-900 transition-colors",
+    socialButtonsBlockButtonText: "!text-white font-medium",
+    socialButtonsProviderIcon: "brightness-0 invert",
     formButtonPrimary: "bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium",
     formFieldInput: "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
     footerAction: "bg-muted/50 py-4 mt-6",
@@ -96,15 +97,7 @@ const clerkAppearance = {
 function SignInPage() {
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-12">
-      <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
-    </div>
-  );
-}
-
-function SignUpPage() {
-  return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-12">
-      <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
+      <SignIn routing="path" path={`${basePath}/sign-in`} />
     </div>
   );
 }
@@ -244,7 +237,6 @@ function ClerkProviderWithRoutes() {
       proxyUrl={clerkProxyUrl}
       appearance={clerkAppearance}
       signInUrl={`${basePath}/sign-in`}
-      signUpUrl={`${basePath}/sign-up`}
       routerPush={(to) => setLocation(stripBase(to))}
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
@@ -253,7 +245,6 @@ function ClerkProviderWithRoutes() {
         <Switch>
           <Route path="/" component={HomeRedirect} />
           <Route path="/sign-in/*?" component={SignInPage} />
-          <Route path="/sign-up/*?" component={SignUpPage} />
           <Route path="/*" component={AdminApp} />
         </Switch>
       </QueryClientProvider>
