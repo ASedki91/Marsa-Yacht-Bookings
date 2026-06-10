@@ -225,6 +225,21 @@ export default function BecomeHostScreen() {
               ))}
             </View>
 
+            <View style={[styles.feeCard, { backgroundColor: colors.light.navy + "12", borderColor: colors.light.navy + "30" }]}>
+              <View style={styles.feeCardRow}>
+                <View style={[styles.feeIconBg, { backgroundColor: colors.light.gold + "25" }]}>
+                  <Ionicons name="cash-outline" size={20} color={colors.light.gold} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.feeTitle, { color: colors.light.navy }]}>MARSA Service Fee: 15%</Text>
+                  <Text style={[styles.feeSub, { color: c.mutedForeground }]}>
+                    You keep <Text style={{ fontFamily: "Inter_700Bold", color: "#22C55E" }}>85%</Text> of every booking.
+                    No hidden charges — just a simple 15% platform fee to cover payments, support, and marketing.
+                  </Text>
+                </View>
+              </View>
+            </View>
+
             <View style={styles.formSection}>
               <Text style={[styles.formTitle, { color: c.foreground }]}>About You & Your Yacht</Text>
               <Text style={[styles.formSub, { color: c.mutedForeground }]}>
@@ -401,6 +416,11 @@ const styles = StyleSheet.create({
     padding: 14, borderRadius: 12, borderWidth: 1,
   },
   infoText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  feeCard: { borderRadius: 14, borderWidth: 1, padding: 14 },
+  feeCardRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  feeIconBg: { width: 38, height: 38, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  feeTitle: { fontSize: 14, fontFamily: "Inter_700Bold", marginBottom: 4 },
+  feeSub: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
   footer: { position: "absolute", bottom: 0, left: 0, right: 0, padding: 16, paddingTop: 12, borderTopWidth: 1 },
   applyBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center",

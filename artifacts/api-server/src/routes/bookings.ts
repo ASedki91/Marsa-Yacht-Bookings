@@ -4,6 +4,8 @@ import {
   db,
   bookingsTable,
   yachtsTable,
+  yachtPhotosTable,
+  bookingTemplatesTable,
   yachtTemplatePricingTable,
   addOnsTable,
   bookingAddOnsTable,
@@ -14,7 +16,7 @@ import {
   availabilitySlotsTable,
   auditLogsTable,
 } from "@workspace/db";
-import { and, eq, sql, desc } from "drizzle-orm";
+import { and, eq, sql, desc, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { requireAuth, requireRole, validateBody, validateQuery } from "../middlewares/index";
 import { stripe } from "../lib/stripe";
@@ -24,6 +26,46 @@ import { notify } from "../lib/notify";
 const router: IRouter = Router();
 
 const PLATFORM_FEE_PCT = 0.15;
+
+// ── Enrich bookings with yacht + template display data ───────────────────────
+async function enrichBookings(bookings: (typeof bookingsTable.$inferSelect)[]) {
+  if (!bookings.length) return [];
+  const yachtIds = [...new Set(bookings.map((b) => b.yachtId))];
+  const templateIds = [...new Set(bookings.map((b) => b.templateId))];
+
+  const [yachts, photos, templates] = await Promise.all([
+    db
+      .select({ id: yachtsTable.id, name: yachtsTable.title })
+      .from(yachtsTable)
+      .where(inArray(yachtsTable.id, yachtIds)),
+    db
+      .select({ yachtId: yachtPhotosTable.yachtId, url: yachtPhotosTable.url })
+      .from(yachtPhotosTable)
+      .where(inArray(yachtPhotosTable.yachtId, yachtIds)),
+    db
+      .select({ id: bookingTemplatesTable.id, name: bookingTemplatesTable.name, durationHours: bookingTemplatesTable.durationHours })
+      .from(bookingTemplatesTable)
+      .where(inArray(bookingTemplatesTable.id, templateIds)),
+  ]);
+
+  const yachtMap = new Map(yachts.map((y) => [y.id, y]));
+  const photoMap = new Map<string, { url: string }[]>();
+  for (const p of photos) {
+    if (!photoMap.has(p.yachtId)) photoMap.set(p.yachtId, []);
+    photoMap.get(p.yachtId)!.push({ url: p.url });
+  }
+  const templateMap = new Map(templates.map((t) => [t.id, t]));
+
+  return bookings.map((b) => ({
+    ...b,
+    yacht: yachtMap.has(b.yachtId)
+      ? { name: yachtMap.get(b.yachtId)!.name, photos: (photoMap.get(b.yachtId) ?? []).slice(0, 1) }
+      : undefined,
+    template: templateMap.has(b.templateId)
+      ? { name: templateMap.get(b.templateId)!.name, durationHours: templateMap.get(b.templateId)!.durationHours }
+      : undefined,
+  }));
+}
 
 // ── Create Booking ──────────────────────────────────────────────────────────
 const bookingInputSchema = z.object({
@@ -240,7 +282,7 @@ router.get(
       db.select({ count: sql<number>`count(*)::int` }).from(bookingsTable).where(where),
     ]);
 
-    res.json({ bookings, total: countRow?.count ?? 0, page });
+    res.json({ bookings: await enrichBookings(bookings), total: countRow?.count ?? 0, page });
   },
 );
 
@@ -308,7 +350,7 @@ router.get(
       allBookings.sort((a, b) => new Date(String(b.createdAt)).getTime() - new Date(String(a.createdAt)).getTime());
       const total = allBookings.length;
       const bookings = allBookings.slice(offset, offset + limit);
-      res.json({ bookings, total, page });
+      res.json({ bookings: await enrichBookings(bookings), total, page });
       return;
     } else if (role === "host") {
       const [profile] = await db
@@ -356,7 +398,7 @@ router.get(
         .where(whereClause),
     ]);
 
-    res.json({ bookings, total: countRow?.count ?? 0, page });
+    res.json({ bookings: await enrichBookings(bookings), total: countRow?.count ?? 0, page });
   },
 );
 

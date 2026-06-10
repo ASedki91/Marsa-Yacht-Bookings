@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, Pressable, Platform, Alert,
-  ActivityIndicator,
+  ActivityIndicator, Linking, TextInput, Modal, KeyboardAvoidingView,
 } from "react-native";
 import { useClerk, useAuth } from "@clerk/expo";
 import { useRouter } from "expo-router";
@@ -12,6 +12,9 @@ import { useUser } from "@/contexts/UserContext";
 import colors from "@/constants/colors";
 
 const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
+const WHATSAPP_NUMBER = "201030303030";
+const PRIVACY_URL = "https://marsa.app/privacy";
+const TERMS_URL = "https://marsa.app/terms";
 
 interface SettingRowProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -58,11 +61,55 @@ export default function ProfileScreen() {
   const { signOut } = useClerk();
   const { getToken } = useAuth();
   const router = useRouter();
-  const { user, isHost, isAdmin } = useUser();
+  const { user, isHost, isAdmin, refetch } = useUser();
+
   const [hostLoading, setHostLoading] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+
+  const openEditModal = () => {
+    setEditName(user?.name ?? "");
+    setEditPhone((user as any)?.phone ?? "");
+    setShowEditModal(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!editName.trim()) {
+      Alert.alert("Name required", "Please enter your name.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${BASE_URL}/api/users/me`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          fullName: editName.trim(),
+          phone: editPhone.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        Alert.alert("Update Failed", data.error ?? "Could not save your profile.");
+        return;
+      }
+      await refetch();
+      setShowEditModal(false);
+    } catch (err: any) {
+      Alert.alert("Error", err.message ?? "Network error");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleSignOut = () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
@@ -115,7 +162,7 @@ export default function ProfileScreen() {
     ? displayName.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()
     : "??";
 
-  const roleBadge = isAdmin ? "Admin" : isHost ? "Host" : "Guest";
+  const roleBadge = isAdmin ? "Admin" : isHost ? "Host & Guest" : "Guest";
   const roleBadgeColor = isAdmin ? "#7C3AED" : isHost ? colors.light.ocean : colors.light.gold;
 
   return (
@@ -150,8 +197,37 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        <Text style={[styles.sectionLabel, { color: c.mutedForeground }]}>ACCOUNT</Text>
+        <Text style={[styles.sectionLabel, { color: c.mutedForeground }]}>PROFILE</Text>
         <View style={styles.settingsGroup}>
+          <SettingRow
+            icon="person-outline"
+            label="Edit Profile"
+            value={displayName !== "MARSA User" ? displayName : undefined}
+            onPress={openEditModal}
+          />
+          {(user as any)?.phone ? (
+            <SettingRow
+              icon="call-outline"
+              label="Phone"
+              value={(user as any).phone}
+              onPress={openEditModal}
+            />
+          ) : (
+            <SettingRow
+              icon="call-outline"
+              label="Add Phone Number"
+              onPress={openEditModal}
+            />
+          )}
+        </View>
+
+        <Text style={[styles.sectionLabel, { color: c.mutedForeground }]}>GUEST</Text>
+        <View style={styles.settingsGroup}>
+          <SettingRow
+            icon="receipt-outline"
+            label="My Bookings"
+            onPress={() => router.push("/(home)/(tabs)/bookings")}
+          />
           <SettingRow
             icon="notifications-outline"
             label="Notifications"
@@ -166,27 +242,57 @@ export default function ProfileScreen() {
               onPress={() => router.push("/(home)/become-host")}
             />
           )}
-          {isHost && (
-            <SettingRow
-              icon="boat-outline"
-              label="Become a Host"
-              badge="Active"
-              iconColor={colors.light.ocean}
-              onPress={() => Alert.alert("You are already a host", "Go to your yachts or bookings tab to manage your listings.")}
-            />
-          )}
-          {isAdmin && (
-            <SettingRow
-              icon="shield-checkmark-outline"
-              label="Admin Panel"
-              iconColor="#7C3AED"
-              onPress={() => Alert.alert("Admin Panel", "Access the admin dashboard from a web browser.")}
-            />
-          )}
         </View>
 
-        <Text style={[styles.sectionLabel, { color: c.mutedForeground }]}>ABOUT MARSA</Text>
+        {isHost && (
+          <>
+            <Text style={[styles.sectionLabel, { color: c.mutedForeground }]}>HOST</Text>
+            <View style={styles.settingsGroup}>
+              <SettingRow
+                icon="boat-outline"
+                label="My Yachts"
+                badge="Active"
+                iconColor={colors.light.ocean}
+                onPress={() => router.push("/(home)/(tabs)/yachts")}
+              />
+              <SettingRow
+                icon="calendar-outline"
+                label="Incoming Bookings"
+                onPress={() => router.push("/(home)/(tabs)/dashboard")}
+              />
+              <SettingRow
+                icon="cash-outline"
+                label="Earnings"
+                onPress={() => router.push("/(home)/(tabs)/earnings")}
+              />
+            </View>
+          </>
+        )}
+
+        {isAdmin && (
+          <>
+            <Text style={[styles.sectionLabel, { color: c.mutedForeground }]}>ADMIN</Text>
+            <View style={styles.settingsGroup}>
+              <SettingRow
+                icon="shield-checkmark-outline"
+                label="Admin Panel"
+                iconColor="#7C3AED"
+                onPress={() => Alert.alert("Admin Panel", "Access the admin dashboard from a web browser.")}
+              />
+            </View>
+          </>
+        )}
+
+        <Text style={[styles.sectionLabel, { color: c.mutedForeground }]}>SUPPORT & LEGAL</Text>
         <View style={styles.settingsGroup}>
+          <SettingRow
+            icon="logo-whatsapp"
+            label="WhatsApp Support"
+            iconColor="#22C55E"
+            onPress={() => Linking.openURL(`https://wa.me/${WHATSAPP_NUMBER}?text=Hi%2C%20I%20need%20help%20with%20MARSA`).catch(() =>
+              Alert.alert("WhatsApp", "Could not open WhatsApp. Please contact support@marsa.app")
+            )}
+          />
           <SettingRow
             icon="information-circle-outline"
             label="About MARSA"
@@ -195,17 +301,12 @@ export default function ProfileScreen() {
           <SettingRow
             icon="shield-outline"
             label="Privacy Policy"
-            onPress={() => Alert.alert("Privacy Policy", "Coming soon.")}
+            onPress={() => Linking.openURL(PRIVACY_URL).catch(() => Alert.alert("Error", "Could not open link."))}
           />
           <SettingRow
             icon="document-text-outline"
             label="Terms of Service"
-            onPress={() => Alert.alert("Terms of Service", "Coming soon.")}
-          />
-          <SettingRow
-            icon="headset-outline"
-            label="Support"
-            onPress={() => Alert.alert("Support", "Contact us at support@marsa.app")}
+            onPress={() => Linking.openURL(TERMS_URL).catch(() => Alert.alert("Error", "Could not open link."))}
           />
         </View>
 
@@ -222,6 +323,82 @@ export default function ProfileScreen() {
 
         <Text style={[styles.version, { color: c.mutedForeground }]}>MARSA v1.0.0 · El Gouna, Egypt</Text>
       </ScrollView>
+
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <KeyboardAvoidingView
+          style={[styles.modalContainer, { backgroundColor: c.background }]}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <View style={[styles.modalHeader, { borderBottomColor: c.border }]}>
+            <Pressable onPress={() => setShowEditModal(false)} style={styles.modalClose}>
+              <Ionicons name="close" size={22} color={c.foreground} />
+            </Pressable>
+            <Text style={[styles.modalTitle, { color: c.foreground }]}>Edit Profile</Text>
+            <Pressable
+              onPress={handleSaveProfile}
+              disabled={saving}
+              style={[styles.modalSaveBtn, { opacity: saving ? 0.6 : 1 }]}
+            >
+              {saving ? (
+                <ActivityIndicator size="small" color={colors.light.ocean} />
+              ) : (
+                <Text style={[styles.modalSaveText, { color: colors.light.ocean }]}>Save</Text>
+              )}
+            </Pressable>
+          </View>
+
+          <ScrollView contentContainerStyle={styles.modalContent}>
+            <View style={[styles.modalField, { backgroundColor: c.card, borderColor: c.border }]}>
+              <Text style={[styles.modalFieldLabel, { color: c.mutedForeground }]}>Full Name</Text>
+              <TextInput
+                style={[styles.modalFieldInput, { color: c.foreground }]}
+                value={editName}
+                onChangeText={setEditName}
+                placeholder="Your full name"
+                placeholderTextColor={c.mutedForeground}
+                autoCapitalize="words"
+                returnKeyType="next"
+              />
+            </View>
+
+            <View style={[styles.modalField, { backgroundColor: c.card, borderColor: c.border }]}>
+              <Text style={[styles.modalFieldLabel, { color: c.mutedForeground }]}>Email</Text>
+              <Text style={[styles.modalFieldStatic, { color: c.foreground }]}>{user?.email ?? ""}</Text>
+              <Text style={[styles.modalFieldNote, { color: c.mutedForeground }]}>Managed by your sign-in account</Text>
+            </View>
+
+            <View style={[styles.modalField, { backgroundColor: c.card, borderColor: c.border }]}>
+              <Text style={[styles.modalFieldLabel, { color: c.mutedForeground }]}>Phone Number</Text>
+              <TextInput
+                style={[styles.modalFieldInput, { color: c.foreground }]}
+                value={editPhone}
+                onChangeText={setEditPhone}
+                placeholder="+20 100 000 0000"
+                placeholderTextColor={c.mutedForeground}
+                keyboardType="phone-pad"
+                returnKeyType="done"
+              />
+            </View>
+
+            <Pressable
+              style={[styles.saveBtnFull, { backgroundColor: colors.light.navy, opacity: saving ? 0.7 : 1 }]}
+              onPress={handleSaveProfile}
+              disabled={saving}
+            >
+              {saving ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.saveBtnFullText}>Save Changes</Text>
+              )}
+            </Pressable>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -249,7 +426,7 @@ const styles = StyleSheet.create({
   devBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.light.gold },
   sectionLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 1, paddingHorizontal: 4, marginTop: 6 },
   settingsGroup: { gap: 2, borderRadius: 14, overflow: "hidden" },
-  settingRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderBottomWidth: 0 },
+  settingRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14 },
   settingIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   settingLabel: { flex: 1, fontSize: 15, fontFamily: "Inter_400Regular" },
   settingRight: { flexDirection: "row", alignItems: "center", gap: 8 },
@@ -257,4 +434,23 @@ const styles = StyleSheet.create({
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
   badgeText: { color: "#fff", fontSize: 11, fontFamily: "Inter_600SemiBold" },
   version: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 8 },
+  modalContainer: { flex: 1 },
+  modalHeader: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1,
+  },
+  modalClose: { padding: 4 },
+  modalTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },
+  modalSaveBtn: { padding: 4 },
+  modalSaveText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  modalContent: { padding: 16, gap: 12 },
+  modalField: { borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, gap: 4 },
+  modalFieldLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.5 },
+  modalFieldInput: { fontSize: 16, fontFamily: "Inter_400Regular", paddingVertical: 4 },
+  modalFieldStatic: { fontSize: 16, fontFamily: "Inter_400Regular", paddingVertical: 4 },
+  modalFieldNote: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  saveBtnFull: {
+    borderRadius: 14, paddingVertical: 15, alignItems: "center", marginTop: 8,
+  },
+  saveBtnFullText: { color: "#fff", fontSize: 16, fontFamily: "Inter_700Bold" },
 });
