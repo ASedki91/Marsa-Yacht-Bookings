@@ -1,12 +1,12 @@
 import React, { useState, useCallback } from "react";
 import {
   View, Text, StyleSheet, FlatList, TextInput, Pressable,
-  ScrollView, RefreshControl, Platform, Modal, Switch,
+  ScrollView, RefreshControl, Platform, Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useListYachts, useListCategories } from "@workspace/api-client-react";
+import { useListYachts, useListCategories, useListBookingTemplates } from "@workspace/api-client-react";
 import { useColors } from "@/hooks/useColors";
 import { YachtCard } from "@/components/YachtCard";
 import { EmptyState } from "@/components/EmptyState";
@@ -29,30 +29,76 @@ const CAPACITY_OPTIONS = [
   { label: "12+", value: 12 },
 ];
 
+const FEATURE_OPTIONS = [
+  "Air Conditioning", "Swimming Platform", "Snorkeling Gear", "Fishing Equipment",
+  "Bluetooth Sound System", "BBQ Grill", "GPS Navigation", "WiFi",
+  "Sun Deck", "Kitchenette", "Life Jackets",
+];
+
+function formatDateLabel(dateStr: string): string {
+  const today = new Date();
+  const d = new Date(dateStr + "T12:00:00");
+  const diff = Math.round((d.getTime() - new Date(today.toISOString().slice(0, 10) + "T12:00:00").getTime()) / 86400000);
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Tomorrow";
+  return d.toLocaleDateString("en-EG", { weekday: "short", month: "short", day: "numeric" });
+}
+
+function buildDateOptions(): { label: string; value: string }[] {
+  const opts: { label: string; value: string }[] = [];
+  for (let i = 0; i < 8; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const value = d.toISOString().slice(0, 10);
+    opts.push({ label: formatDateLabel(value), value });
+  }
+  return opts;
+}
+
 interface FilterState {
   sort: string;
   minCapacity: number;
   maxPriceEgp: string;
+  date: string;
+  templateId: string;
+  features: string[];
 }
 
-const DEFAULT_FILTERS: FilterState = { sort: "newest", minCapacity: 0, maxPriceEgp: "" };
+const DEFAULT_FILTERS: FilterState = {
+  sort: "newest",
+  minCapacity: 0,
+  maxPriceEgp: "",
+  date: "",
+  templateId: "",
+  features: [],
+};
 
 function FilterModal({
   visible,
   filters,
+  templates,
   onApply,
   onClose,
 }: {
   visible: boolean;
   filters: FilterState;
+  templates: any[];
   onApply: (f: FilterState) => void;
   onClose: () => void;
 }) {
   const c = useColors();
   const [draft, setDraft] = useState<FilterState>(filters);
+  const dateOptions = buildDateOptions();
 
   const reset = () => setDraft(DEFAULT_FILTERS);
   const apply = () => { onApply(draft); onClose(); };
+
+  const toggleFeature = (f: string) => {
+    setDraft((d) => ({
+      ...d,
+      features: d.features.includes(f) ? d.features.filter((x) => x !== f) : [...d.features, f],
+    }));
+  };
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -88,6 +134,82 @@ function FilterModal({
             ))}
           </View>
 
+          <Text style={[fStyles.sectionTitle, { color: c.foreground }]}>Date</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={fStyles.chipRow}>
+              <Pressable
+                style={[
+                  fStyles.dateChip,
+                  {
+                    backgroundColor: !draft.date ? colors.light.navy : c.card,
+                    borderColor: !draft.date ? colors.light.navy : c.border,
+                  },
+                ]}
+                onPress={() => setDraft((d) => ({ ...d, date: "" }))}
+              >
+                <Text style={[fStyles.dateChipText, { color: !draft.date ? "#fff" : c.foreground }]}>
+                  Any Date
+                </Text>
+              </Pressable>
+              {dateOptions.map((opt) => (
+                <Pressable
+                  key={opt.value}
+                  style={[
+                    fStyles.dateChip,
+                    {
+                      backgroundColor: draft.date === opt.value ? colors.light.navy : c.card,
+                      borderColor: draft.date === opt.value ? colors.light.navy : c.border,
+                    },
+                  ]}
+                  onPress={() => setDraft((d) => ({ ...d, date: opt.value }))}
+                >
+                  <Text style={[fStyles.dateChipText, { color: draft.date === opt.value ? "#fff" : c.foreground }]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </ScrollView>
+
+          {templates.length > 0 && (
+            <>
+              <Text style={[fStyles.sectionTitle, { color: c.foreground }]}>Duration</Text>
+              <View style={fStyles.chipRow}>
+                <Pressable
+                  style={[
+                    fStyles.templateChip,
+                    {
+                      backgroundColor: !draft.templateId ? colors.light.navy : c.card,
+                      borderColor: !draft.templateId ? colors.light.navy : c.border,
+                    },
+                  ]}
+                  onPress={() => setDraft((d) => ({ ...d, templateId: "" }))}
+                >
+                  <Text style={[fStyles.dateChipText, { color: !draft.templateId ? "#fff" : c.foreground }]}>
+                    Any
+                  </Text>
+                </Pressable>
+                {templates.map((t: any) => (
+                  <Pressable
+                    key={t.id}
+                    style={[
+                      fStyles.templateChip,
+                      {
+                        backgroundColor: draft.templateId === t.id ? colors.light.navy : c.card,
+                        borderColor: draft.templateId === t.id ? colors.light.navy : c.border,
+                      },
+                    ]}
+                    onPress={() => setDraft((d) => ({ ...d, templateId: t.id }))}
+                  >
+                    <Text style={[fStyles.dateChipText, { color: draft.templateId === t.id ? "#fff" : c.foreground }]}>
+                      {t.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          )}
+
           <Text style={[fStyles.sectionTitle, { color: c.foreground }]}>Minimum Capacity</Text>
           <View style={fStyles.capacityRow}>
             {CAPACITY_OPTIONS.map((opt) => (
@@ -121,6 +243,30 @@ function FilterModal({
           <Text style={[fStyles.priceNote, { color: c.mutedForeground }]}>
             Per booking (based on the shortest available slot)
           </Text>
+
+          <Text style={[fStyles.sectionTitle, { color: c.foreground }]}>Features & Amenities</Text>
+          <View style={fStyles.featuresGrid}>
+            {FEATURE_OPTIONS.map((f) => (
+              <Pressable
+                key={f}
+                style={[
+                  fStyles.featureChip,
+                  {
+                    backgroundColor: draft.features.includes(f) ? colors.light.navy + "15" : c.card,
+                    borderColor: draft.features.includes(f) ? colors.light.navy : c.border,
+                  },
+                ]}
+                onPress={() => toggleFeature(f)}
+              >
+                {draft.features.includes(f) && (
+                  <Ionicons name="checkmark-circle" size={13} color={colors.light.navy} />
+                )}
+                <Text style={[fStyles.featureChipText, { color: draft.features.includes(f) ? colors.light.navy : c.foreground }]}>
+                  {f}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
         </ScrollView>
 
         <View style={[fStyles.footer, { borderTopColor: c.border }]}>
@@ -144,11 +290,18 @@ const fStyles = StyleSheet.create({
   sortOptions: { gap: 8 },
   sortOption: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 12, borderWidth: 1 },
   sortLabel: { fontSize: 14, fontFamily: "Inter_400Regular" },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  dateChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, marginRight: 2 },
+  dateChipText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  templateChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   capacityRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   capacityChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   capacityText: { fontSize: 13, fontFamily: "Inter_500Medium" },
   priceInput: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontFamily: "Inter_400Regular" },
   priceNote: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: -8 },
+  featuresGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  featureChip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  featureChipText: { fontSize: 12, fontFamily: "Inter_400Regular" },
   footer: { padding: 16, borderTopWidth: 1 },
   applyBtn: { borderRadius: 14, paddingVertical: 15, alignItems: "center" },
   applyBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
@@ -177,16 +330,30 @@ export default function ExploreScreen() {
   const [layout, setLayout] = useState<"list" | "grid">("list");
 
   const { data: categoriesData } = useListCategories();
+  const { data: templatesData } = useListBookingTemplates();
   const categories = (categoriesData as any)?.categories ?? [];
+  const templates = (templatesData as any)?.templates ?? [];
 
   const { data, isLoading, error, refetch } = useListYachts({
     limit: 40,
     categoryId: selectedCategory,
-  });
+    date: filters.date || undefined,
+    templateId: filters.templateId || undefined,
+    features: filters.features.length > 0 ? filters.features.join(",") : undefined,
+    capacity: filters.minCapacity > 0 ? filters.minCapacity : undefined,
+    maxPrice: filters.maxPriceEgp ? Number(filters.maxPriceEgp) : undefined,
+  } as any);
 
   const yachts = (data as any)?.yachts ?? [];
 
-  const hasFilters = filters.sort !== "newest" || filters.minCapacity > 0 || !!filters.maxPriceEgp;
+  const hasFilters = (
+    filters.sort !== "newest" ||
+    filters.minCapacity > 0 ||
+    !!filters.maxPriceEgp ||
+    !!filters.date ||
+    !!filters.templateId ||
+    filters.features.length > 0
+  );
 
   const filtered = (() => {
     let arr = [...yachts];
@@ -197,13 +364,6 @@ export default function ExploreScreen() {
         y.description?.toLowerCase().includes(q) ||
         y.location?.toLowerCase().includes(q)
       );
-    }
-    if (filters.minCapacity > 0) {
-      arr = arr.filter((y: any) => (y.capacity ?? 0) >= filters.minCapacity);
-    }
-    if (filters.maxPriceEgp) {
-      const max = Number(filters.maxPriceEgp);
-      arr = arr.filter((y: any) => Number(y.basePriceEgp ?? 0) <= max);
     }
     return sortYachts(arr, filters.sort);
   })();
@@ -216,11 +376,21 @@ export default function ExploreScreen() {
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
+  const activeFilterLabels = [
+    filters.sort !== "newest" && SORT_OPTIONS.find((s) => s.key === filters.sort)?.label,
+    filters.date && formatDateLabel(filters.date),
+    filters.templateId && templates.find((t: any) => t.id === filters.templateId)?.name,
+    filters.minCapacity > 0 && `${filters.minCapacity}+ guests`,
+    filters.maxPriceEgp && `≤ EGP ${filters.maxPriceEgp}`,
+    filters.features.length > 0 && `${filters.features.length} feature${filters.features.length > 1 ? "s" : ""}`,
+  ].filter(Boolean).join(" · ");
+
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
       <FilterModal
         visible={showFilter}
         filters={filters}
+        templates={templates}
         onApply={setFilters}
         onClose={() => setShowFilter(false)}
       />
@@ -302,14 +472,8 @@ export default function ExploreScreen() {
         {hasFilters && (
           <View style={styles.activeFilters}>
             <Ionicons name="funnel-outline" size={13} color={c.primary} />
-            <Text style={[styles.activeFiltersText, { color: c.primary }]}>
-              {[
-                filters.sort !== "newest" && SORT_OPTIONS.find((s) => s.key === filters.sort)?.label,
-                filters.minCapacity > 0 && `${filters.minCapacity}+ guests`,
-                filters.maxPriceEgp && `≤ EGP ${filters.maxPriceEgp}`,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
+            <Text style={[styles.activeFiltersText, { color: c.primary }]} numberOfLines={1}>
+              {activeFilterLabels}
             </Text>
             <Pressable onPress={() => setFilters(DEFAULT_FILTERS)} style={styles.clearFilters}>
               <Ionicons name="close-circle" size={14} color={c.primary} />

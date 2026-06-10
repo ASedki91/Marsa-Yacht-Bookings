@@ -392,8 +392,8 @@ export default function BookScreen() {
               <>
                 <Text style={[styles.slotsLabel, { color: c.foreground }]}>Available Slots</Text>
                 {slots.map((slot: any) => {
-                  const startTime = new Date(slot.startTime).toLocaleTimeString("en-EG", { hour: "2-digit", minute: "2-digit" });
-                  const endTime = new Date(slot.endTime).toLocaleTimeString("en-EG", { hour: "2-digit", minute: "2-digit" });
+                  const startTime = slot.startTime?.slice(0, 5) ?? "";
+                  const endTime = slot.endTime?.slice(0, 5) ?? "";
                   return (
                     <Pressable
                       key={slot.startTime}
@@ -581,14 +581,11 @@ export default function BookScreen() {
                 <View style={styles.summaryRow}>
                   <Text style={[styles.summaryLabel, { color: c.mutedForeground }]}>Date & Time</Text>
                   <Text style={[styles.summaryValue, { color: c.foreground }]}>
-                    {new Date(selectedSlot.startTime).toLocaleDateString("en-EG", {
+                    {new Date(selectedDate).toLocaleDateString("en-EG", {
                       month: "short",
                       day: "numeric",
                     })}{" "}
-                    {new Date(selectedSlot.startTime).toLocaleTimeString("en-EG", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {selectedSlot.startTime?.slice(0, 5) ?? ""}
                   </Text>
                 </View>
               )}

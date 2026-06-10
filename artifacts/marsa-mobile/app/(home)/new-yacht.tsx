@@ -1,23 +1,25 @@
 import React, { useState } from "react";
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView,
-  Platform, ActivityIndicator, Alert, Switch,
+  Platform, ActivityIndicator, Alert, Switch, Image,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import {
   useCreateYacht,
-  useUpdateYacht,
   useListCategories,
   useSetYachtPricing,
   useListBookingTemplates,
   useSubmitYachtForReview,
+  useSetYachtAvailability,
+  useRequestUploadUrl,
 } from "@workspace/api-client-react";
 import { useColors } from "@/hooks/useColors";
 import colors from "@/constants/colors";
 
-const STEPS = ["Basic Info", "Details", "Pricing", "Submit"];
+const STEPS = ["Basic Info", "Details", "Photos", "Pricing", "Availability", "Review"];
 
 const COMMON_FEATURES = [
   "Air Conditioning", "Swimming Platform", "Snorkeling Gear", "Fishing Equipment",
@@ -25,6 +27,36 @@ const COMMON_FEATURES = [
   "GPS Navigation", "WiFi", "Sun Deck", "Kitchenette",
 ];
 
+const DAYS_OF_WEEK = [
+  { key: "0", label: "Sun" },
+  { key: "1", label: "Mon" },
+  { key: "2", label: "Tue" },
+  { key: "3", label: "Wed" },
+  { key: "4", label: "Thu" },
+  { key: "5", label: "Fri" },
+  { key: "6", label: "Sat" },
+];
+
+function buildSlotsForNextDays(
+  daysEnabled: Record<string, boolean>,
+  startTime: string,
+  templates: any[],
+  daysAhead = 60,
+): { templateId: string; date: string; startTime: string; isAvailable: boolean }[] {
+  const slots: { templateId: string; date: string; startTime: string; isAvailable: boolean }[] = [];
+  const today = new Date();
+  for (let i = 1; i <= daysAhead; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() + i);
+    const dayKey = String(d.getDay());
+    if (!daysEnabled[dayKey]) continue;
+    const dateStr = d.toISOString().slice(0, 10);
+    for (const t of templates) {
+      slots.push({ templateId: t.id, date: dateStr, startTime: startTime + ":00", isAvailable: true });
+    }
+  }
+  return slots;
+}
 
 export default function NewYachtScreen() {
   const c = useColors();
@@ -36,6 +68,8 @@ export default function NewYachtScreen() {
   const createYacht = useCreateYacht();
   const setYachtPricing = useSetYachtPricing();
   const submitForReview = useSubmitYachtForReview();
+  const setYachtAvailability = useSetYachtAvailability();
+  const requestUploadUrl = useRequestUploadUrl();
 
   const { data: categoriesData } = useListCategories();
   const { data: templatesData } = useListBookingTemplates();
@@ -56,7 +90,16 @@ export default function NewYachtScreen() {
   const [manufacturer, setManufacturer] = useState("");
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
 
+  const [photoUris, setPhotoUris] = useState<string[]>([]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [requestPhotographer, setRequestPhotographer] = useState(false);
+
   const [pricing, setPricing] = useState<Record<string, string>>({});
+
+  const [availDays, setAvailDays] = useState<Record<string, boolean>>({
+    "0": false, "1": true, "2": true, "3": true, "4": true, "5": true, "6": false,
+  });
+  const [availStartTime, setAvailStartTime] = useState("09:00");
 
   const [loading, setLoading] = useState(false);
 
@@ -69,6 +112,43 @@ export default function NewYachtScreen() {
     );
   };
 
+  const pickPhoto = async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Permission needed", "Please allow photo library access to upload yacht photos.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.85,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+
+      const asset = result.assets[0];
+      setUploadingPhoto(true);
+
+      const ext = asset.uri.split(".").pop() ?? "jpg";
+      const contentType = ext === "png" ? "image/png" : "image/jpeg";
+
+      const uploadRes = await requestUploadUrl.mutateAsync({
+        data: { name: `yacht-photo-${Date.now()}.${ext}`, contentType, size: asset.fileSize ?? 0 },
+      });
+      const { uploadUrl, publicUrl } = uploadRes as any;
+
+      const blob = await fetch(asset.uri).then((r) => r.blob());
+      await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": contentType }, body: blob });
+
+      setPhotoUris((prev) => [...prev, publicUrl]);
+    } catch (err: any) {
+      Alert.alert("Upload Failed", err?.message ?? "Could not upload photo.");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   const handleNextStep1 = async () => {
     if (!title.trim() || title.trim().length < 3) {
       Alert.alert("Required", "Please enter a yacht name (minimum 3 characters).");
@@ -78,7 +158,6 @@ export default function NewYachtScreen() {
       Alert.alert("Required", "Please enter a valid guest capacity.");
       return;
     }
-
     setLoading(true);
     try {
       const result = await createYacht.mutateAsync({
@@ -103,13 +182,8 @@ export default function NewYachtScreen() {
     }
   };
 
-  const handleStep2 = () => {
-    setStep(2);
-  };
-
   const handleStep3 = async () => {
     if (!yachtId) { setStep(3); return; }
-
     const pricingItems = templates
       .filter((t: any) => pricing[t.id]?.trim())
       .map((t: any) => ({ templateId: t.id, priceEgp: pricing[t.id].trim() }));
@@ -118,13 +192,35 @@ export default function NewYachtScreen() {
       Alert.alert("Pricing Required", "Please set a price for at least one booking template.");
       return;
     }
-
     setLoading(true);
     try {
       await setYachtPricing.mutateAsync({ id: yachtId, data: { pricing: pricingItems } });
-      setStep(3);
+      setStep(4);
     } catch (err: any) {
       Alert.alert("Error", err?.errors?.[0]?.message ?? "Could not save pricing.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStep4Availability = async () => {
+    if (!yachtId) { setStep(5); return; }
+    const enabledDays = Object.entries(availDays).filter(([, v]) => v);
+    if (enabledDays.length === 0) {
+      Alert.alert("Select days", "Please select at least one day of the week you're available.");
+      return;
+    }
+    if (templates.length === 0) { setStep(5); return; }
+
+    setLoading(true);
+    try {
+      const slots = buildSlotsForNextDays(availDays, availStartTime, templates, 60);
+      if (slots.length > 0) {
+        await setYachtAvailability.mutateAsync({ id: yachtId, data: { slots } });
+      }
+      setStep(5);
+    } catch (err: any) {
+      Alert.alert("Availability Error", err?.errors?.[0]?.message ?? "Could not save availability.");
     } finally {
       setLoading(false);
     }
@@ -153,9 +249,7 @@ export default function NewYachtScreen() {
         return (
           <View style={styles.stepContent}>
             <Text style={[styles.stepTitle, { color: c.foreground }]}>Basic Information</Text>
-            <Text style={[styles.stepSub, { color: c.mutedForeground }]}>
-              Tell guests about your yacht
-            </Text>
+            <Text style={[styles.stepSub, { color: c.mutedForeground }]}>Tell guests about your yacht</Text>
 
             <View style={styles.field}>
               <Text style={[styles.label, { color: c.foreground }]}>Yacht Name *</Text>
@@ -188,9 +282,10 @@ export default function NewYachtScreen() {
                 style={[styles.input, { backgroundColor: c.input, color: c.foreground, borderColor: c.border }]}
                 value={location}
                 onChangeText={setLocation}
-                placeholder="e.g. El Gouna Marina"
+                placeholder="e.g. Abu Tig Marina, El Gouna"
                 placeholderTextColor={c.mutedForeground}
               />
+              <Text style={[styles.hint, { color: c.mutedForeground }]}>Specify your marina or dock location</Text>
             </View>
 
             {categories.length > 0 && (
@@ -243,9 +338,7 @@ export default function NewYachtScreen() {
         return (
           <View style={styles.stepContent}>
             <Text style={[styles.stepTitle, { color: c.foreground }]}>Yacht Details</Text>
-            <Text style={[styles.stepSub, { color: c.mutedForeground }]}>
-              Technical specs and features
-            </Text>
+            <Text style={[styles.stepSub, { color: c.mutedForeground }]}>Technical specs and amenities</Text>
 
             <View style={styles.twoCol}>
               <View style={[styles.field, { flex: 1 }]}>
@@ -302,12 +395,7 @@ export default function NewYachtScreen() {
                     {selectedFeatures.includes(f) && (
                       <Ionicons name="checkmark-circle" size={14} color={colors.light.navy} />
                     )}
-                    <Text
-                      style={[
-                        styles.featureText,
-                        { color: selectedFeatures.includes(f) ? colors.light.navy : c.foreground },
-                      ]}
-                    >
+                    <Text style={[styles.featureText, { color: selectedFeatures.includes(f) ? colors.light.navy : c.foreground }]}>
                       {f}
                     </Text>
                   </Pressable>
@@ -318,6 +406,111 @@ export default function NewYachtScreen() {
         );
 
       case 2:
+        return (
+          <View style={styles.stepContent}>
+            <Text style={[styles.stepTitle, { color: c.foreground }]}>Yacht Photos</Text>
+            <Text style={[styles.stepSub, { color: c.mutedForeground }]}>
+              Great photos get more bookings. Aim for 5–10 well-lit shots.
+            </Text>
+
+            <Pressable
+              style={[styles.photographerCTA, { backgroundColor: colors.light.navy }]}
+              onPress={() => {
+                setRequestPhotographer(true);
+                Alert.alert(
+                  "Photographer Requested",
+                  "Our team will contact you within 24 hours to schedule a professional photography session at no extra cost.",
+                  [{ text: "Great, thanks!" }]
+                );
+              }}
+            >
+              <View style={styles.photographerLeft}>
+                <View style={styles.photographerIconBg}>
+                  <Ionicons name="camera" size={22} color={colors.light.gold} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.photographerTitle}>Request a Photographer</Text>
+                  <Text style={styles.photographerSub}>
+                    Free professional photo shoot included for new hosts
+                  </Text>
+                </View>
+              </View>
+              {requestPhotographer ? (
+                <Ionicons name="checkmark-circle" size={22} color={colors.light.gold} />
+              ) : (
+                <Ionicons name="arrow-forward" size={18} color="#fff" />
+              )}
+            </Pressable>
+
+            {requestPhotographer && (
+              <View style={[styles.infoBox, { backgroundColor: "#F0FDF4", borderColor: "#BBF7D0" }]}>
+                <Ionicons name="checkmark-circle" size={16} color="#16A34A" />
+                <Text style={[styles.infoText, { color: "#15803D" }]}>
+                  Photographer requested! We'll contact you within 24 hours to schedule your session.
+                </Text>
+              </View>
+            )}
+
+            <View style={[styles.dividerRow]}>
+              <View style={[styles.dividerLine, { backgroundColor: c.border }]} />
+              <Text style={[styles.dividerText, { color: c.mutedForeground }]}>or upload your own</Text>
+              <View style={[styles.dividerLine, { backgroundColor: c.border }]} />
+            </View>
+
+            <View style={styles.photoGrid}>
+              {photoUris.map((uri, i) => (
+                <View key={uri} style={styles.photoThumbWrap}>
+                  <Image source={{ uri }} style={styles.photoThumb} />
+                  <Pressable
+                    style={styles.removePhotoBtn}
+                    onPress={() => setPhotoUris((prev) => prev.filter((_, idx) => idx !== i))}
+                  >
+                    <Ionicons name="close-circle" size={20} color="#fff" />
+                  </Pressable>
+                  {i === 0 && (
+                    <View style={styles.coverBadge}>
+                      <Text style={styles.coverBadgeText}>Cover</Text>
+                    </View>
+                  )}
+                </View>
+              ))}
+
+              {photoUris.length < 10 && (
+                <Pressable
+                  style={[styles.addPhotoBtn, { backgroundColor: c.card, borderColor: c.border }]}
+                  onPress={pickPhoto}
+                  disabled={uploadingPhoto}
+                >
+                  {uploadingPhoto ? (
+                    <ActivityIndicator color={colors.light.navy} />
+                  ) : (
+                    <>
+                      <Ionicons name="add" size={28} color={c.mutedForeground} />
+                      <Text style={[styles.addPhotoText, { color: c.mutedForeground }]}>Add Photo</Text>
+                    </>
+                  )}
+                </Pressable>
+              )}
+            </View>
+
+            <View style={[styles.photoTips, { backgroundColor: c.card, borderColor: c.border }]}>
+              <Text style={[styles.photoTipsTitle, { color: c.foreground }]}>Photo Tips</Text>
+              {[
+                "Shoot in bright natural daylight",
+                "Include exterior, deck, cabin, and helm",
+                "Show the swimming platform and water access",
+                "Capture the view guests will enjoy",
+              ].map((tip) => (
+                <View key={tip} style={styles.tipRow}>
+                  <Ionicons name="checkmark-circle-outline" size={14} color={colors.light.ocean} />
+                  <Text style={[styles.tipText, { color: c.mutedForeground }]}>{tip}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        );
+
+      case 3:
         return (
           <View style={styles.stepContent}>
             <Text style={[styles.stepTitle, { color: c.foreground }]}>Set Pricing</Text>
@@ -333,55 +526,139 @@ export default function NewYachtScreen() {
                 </Text>
               </View>
             ) : (
-              templates.map((t: any) => (
-                <View key={t.id} style={[styles.pricingRow, { backgroundColor: c.card, borderColor: c.border }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.templateName, { color: c.foreground }]}>{t.name}</Text>
-                    <Text style={[styles.templateDuration, { color: c.mutedForeground }]}>
-                      {t.durationHours}h
-                    </Text>
+              templates.map((t: any) => {
+                const earned = pricing[t.id] ? Math.round(Number(pricing[t.id]) * 0.85) : 0;
+                return (
+                  <View key={t.id} style={[styles.pricingRow, { backgroundColor: c.card, borderColor: c.border }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.templateName, { color: c.foreground }]}>{t.name}</Text>
+                      <Text style={[styles.templateDuration, { color: c.mutedForeground }]}>{t.durationHours}h charter</Text>
+                      {pricing[t.id] ? (
+                        <Text style={[styles.earningsPreview, { color: "#22C55E" }]}>
+                          You earn: EGP {earned.toLocaleString("en-EG")}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <View style={styles.priceInputRow}>
+                      <Text style={[styles.currency, { color: c.mutedForeground }]}>EGP</Text>
+                      <TextInput
+                        style={[styles.priceInput, { backgroundColor: c.input, color: c.foreground, borderColor: c.border }]}
+                        value={pricing[t.id] ?? ""}
+                        onChangeText={(v) => setPricing((p) => ({ ...p, [t.id]: v }))}
+                        placeholder="0"
+                        placeholderTextColor={c.mutedForeground}
+                        keyboardType="numeric"
+                      />
+                    </View>
                   </View>
-                  <View style={styles.priceInputRow}>
-                    <Text style={[styles.currency, { color: c.mutedForeground }]}>EGP</Text>
-                    <TextInput
-                      style={[styles.priceInput, { backgroundColor: c.input, color: c.foreground, borderColor: c.border }]}
-                      value={pricing[t.id] ?? ""}
-                      onChangeText={(v) => setPricing((p) => ({ ...p, [t.id]: v }))}
-                      placeholder="0"
-                      placeholderTextColor={c.mutedForeground}
-                      keyboardType="numeric"
-                    />
-                  </View>
-                </View>
-              ))
+                );
+              })
             )}
 
             <View style={[styles.feeNote, { backgroundColor: c.card, borderColor: c.border }]}>
               <Ionicons name="information-circle-outline" size={16} color={c.primary} />
               <Text style={[styles.feeNoteText, { color: c.mutedForeground }]}>
-                MARSA takes a 15% platform fee. You receive 85% of each booking.
+                MARSA takes a 15% platform fee. You receive 85% of each booking. Prices shown above reflect your earnings.
               </Text>
             </View>
           </View>
         );
 
-      case 3:
+      case 4:
+        return (
+          <View style={styles.stepContent}>
+            <Text style={[styles.stepTitle, { color: c.foreground }]}>Set Availability</Text>
+            <Text style={[styles.stepSub, { color: c.mutedForeground }]}>
+              Choose which days your yacht is available for charter. We'll create slots for the next 60 days.
+            </Text>
+
+            <View style={styles.field}>
+              <Text style={[styles.label, { color: c.foreground }]}>Available Days</Text>
+              <View style={styles.daysRow}>
+                {DAYS_OF_WEEK.map((day) => (
+                  <Pressable
+                    key={day.key}
+                    style={[
+                      styles.dayChip,
+                      {
+                        backgroundColor: availDays[day.key] ? colors.light.navy : c.card,
+                        borderColor: availDays[day.key] ? colors.light.navy : c.border,
+                      },
+                    ]}
+                    onPress={() => setAvailDays((d) => ({ ...d, [day.key]: !d[day.key] }))}
+                  >
+                    <Text style={[styles.dayChipText, { color: availDays[day.key] ? "#fff" : c.foreground }]}>
+                      {day.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.field}>
+              <Text style={[styles.label, { color: c.foreground }]}>Charter Start Time</Text>
+              <View style={styles.timeRow}>
+                {["07:00", "08:00", "09:00", "10:00", "11:00", "14:00"].map((t) => (
+                  <Pressable
+                    key={t}
+                    style={[
+                      styles.timeChip,
+                      {
+                        backgroundColor: availStartTime === t ? colors.light.navy : c.card,
+                        borderColor: availStartTime === t ? colors.light.navy : c.border,
+                      },
+                    ]}
+                    onPress={() => setAvailStartTime(t)}
+                  >
+                    <Text style={[styles.timeChipText, { color: availStartTime === t ? "#fff" : c.foreground }]}>{t}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={[styles.hint, { color: c.mutedForeground }]}>
+                Duration is set by the booking template the guest chooses. Multiple start times can be added after listing goes live.
+              </Text>
+            </View>
+
+            <View style={[styles.availSummary, { backgroundColor: c.card, borderColor: c.border }]}>
+              <Ionicons name="calendar-outline" size={20} color={colors.light.ocean} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.availSummaryTitle, { color: c.foreground }]}>Availability Preview</Text>
+                <Text style={[styles.availSummaryText, { color: c.mutedForeground }]}>
+                  {Object.values(availDays).filter(Boolean).length} days/week ·{" "}
+                  Starting at {availStartTime} ·{" "}
+                  ~{Object.values(availDays).filter(Boolean).length * templates.length * 8} slots over 60 days
+                </Text>
+              </View>
+            </View>
+
+            <View style={[styles.infoBox, { backgroundColor: "#EFF6FF", borderColor: "#BFDBFE" }]}>
+              <Ionicons name="information-circle-outline" size={16} color={colors.light.ocean} />
+              <Text style={[styles.infoText, { color: "#1E40AF" }]}>
+                You can adjust your availability at any time from the Host Dashboard after your listing is live.
+              </Text>
+            </View>
+          </View>
+        );
+
+      case 5:
         return (
           <View style={styles.stepContent}>
             <View style={[styles.successCard, { backgroundColor: colors.light.navy }]}>
               <Ionicons name="boat" size={48} color={colors.light.gold} />
               <Text style={styles.successTitle}>Almost Ready!</Text>
               <Text style={styles.successSub}>
-                Your yacht listing is ready to submit for review. Our team will review it within 2-3 business days.
+                Your yacht listing is ready for review. Our team will inspect it within 2-3 business days.
               </Text>
             </View>
 
             <View style={[styles.checkCard, { backgroundColor: c.card, borderColor: c.border }]}>
               {[
-                { label: "Yacht details", done: true },
+                { label: "Yacht details", done: !!title },
                 { label: "Technical specs", done: !!lengthFt || !!manufacturer },
                 { label: "Features listed", done: selectedFeatures.length > 0 },
+                { label: "Photos added", done: photoUris.length > 0 || requestPhotographer },
                 { label: "Pricing set", done: Object.values(pricing).some((v) => !!v) },
+                { label: "Availability configured", done: Object.values(availDays).some(Boolean) },
               ].map((item, i) => (
                 <View key={i} style={[styles.checkRow, { borderBottomColor: c.border }]}>
                   <Ionicons
@@ -399,18 +676,23 @@ export default function NewYachtScreen() {
             <View style={[styles.reviewNote, { backgroundColor: "#EFF6FF", borderColor: "#BFDBFE" }]}>
               <Ionicons name="shield-checkmark-outline" size={18} color={colors.light.ocean} />
               <Text style={[styles.reviewNoteText, { color: "#1E40AF" }]}>
-                After approval, your yacht will be visible to thousands of guests in El Gouna. You'll receive a notification when it's live.
+                After approval, your yacht will be visible to guests in El Gouna. You'll receive a notification when it's live.
               </Text>
             </View>
           </View>
         );
+
+      default:
+        return null;
     }
   };
 
   const handleNext = async () => {
     if (step === 0) await handleNextStep1();
-    else if (step === 1) handleStep2();
-    else if (step === 2) await handleStep3();
+    else if (step === 1) setStep(2);
+    else if (step === 2) setStep(3);
+    else if (step === 3) await handleStep3();
+    else if (step === 4) await handleStep4Availability();
     else await handleSubmitForReview();
   };
 
@@ -480,6 +762,7 @@ const styles = StyleSheet.create({
   stepTitle: { fontSize: 20, fontFamily: "Inter_700Bold" },
   stepSub: { fontSize: 14, fontFamily: "Inter_400Regular", marginTop: -8 },
   field: { gap: 8 },
+  hint: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 16 },
   label: { fontSize: 14, fontFamily: "Inter_500Medium" },
   input: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: "Inter_400Regular" },
   textArea: { minHeight: 100, textAlignVertical: "top" },
@@ -493,9 +776,43 @@ const styles = StyleSheet.create({
   featuresGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   featureChip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
   featureText: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  photographerCTA: {
+    flexDirection: "row", alignItems: "center", padding: 16, borderRadius: 16, gap: 12,
+  },
+  photographerLeft: { flexDirection: "row", alignItems: "center", flex: 1, gap: 12 },
+  photographerIconBg: { width: 44, height: 44, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
+  photographerTitle: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#fff" },
+  photographerSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#CBD5E1", marginTop: 2 },
+  dividerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  dividerLine: { flex: 1, height: 1 },
+  dividerText: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  photoThumbWrap: { position: "relative" },
+  photoThumb: { width: 100, height: 75, borderRadius: 10 },
+  removePhotoBtn: {
+    position: "absolute", top: -6, right: -6,
+    backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 10,
+  },
+  coverBadge: {
+    position: "absolute", bottom: 4, left: 4,
+    backgroundColor: colors.light.navy, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
+  },
+  coverBadgeText: { color: "#fff", fontSize: 10, fontFamily: "Inter_600SemiBold" },
+  addPhotoBtn: {
+    width: 100, height: 75, borderRadius: 10, borderWidth: 1, borderStyle: "dashed",
+    alignItems: "center", justifyContent: "center", gap: 4,
+  },
+  addPhotoText: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  photoTips: { borderRadius: 14, borderWidth: 1, padding: 14, gap: 10 },
+  photoTipsTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  tipRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  tipText: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  infoBox: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 14, borderRadius: 12, borderWidth: 1 },
+  infoText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
   pricingRow: { flexDirection: "row", alignItems: "center", padding: 14, borderRadius: 14, borderWidth: 1, gap: 12 },
   templateName: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   templateDuration: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  earningsPreview: { fontSize: 12, fontFamily: "Inter_500Medium", marginTop: 4 },
   priceInputRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   currency: { fontSize: 13, fontFamily: "Inter_500Medium" },
   priceInput: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8, fontSize: 15, fontFamily: "Inter_700Bold", minWidth: 80, textAlign: "right" },
@@ -503,6 +820,15 @@ const styles = StyleSheet.create({
   feeNoteText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
   noTemplates: { padding: 20, borderRadius: 14, borderWidth: 1, gap: 10, alignItems: "center" },
   noTemplatesText: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20 },
+  daysRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  dayChip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, borderWidth: 1, minWidth: 50, alignItems: "center" },
+  dayChipText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  timeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  timeChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, borderWidth: 1 },
+  timeChipText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  availSummary: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 14, borderWidth: 1 },
+  availSummaryTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  availSummaryText: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
   successCard: { borderRadius: 20, padding: 24, alignItems: "center", gap: 12 },
   successTitle: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#fff" },
   successSub: { fontSize: 14, fontFamily: "Inter_400Regular", color: "#CBD5E1", textAlign: "center", lineHeight: 20 },
