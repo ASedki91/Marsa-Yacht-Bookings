@@ -105,7 +105,7 @@ function SignInPage() {
 function AccessDenied() {
   const { signOut } = useClerk();
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 dark">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
       <div className="max-w-md w-full bg-card border border-border p-8 rounded-xl shadow-xl text-center">
         <h1 className="text-2xl font-bold text-foreground mb-4">Access Denied</h1>
         <p className="text-muted-foreground mb-8">You do not have administrative privileges to access this area.</p>
@@ -162,7 +162,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (!clerkLoaded || (isSignedIn && meLoading)) {
     return (
-      <div className="flex min-h-[100dvh] items-center justify-center bg-background dark text-foreground text-sm">
+      <div className="flex min-h-[100dvh] items-center justify-center bg-background text-foreground text-sm">
         Loading...
       </div>
     );

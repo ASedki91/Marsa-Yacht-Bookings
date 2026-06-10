@@ -32,7 +32,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-background dark overflow-hidden">
+    <div className="flex h-screen bg-background overflow-hidden">
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
