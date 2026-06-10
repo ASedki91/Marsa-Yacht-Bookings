@@ -5,17 +5,19 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 
-type FormState = { name: string; description: string; priceEgp: string };
-const empty: FormState = { name: "", description: "", priceEgp: "" };
+type FormState = { name: string; description: string; priceEgp: string; isActive: boolean };
+const empty: FormState = { name: "", description: "", priceEgp: "", isActive: true };
 
 export default function AddOns() {
   const [dialog, setDialog] = useState<{ mode: "create" | "edit"; id?: string } | null>(null);
@@ -38,8 +40,13 @@ export default function AddOns() {
   const addOns = (data as any)?.addOns ?? [];
 
   const handleSave = () => {
-    if (!form.name.trim()) return;
-    const payload = { name: form.name, description: form.description, priceEgp: form.priceEgp };
+    if (!form.name.trim() || !form.priceEgp) return;
+    const payload = {
+      name: form.name,
+      description: form.description || undefined,
+      priceEgp: form.priceEgp,
+      isActive: form.isActive,
+    };
     if (dialog?.mode === "create") create.mutate({ data: payload });
     else if (dialog?.id) update.mutate({ id: dialog.id, data: payload });
   };
@@ -68,12 +75,28 @@ export default function AddOns() {
             <Card key={a.id} data-testid={`card-addon-${a.id}`}>
               <CardContent className="flex items-center justify-between py-3 px-4">
                 <div className="min-w-0">
-                  <p className="font-medium text-foreground text-sm">{a.name}</p>
-                  <p className="text-xs text-muted-foreground">{formatEgp(a.priceEgp ?? 0)}{a.description && ` · ${a.description}`}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-foreground text-sm">{a.name}</p>
+                    {a.isActive === false && (
+                      <Badge variant="outline" className="text-xs text-muted-foreground border-muted/40">Inactive</Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {formatEgp(a.priceEgp ?? 0)}
+                    {a.description && ` · ${a.description}`}
+                  </p>
                 </div>
                 <div className="flex gap-2 ml-4 shrink-0">
                   <Button size="sm" variant="ghost" data-testid={`button-edit-addon-${a.id}`}
-                    onClick={() => { setForm({ name: a.name, description: a.description ?? "", priceEgp: String(a.priceEgp ?? "") }); setDialog({ mode: "edit", id: a.id }); }}>
+                    onClick={() => {
+                      setForm({
+                        name: a.name,
+                        description: a.description ?? "",
+                        priceEgp: String(a.priceEgp ?? ""),
+                        isActive: a.isActive !== false,
+                      });
+                      setDialog({ mode: "edit", id: a.id });
+                    }}>
                     <Pencil className="w-3 h-3" />
                   </Button>
                   <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
@@ -92,13 +115,35 @@ export default function AddOns() {
         <DialogContent>
           <DialogHeader><DialogTitle>{dialog?.mode === "create" ? "Add Add-on" : "Edit Add-on"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>Name</Label><Input data-testid="input-addon-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Add-on name" className="mt-1" /></div>
-            <div><Label>Price (EGP)</Label><Input data-testid="input-addon-price" type="number" value={form.priceEgp} onChange={e => setForm(f => ({ ...f, priceEgp: e.target.value }))} placeholder="0" className="mt-1" /></div>
-            <div><Label>Description</Label><Textarea data-testid="input-addon-desc" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} className="mt-1" /></div>
+            <div>
+              <Label>Name</Label>
+              <Input data-testid="input-addon-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Add-on name" className="mt-1" />
+            </div>
+            <div>
+              <Label>Price (EGP)</Label>
+              <Input data-testid="input-addon-price" type="number" min="0" step="50" value={form.priceEgp} onChange={e => setForm(f => ({ ...f, priceEgp: e.target.value }))} placeholder="500" className="mt-1" />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Textarea data-testid="input-addon-desc" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} className="mt-1" placeholder="What's included?" />
+            </div>
+            <div className="flex items-center gap-3 pt-1">
+              <Switch
+                id="addon-active"
+                data-testid="switch-addon-active"
+                checked={form.isActive}
+                onCheckedChange={v => setForm(f => ({ ...f, isActive: v }))}
+              />
+              <Label htmlFor="addon-active">Active (available for booking)</Label>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button>
-            <Button data-testid="button-save-addon" disabled={!form.name.trim() || create.isPending || update.isPending} onClick={handleSave}>
+            <Button
+              data-testid="button-save-addon"
+              disabled={!form.name.trim() || !form.priceEgp || create.isPending || update.isPending}
+              onClick={handleSave}
+            >
               {create.isPending || update.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>

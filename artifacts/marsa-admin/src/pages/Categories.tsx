@@ -9,13 +9,16 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 
-type FormState = { name: string; description: string; iconUrl: string };
-const empty: FormState = { name: "", description: "", iconUrl: "" };
+type FormState = { name: string; slug: string; iconUrl: string; sortOrder: string };
+const empty: FormState = { name: "", slug: "", iconUrl: "", sortOrder: "" };
+
+function slugify(name: string) {
+  return name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+}
 
 export default function Categories() {
   const [dialog, setDialog] = useState<{ mode: "create" | "edit"; id?: string } | null>(null);
@@ -37,10 +40,24 @@ export default function Categories() {
 
   const categories = (data as any)?.categories ?? [];
 
+  const handleNameChange = (name: string) => {
+    setForm(f => ({
+      ...f,
+      name,
+      slug: dialog?.mode === "create" ? slugify(name) : f.slug,
+    }));
+  };
+
   const handleSave = () => {
-    if (!form.name.trim()) return;
-    if (dialog?.mode === "create") create.mutate({ data: form });
-    else if (dialog?.id) update.mutate({ id: dialog.id, data: form });
+    if (!form.name.trim() || !form.slug.trim()) return;
+    const payload = {
+      name: form.name,
+      slug: form.slug,
+      iconUrl: form.iconUrl || undefined,
+      sortOrder: form.sortOrder ? parseInt(form.sortOrder) : undefined,
+    };
+    if (dialog?.mode === "create") create.mutate({ data: payload });
+    else if (dialog?.id) update.mutate({ id: dialog.id, data: payload });
   };
 
   return (
@@ -62,12 +79,21 @@ export default function Categories() {
             <Card key={c.id} data-testid={`card-category-${c.id}`}>
               <CardContent className="flex items-center justify-between py-3 px-4">
                 <div className="min-w-0">
-                  <p className="font-medium text-foreground text-sm">{c.name}</p>
-                  {c.description && <p className="text-xs text-muted-foreground truncate">{c.description}</p>}
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-foreground text-sm">{c.name}</p>
+                    <span className="text-xs text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded">{c.slug}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {c.sortOrder !== undefined && `Order: ${c.sortOrder}`}
+                    {c.iconUrl && ` · Has icon`}
+                  </p>
                 </div>
                 <div className="flex gap-2 ml-4 shrink-0">
                   <Button size="sm" variant="ghost" data-testid={`button-edit-category-${c.id}`}
-                    onClick={() => { setForm({ name: c.name, description: c.description ?? "", iconUrl: c.iconUrl ?? "" }); setDialog({ mode: "edit", id: c.id }); }}>
+                    onClick={() => {
+                      setForm({ name: c.name, slug: c.slug ?? "", iconUrl: c.iconUrl ?? "", sortOrder: c.sortOrder !== undefined ? String(c.sortOrder) : "" });
+                      setDialog({ mode: "edit", id: c.id });
+                    }}>
                     <Pencil className="w-3 h-3" />
                   </Button>
                   <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
@@ -86,13 +112,30 @@ export default function Categories() {
         <DialogContent>
           <DialogHeader><DialogTitle>{dialog?.mode === "create" ? "Add Category" : "Edit Category"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>Name</Label><Input data-testid="input-category-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Category name" className="mt-1" /></div>
-            <div><Label>Description</Label><Textarea data-testid="input-category-desc" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} className="mt-1" /></div>
-            <div><Label>Icon URL</Label><Input data-testid="input-category-icon" value={form.iconUrl} onChange={e => setForm(f => ({ ...f, iconUrl: e.target.value }))} placeholder="https://..." className="mt-1" /></div>
+            <div>
+              <Label>Name</Label>
+              <Input data-testid="input-category-name" value={form.name} onChange={e => handleNameChange(e.target.value)} placeholder="Category name" className="mt-1" />
+            </div>
+            <div>
+              <Label>Slug <span className="text-muted-foreground text-xs">(URL-safe identifier)</span></Label>
+              <Input data-testid="input-category-slug" value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value }))} placeholder="e.g. sailing-yachts" className="mt-1 font-mono text-sm" />
+            </div>
+            <div>
+              <Label>Icon URL</Label>
+              <Input data-testid="input-category-icon" value={form.iconUrl} onChange={e => setForm(f => ({ ...f, iconUrl: e.target.value }))} placeholder="https://..." className="mt-1" />
+            </div>
+            <div>
+              <Label>Sort Order <span className="text-muted-foreground text-xs">(lower = first)</span></Label>
+              <Input data-testid="input-category-sort" type="number" value={form.sortOrder} onChange={e => setForm(f => ({ ...f, sortOrder: e.target.value }))} placeholder="0" className="mt-1" />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button>
-            <Button data-testid="button-save-category" disabled={!form.name.trim() || create.isPending || update.isPending} onClick={handleSave}>
+            <Button
+              data-testid="button-save-category"
+              disabled={!form.name.trim() || !form.slug.trim() || create.isPending || update.isPending}
+              onClick={handleSave}
+            >
               {create.isPending || update.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
@@ -102,7 +145,7 @@ export default function Categories() {
       <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>Delete Category</DialogTitle></DialogHeader>
-          <p className="text-muted-foreground text-sm">This will permanently delete the category.</p>
+          <p className="text-muted-foreground text-sm">This will permanently delete the category. Any yachts linked to it will lose their category.</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
             <Button variant="destructive" data-testid="button-confirm-delete-category" disabled={del.isPending} onClick={() => deleteId && del.mutate({ id: deleteId })}>
