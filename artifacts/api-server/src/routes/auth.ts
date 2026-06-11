@@ -52,11 +52,31 @@ router.post(
       typeof userSyncBodySchema
     >;
 
-    const [existing] = await db
+    let [existing] = await db
       .select()
       .from(usersTable)
       .where(eq(usersTable.clerkId, clerkUserId))
       .limit(1);
+
+    // If no match by clerkId, try to find by email (e.g. pre-seeded admin accounts).
+    // Relink the clerkId so subsequent lookups succeed and the role is preserved.
+    if (!existing) {
+      const [byEmail] = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.email, email))
+        .limit(1);
+
+      if (byEmail) {
+        req.log.info({ userId: byEmail.id, email }, "Relinking clerkId for existing user");
+        const [relinked] = await db
+          .update(usersTable)
+          .set({ clerkId: clerkUserId })
+          .where(eq(usersTable.id, byEmail.id))
+          .returning();
+        existing = relinked;
+      }
+    }
 
     if (existing) {
       const updates: Partial<typeof existing> = {};
