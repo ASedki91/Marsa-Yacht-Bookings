@@ -81,7 +81,7 @@ export default function NewYachtScreen() {
   const templates = (templatesData as any)?.templates ?? [];
 
   const { data: existingYachtData } = useGetYacht(editId, {
-    query: { enabled: isEdit },
+    query: { enabled: isEdit } as any,
   });
 
   const [step, setStep] = useState(0);
@@ -218,7 +218,7 @@ export default function NewYachtScreen() {
         templateId: t.id,
         priceEgp: pricing[t.id].trim().replace(/,/g, "").replace(/[^\d.]/g, ""),
       }))
-      .filter((item) => /^\d+(\.\d{1,2})?$/.test(item.priceEgp) && Number(item.priceEgp) > 0);
+      .filter((item: { templateId: string; priceEgp: string }) => /^\d+(\.\d{1,2})?$/.test(item.priceEgp) && Number(item.priceEgp) > 0);
 
     if (pricingItems.length === 0) {
       Alert.alert("Pricing Required", "Please set a valid price (numbers only) for at least one booking template.");

@@ -1,6 +1,7 @@
 - [Express router guard scoping](express-router-guard-scoping.md) — path-less `router.use(requireAuth/requireRole)` in a path-less-mounted sub-router intercepts ALL requests; scope to a path.
 - [Clerk Expo v3 API](clerk-expo-v3-api.md) — useSignIn/useSignUp from `@clerk/expo/legacy`; tokenCache must be custom (not imported from @clerk/expo); ClerkProvider setup and SSO.
 - [MARSA API response shapes](marsa-api-shapes.md) — yacht list/detail return nested/string fields; mobile screens must map them, not assume flat camelCase.
+- [Alert.alert blocked in Replit canvas iframe](replit-iframe-alert.md) — RN Alert.alert() is silently suppressed inside Replit's canvas iframe; always use inline error state instead.
 - [Drizzle ANY array bug](drizzle-any-array-bug.md) — `sql\`col = ANY(${jsArray})\`` generates invalid SQL; always use `inArray(col, array)` from drizzle-orm instead.
 - [Stripe React Native web bundling](stripe-rn-web-fix.md) — @stripe/stripe-react-native must be excluded from web builds via platform-specific files (StripeProvider.web.tsx no-op stub + StripeProvider.tsx re-exports Stripe).
 - [MARSA platform fee](marsa-platform-fee.md) — 20% platform fee (not 15%); host earns 80%. Update: bookings.ts PLATFORM_FEE_PCT, new-yacht.tsx, become-host.tsx, dashboard.tsx (mobile), Dashboard.tsx (admin).

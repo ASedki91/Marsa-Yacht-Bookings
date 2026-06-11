@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView,
-  Platform, KeyboardAvoidingView, ActivityIndicator, Alert,
+  Platform, KeyboardAvoidingView, ActivityIndicator,
 } from "react-native";
 import { useSignUp } from "@clerk/expo/legacy";
 import { useSSO } from "@clerk/expo";
@@ -31,9 +31,11 @@ export default function SignUpScreen() {
   const [loading, setLoading] = useState(false);
   const [ssoLoading, setSsoLoading] = useState(false);
   const [pendingVerification, setPendingVerification] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSignUp = async () => {
     if (!isLoaded) return;
+    setError(null);
     setLoading(true);
     try {
       await signUp.create({
@@ -44,7 +46,7 @@ export default function SignUpScreen() {
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setPendingVerification(true);
     } catch (err: any) {
-      Alert.alert("Sign Up Error", err?.errors?.[0]?.longMessage ?? err?.message ?? "Sign up failed.");
+      setError(err?.errors?.[0]?.longMessage ?? err?.message ?? "Sign up failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -52,6 +54,7 @@ export default function SignUpScreen() {
 
   const handleVerify = async () => {
     if (!isLoaded) return;
+    setError(null);
     setLoading(true);
     try {
       const result = await signUp.attemptEmailAddressVerification({ code });
@@ -60,13 +63,14 @@ export default function SignUpScreen() {
         router.replace("/(home)/(tabs)/explore");
       }
     } catch (err: any) {
-      Alert.alert("Verification Error", err?.errors?.[0]?.longMessage ?? "Invalid code.");
+      setError(err?.errors?.[0]?.longMessage ?? "Invalid code. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogle = useCallback(async () => {
+    setError(null);
     try {
       setSsoLoading(true);
       const { createdSessionId, setActive: ssoSetActive } = await startSSOFlow({
@@ -78,7 +82,7 @@ export default function SignUpScreen() {
         router.replace("/(home)/(tabs)/explore");
       }
     } catch (err: any) {
-      Alert.alert("Google Error", err?.errors?.[0]?.longMessage ?? "Could not sign in with Google.");
+      setError(err?.errors?.[0]?.longMessage ?? "Could not sign in with Google.");
     } finally {
       setSsoLoading(false);
     }
@@ -93,10 +97,16 @@ export default function SignUpScreen() {
         </View>
         <Text style={[styles.title, { color: c.foreground }]}>Verify your email</Text>
         <Text style={[styles.subtitle, { color: c.mutedForeground }]}>We sent a 6-digit code to {email}</Text>
+        {error ? (
+          <View style={[styles.errorBox, { backgroundColor: "#fef2f2", borderColor: "#fecaca" }]}>
+            <Ionicons name="alert-circle-outline" size={16} color="#ef4444" />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
         <TextInput
-          style={[styles.input, { backgroundColor: c.input, color: c.foreground, borderColor: c.border, width: "100%" }]}
+          style={[styles.input, { backgroundColor: c.input, color: c.foreground, borderColor: error ? "#ef4444" : c.border, width: "100%" }]}
           value={code}
-          onChangeText={setCode}
+          onChangeText={(v) => { setCode(v); setError(null); }}
           placeholder="6-digit code"
           placeholderTextColor={c.mutedForeground}
           keyboardType="numeric"
@@ -110,7 +120,7 @@ export default function SignUpScreen() {
         >
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Verify & Create Account</Text>}
         </Pressable>
-        <Pressable onPress={() => signUp?.prepareEmailAddressVerification({ strategy: "email_code" })}>
+        <Pressable onPress={() => { setError(null); signUp?.prepareEmailAddressVerification({ strategy: "email_code" }); }}>
           <Text style={[styles.linkText, { color: c.primary }]}>Resend code</Text>
         </Pressable>
       </View>
@@ -157,12 +167,19 @@ export default function SignUpScreen() {
           <View style={[styles.dividerLine, { backgroundColor: c.border }]} />
         </View>
 
+        {error ? (
+          <View style={[styles.errorBox, { backgroundColor: "#fef2f2", borderColor: "#fecaca" }]}>
+            <Ionicons name="alert-circle-outline" size={16} color="#ef4444" />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
+
         <View style={styles.field}>
           <Text style={[styles.label, { color: c.foreground }]}>Full name</Text>
           <TextInput
             style={[styles.input, { backgroundColor: c.input, color: c.foreground, borderColor: c.border }]}
             value={name}
-            onChangeText={setName}
+            onChangeText={(v) => { setName(v); setError(null); }}
             placeholder="Your full name"
             placeholderTextColor={c.mutedForeground}
             autoCapitalize="words"
@@ -174,7 +191,7 @@ export default function SignUpScreen() {
           <TextInput
             style={[styles.input, { backgroundColor: c.input, color: c.foreground, borderColor: c.border }]}
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(v) => { setEmail(v); setError(null); }}
             placeholder="your@email.com"
             placeholderTextColor={c.mutedForeground}
             autoCapitalize="none"
@@ -188,7 +205,7 @@ export default function SignUpScreen() {
             <TextInput
               style={[styles.input, { backgroundColor: c.input, color: c.foreground, borderColor: c.border, paddingRight: 48 }]}
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(v) => { setPassword(v); setError(null); }}
               placeholder="Min. 8 characters"
               placeholderTextColor={c.mutedForeground}
               secureTextEntry={!showPassword}
@@ -200,9 +217,9 @@ export default function SignUpScreen() {
         </View>
 
         <Pressable
-          style={[styles.primaryBtn, { backgroundColor: c.primary, opacity: (!email || !password || loading) ? 0.6 : 1 }]}
+          style={[styles.primaryBtn, { backgroundColor: c.primary, opacity: (!email || !password || loading || !isLoaded) ? 0.6 : 1 }]}
           onPress={handleSignUp}
-          disabled={!email || !password || loading}
+          disabled={!email || !password || loading || !isLoaded}
         >
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Create Account</Text>}
         </Pressable>
@@ -240,4 +257,6 @@ const styles = StyleSheet.create({
   footer: { flexDirection: "row", justifyContent: "center", flexWrap: "wrap" },
   footerText: { fontSize: 14, fontFamily: "Inter_400Regular" },
   linkText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  errorBox: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 10, borderWidth: 1 },
+  errorText: { color: "#ef4444", fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
 });
