@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, XCircle, AlertCircle, PauseCircle } from "lucide-react";
+import { CheckCircle, XCircle, AlertCircle, PauseCircle, ChevronDown, ChevronRight, Anchor, Users, MapPin, Star } from "lucide-react";
 
 type YachtAction = "approve" | "reject" | "request-changes" | "suspend";
 
@@ -26,9 +26,67 @@ const statusColors: Record<string, string> = {
   suspended: "text-red-400 border-red-400/40",
 };
 
+function YachtDetail({ yacht }: { yacht: any }) {
+  const amenities: string[] = typeof yacht.amenities === "string"
+    ? JSON.parse(yacht.amenities || "[]")
+    : yacht.amenities ?? [];
+
+  return (
+    <div className="mt-3 pt-3 border-t border-border">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Users className="w-3 h-3" />Capacity: {yacht.capacity}
+            </span>
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Anchor className="w-3 h-3" />
+              {yacht.type ?? "Yacht"}
+            </span>
+            {yacht.length && (
+              <span className="text-xs text-muted-foreground">{yacht.length}m</span>
+            )}
+            {(yacht.avgRating > 0 || yacht.reviewCount > 0) && (
+              <span className="flex items-center gap-1 text-xs text-amber-400">
+                <Star className="w-3 h-3" />{yacht.avgRating ?? "—"} ({yacht.reviewCount ?? 0} reviews)
+              </span>
+            )}
+          </div>
+          {yacht.location && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <MapPin className="w-3 h-3" />{yacht.location}
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground font-mono">Host: {yacht.hostId?.slice(0, 8)}</p>
+          <p className="text-xs text-muted-foreground">
+            Added: {new Date(yacht.createdAt).toLocaleDateString()}
+          </p>
+        </div>
+        {yacht.description && (
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground mb-1">Description</p>
+            <p className="text-xs text-muted-foreground leading-relaxed line-clamp-4">{yacht.description}</p>
+          </div>
+        )}
+      </div>
+      {amenities.length > 0 && (
+        <div className="mt-2">
+          <p className="text-xs font-semibold text-muted-foreground mb-1">Amenities</p>
+          <div className="flex flex-wrap gap-1">
+            {amenities.map((a: string) => (
+              <Badge key={a} variant="outline" className="text-xs text-muted-foreground border-muted/40">{a}</Badge>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Yachts() {
   const [dialog, setDialog] = useState<{ id: string; action: YachtAction } | null>(null);
   const [reason, setReason] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -69,51 +127,68 @@ export default function Yachts() {
         <div className="text-center text-muted-foreground py-16">No yachts found</div>
       ) : (
         <div className="space-y-2">
-          {yachts.map((yacht: any) => (
-            <Card key={yacht.id} data-testid={`card-yacht-${yacht.id}`}>
-              <CardContent className="flex items-center justify-between py-3 px-4">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-foreground text-sm truncate">{yacht.title}</span>
-                    <Badge variant="outline" className={`text-xs ${statusColors[yacht.status] ?? ""}`}>
-                      {yacht.status?.replace(/_/g, " ")}
-                    </Badge>
+          {yachts.map((yacht: any) => {
+            const isExpanded = expandedId === yacht.id;
+            return (
+              <Card key={yacht.id} data-testid={`card-yacht-${yacht.id}`}>
+                <CardContent className="py-3 px-4">
+                  <div className="flex items-center justify-between">
+                    <button
+                      className="min-w-0 text-left flex items-start gap-2 flex-1"
+                      onClick={() => setExpandedId(isExpanded ? null : yacht.id)}
+                      data-testid={`expand-yacht-${yacht.id}`}
+                    >
+                      {isExpanded
+                        ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                        : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-foreground text-sm truncate">{yacht.title}</span>
+                          <Badge variant="outline" className={`text-xs ${statusColors[yacht.status] ?? ""}`}>
+                            {yacht.status?.replace(/_/g, " ")}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {yacht.capacity} guests
+                          {yacht.basePriceEgp && ` · EGP ${Number(yacht.basePriceEgp).toLocaleString()}`}
+                          {yacht.location && ` · ${yacht.location}`}
+                        </p>
+                      </div>
+                    </button>
+                    <div className="flex gap-1 ml-4 shrink-0 flex-wrap justify-end">
+                      {yacht.status === "pending_review" && (
+                        <>
+                          <Button size="sm" variant="outline" className="text-green-400 border-green-400/40 hover:bg-green-400/10"
+                            data-testid={`button-approve-yacht-${yacht.id}`}
+                            onClick={() => setDialog({ id: yacht.id, action: "approve" })}>
+                            <CheckCircle className="w-3 h-3 mr-1" />Approve
+                          </Button>
+                          <Button size="sm" variant="outline" className="text-orange-400 border-orange-400/40 hover:bg-orange-400/10"
+                            data-testid={`button-changes-yacht-${yacht.id}`}
+                            onClick={() => setDialog({ id: yacht.id, action: "request-changes" })}>
+                            <AlertCircle className="w-3 h-3 mr-1" />Request Changes
+                          </Button>
+                          <Button size="sm" variant="outline" className="text-destructive border-destructive/40 hover:bg-destructive/10"
+                            data-testid={`button-reject-yacht-${yacht.id}`}
+                            onClick={() => setDialog({ id: yacht.id, action: "reject" })}>
+                            <XCircle className="w-3 h-3 mr-1" />Reject
+                          </Button>
+                        </>
+                      )}
+                      {yacht.status === "live" && (
+                        <Button size="sm" variant="outline" className="text-amber-400 border-amber-400/40 hover:bg-amber-400/10"
+                          data-testid={`button-suspend-yacht-${yacht.id}`}
+                          onClick={() => setDialog({ id: yacht.id, action: "suspend" })}>
+                          <PauseCircle className="w-3 h-3 mr-1" />Suspend
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Capacity: {yacht.capacity} · EGP {Number(yacht.basePriceEgp ?? 0).toLocaleString()} · Host: {yacht.hostId?.slice(0, 8)}
-                  </p>
-                </div>
-                <div className="flex gap-1 ml-4 shrink-0 flex-wrap justify-end">
-                  {yacht.status === "pending_review" && (
-                    <>
-                      <Button size="sm" variant="outline" className="text-green-400 border-green-400/40 hover:bg-green-400/10"
-                        data-testid={`button-approve-yacht-${yacht.id}`}
-                        onClick={() => setDialog({ id: yacht.id, action: "approve" })}>
-                        <CheckCircle className="w-3 h-3 mr-1" />Approve
-                      </Button>
-                      <Button size="sm" variant="outline" className="text-orange-400 border-orange-400/40 hover:bg-orange-400/10"
-                        data-testid={`button-changes-yacht-${yacht.id}`}
-                        onClick={() => setDialog({ id: yacht.id, action: "request-changes" })}>
-                        <AlertCircle className="w-3 h-3 mr-1" />Request Changes
-                      </Button>
-                      <Button size="sm" variant="outline" className="text-destructive border-destructive/40 hover:bg-destructive/10"
-                        data-testid={`button-reject-yacht-${yacht.id}`}
-                        onClick={() => setDialog({ id: yacht.id, action: "reject" })}>
-                        <XCircle className="w-3 h-3 mr-1" />Reject
-                      </Button>
-                    </>
-                  )}
-                  {yacht.status === "live" && (
-                    <Button size="sm" variant="outline" className="text-amber-400 border-amber-400/40 hover:bg-amber-400/10"
-                      data-testid={`button-suspend-yacht-${yacht.id}`}
-                      onClick={() => setDialog({ id: yacht.id, action: "suspend" })}>
-                      <PauseCircle className="w-3 h-3 mr-1" />Suspend
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  {isExpanded && <YachtDetail yacht={yacht} />}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 

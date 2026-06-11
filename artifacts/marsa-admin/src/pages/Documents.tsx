@@ -13,7 +13,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, XCircle, Clock, ExternalLink } from "lucide-react";
+import { CheckCircle, XCircle, Clock, ExternalLink, MessageSquare } from "lucide-react";
+
+type DocAction = "approved" | "rejected" | "pending";
 
 const statusBadge: Record<string, React.ReactNode> = {
   pending: <Badge variant="outline" className="text-amber-400 border-amber-400/40"><Clock className="w-3 h-3 mr-1" />Pending</Badge>,
@@ -30,7 +32,7 @@ const docTypeLabels: Record<string, string> = {
 
 export default function Documents() {
   const [statusFilter, setStatusFilter] = useState("pending");
-  const [dialog, setDialog] = useState<{ id: string; action: "approved" | "rejected" } | null>(null);
+  const [dialog, setDialog] = useState<{ id: string; action: DocAction } | null>(null);
   const [reason, setReason] = useState("");
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -43,7 +45,10 @@ export default function Documents() {
   const review = useAdminReviewDocument({
     mutation: {
       onSuccess: () => {
-        toast({ title: "Document updated" });
+        const msg = dialog?.action === "approved" ? "Document approved"
+          : dialog?.action === "rejected" ? "Document rejected"
+          : "More information requested";
+        toast({ title: msg });
         qc.invalidateQueries({ queryKey: getAdminListDocumentsQueryKey() });
         setDialog(null);
         setReason("");
@@ -53,6 +58,10 @@ export default function Documents() {
   });
 
   const docs = (data as any)?.documents ?? [];
+
+  const dialogTitle = dialog?.action === "approved" ? "Approve Document"
+    : dialog?.action === "rejected" ? "Reject Document"
+    : "Request More Information";
 
   return (
     <div>
@@ -93,6 +102,11 @@ export default function Documents() {
                         <ExternalLink className="w-3 h-3" />View file
                       </a>
                     )}
+                    {doc.reviewedAt && (
+                      <span className="text-xs text-muted-foreground">
+                        Reviewed {new Date(doc.reviewedAt).toLocaleDateString()}
+                      </span>
+                    )}
                   </div>
                 </div>
                 {doc.status === "pending" && (
@@ -100,6 +114,11 @@ export default function Documents() {
                     <Button size="sm" variant="outline" className="text-green-400 border-green-400/40 hover:bg-green-400/10"
                       data-testid={`button-approve-doc-${doc.id}`}
                       onClick={() => setDialog({ id: doc.id, action: "approved" })}>Approve</Button>
+                    <Button size="sm" variant="outline" className="text-blue-400 border-blue-400/40 hover:bg-blue-400/10"
+                      data-testid={`button-info-doc-${doc.id}`}
+                      onClick={() => setDialog({ id: doc.id, action: "pending" })}>
+                      <MessageSquare className="w-3 h-3 mr-1" />Request Info
+                    </Button>
                     <Button size="sm" variant="outline" className="text-destructive border-destructive/40 hover:bg-destructive/10"
                       data-testid={`button-reject-doc-${doc.id}`}
                       onClick={() => setDialog({ id: doc.id, action: "rejected" })}>Reject</Button>
@@ -114,21 +133,37 @@ export default function Documents() {
       <Dialog open={!!dialog} onOpenChange={() => { setDialog(null); setReason(""); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{dialog?.action === "approved" ? "Approve Document" : "Reject Document"}</DialogTitle>
+            <DialogTitle>{dialogTitle}</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
-            <Label htmlFor="doc-reason">Reason (optional)</Label>
-            <Textarea id="doc-reason" data-testid="textarea-doc-reason" value={reason} onChange={e => setReason(e.target.value)} rows={3} placeholder="Reason..." />
+            <Label htmlFor="doc-reason">
+              {dialog?.action === "pending" ? "What information is needed? (required)" : "Reason (optional)"}
+            </Label>
+            <Textarea
+              id="doc-reason"
+              data-testid="textarea-doc-reason"
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              rows={3}
+              placeholder={
+                dialog?.action === "pending"
+                  ? "Describe what additional information or documents are needed..."
+                  : "Reason..."
+              }
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setDialog(null); setReason(""); }}>Cancel</Button>
             <Button
               data-testid="button-confirm-doc-action"
-              variant={dialog?.action === "approved" ? "default" : "destructive"}
-              disabled={review.isPending}
+              variant={dialog?.action === "approved" ? "default" : dialog?.action === "pending" ? "outline" : "destructive"}
+              disabled={review.isPending || (dialog?.action === "pending" && !reason.trim())}
               onClick={() => dialog && review.mutate({ id: dialog.id, data: { status: dialog.action, reason: reason || undefined } })}
             >
-              {review.isPending ? "Processing..." : dialog?.action === "approved" ? "Approve" : "Reject"}
+              {review.isPending ? "Processing..."
+                : dialog?.action === "approved" ? "Approve"
+                : dialog?.action === "pending" ? "Send Request"
+                : "Reject"}
             </Button>
           </DialogFooter>
         </DialogContent>

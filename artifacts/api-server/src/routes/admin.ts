@@ -17,7 +17,7 @@ import {
   photographerRequestsTable,
   exampleYachtPhotosTable,
 } from "@workspace/db";
-import { and, eq, sql, desc, asc } from "drizzle-orm";
+import { and, eq, sql, desc, asc, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import {
   requireAuth,
@@ -311,17 +311,71 @@ router.get(
     const offset = (page - 1) * limit;
     const where = status ? eq(bookingsTable.status, status as any) : sql`true`;
 
-    const [bookings, [countRow]] = await Promise.all([
+    const [rawBookings, [countRow]] = await Promise.all([
       db
         .select()
         .from(bookingsTable)
+        .leftJoin(yachtsTable, eq(bookingsTable.yachtId, yachtsTable.id))
         .where(where)
         .orderBy(desc(bookingsTable.createdAt))
         .limit(limit)
         .offset(offset),
       db.select({ count: sql<number>`count(*)::int` }).from(bookingsTable).where(where),
     ]);
+    const bookings = rawBookings.map(r => ({ ...r.bookings, yachtName: r.yachts?.title ?? null }));
     res.json({ bookings, total: countRow?.count ?? 0, page });
+  },
+);
+
+// ── Process Cancellation Request ──────────────────────────────────────────────
+const processCancellationSchema = z.object({
+  action: z.enum(["approve", "reject"]),
+  notes: z.string().max(500).optional(),
+});
+
+router.post(
+  "/admin/bookings/:id/process-cancellation",
+  validateBody(processCancellationSchema),
+  auditLog({
+    action: "admin.process_cancellation",
+    entityType: "booking",
+    getEntityId: (r) => String(r.params.id),
+  }),
+  async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id);
+    const { action, notes } = req.body as z.infer<typeof processCancellationSchema>;
+
+    const [booking] = await db
+      .select()
+      .from(bookingsTable)
+      .where(and(eq(bookingsTable.id, id), eq(bookingsTable.status, "cancel_requested")))
+      .limit(1);
+
+    if (!booking) { res.status(404).json({ error: "Booking not in cancel_requested state" }); return; }
+
+    const hoursOld = (Date.now() - new Date(String(booking.createdAt)).getTime()) / 3600000;
+    const feePct = hoursOld < 24 ? 0.05 : 0;
+    const cancellationFeeEgp = (parseFloat(String(booking.totalAmountEgp ?? "0")) * feePct).toFixed(2);
+
+    const newStatus = action === "approve" ? "cancelled" : "confirmed";
+    const [updated] = await db
+      .update(bookingsTable)
+      .set({ status: newStatus })
+      .where(eq(bookingsTable.id, id))
+      .returning();
+
+    notify({
+      userId: booking.guestId,
+      type: `booking.cancellation_${action === "approve" ? "approved" : "rejected"}`,
+      title: action === "approve" ? "Cancellation approved" : "Cancellation request rejected",
+      message: action === "approve"
+        ? `Your booking has been cancelled.${feePct > 0 ? ` A ${feePct * 100}% cancellation fee (EGP ${cancellationFeeEgp}) applies.` : ""}`
+        : (notes ?? "Your cancellation request was reviewed — the booking remains confirmed."),
+      relatedEntityType: "booking",
+      relatedEntityId: id,
+    });
+
+    res.json({ ...updated, cancellationFeeEgp });
   },
 );
 
@@ -392,7 +446,19 @@ router.get("/admin/withdrawals", async (_req: Request, res: Response): Promise<v
     .from(withdrawalRequestsTable)
     .orderBy(desc(withdrawalRequestsTable.createdAt))
     .limit(200);
-  res.json({ withdrawals, total: withdrawals.length });
+
+  const hostIds = [...new Set(withdrawals.map(w => w.hostId))];
+  const earnings = hostIds.length
+    ? await db.select().from(earningsLedgerTable).where(inArray(earningsLedgerTable.hostId, hostIds))
+    : [];
+  const earningsByHost: Record<string, typeof earnings> = {};
+  for (const e of earnings) {
+    if (!earningsByHost[e.hostId]) earningsByHost[e.hostId] = [];
+    earningsByHost[e.hostId].push(e);
+  }
+  const enriched = withdrawals.map(w => ({ ...w, earningsBreakdown: earningsByHost[w.hostId] ?? [] }));
+
+  res.json({ withdrawals: enriched, total: enriched.length });
 });
 
 const withdrawalProcessSchema = z.object({
@@ -655,7 +721,7 @@ router.get(
 );
 
 const documentReviewSchema = z.object({
-  status: z.enum(["approved", "rejected"]),
+  status: z.enum(["approved", "rejected", "pending"]),
   reason: z.string().max(500).optional(),
 });
 

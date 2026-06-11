@@ -1,7 +1,8 @@
 import { useState } from "react";
 import {
   useAdminListAddOns, useAdminCreateAddOn, useAdminUpdateAddOn, useAdminDeleteAddOn,
-  getAdminListAddOnsQueryKey
+  useAdminListBookingTemplates,
+  getAdminListAddOnsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,11 +14,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Link } from "lucide-react";
 
-type FormState = { name: string; description: string; priceEgp: string; isActive: boolean };
-const empty: FormState = { name: "", description: "", priceEgp: "", isActive: true };
+type FormState = { name: string; description: string; priceEgp: string; isActive: boolean; templateId: string };
+const empty: FormState = { name: "", description: "", priceEgp: "", isActive: true, templateId: "" };
 
 export default function AddOns() {
   const [dialog, setDialog] = useState<{ mode: "create" | "edit"; id?: string } | null>(null);
@@ -29,6 +31,8 @@ export default function AddOns() {
   const { data, isLoading } = useAdminListAddOns({
     query: { queryKey: getAdminListAddOnsQueryKey() }
   });
+  const { data: templatesData } = useAdminListBookingTemplates();
+  const templates: any[] = (templatesData as any)?.templates ?? [];
 
   const invalidate = () => qc.invalidateQueries({ queryKey: getAdminListAddOnsQueryKey() });
   const onErr = () => toast({ title: "Operation failed", variant: "destructive" });
@@ -39,6 +43,9 @@ export default function AddOns() {
 
   const addOns = (data as any)?.addOns ?? [];
 
+  const templateName = (id: string | null | undefined) =>
+    id ? (templates.find((t: any) => t.id === id)?.name ?? id.slice(0, 8)) : null;
+
   const handleSave = () => {
     if (!form.name.trim() || !form.priceEgp) return;
     const payload = {
@@ -46,6 +53,7 @@ export default function AddOns() {
       description: form.description || undefined,
       priceEgp: form.priceEgp,
       isActive: form.isActive,
+      templateId: form.templateId || undefined,
     };
     if (dialog?.mode === "create") create.mutate({ data: payload });
     else if (dialog?.id) update.mutate({ id: dialog.id, data: payload });
@@ -80,6 +88,15 @@ export default function AddOns() {
                     {a.isActive === false && (
                       <Badge variant="outline" className="text-xs text-muted-foreground border-muted/40">Inactive</Badge>
                     )}
+                    {a.templateId && (
+                      <Badge variant="outline" className="text-xs text-blue-400 border-blue-400/30 flex items-center gap-1">
+                        <Link className="w-2.5 h-2.5" />
+                        {templateName(a.templateId)}
+                      </Badge>
+                    )}
+                    {!a.templateId && (
+                      <Badge variant="outline" className="text-xs text-muted-foreground border-muted/30">All templates</Badge>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {formatEgp(a.priceEgp ?? 0)}
@@ -94,6 +111,7 @@ export default function AddOns() {
                         description: a.description ?? "",
                         priceEgp: String(a.priceEgp ?? ""),
                         isActive: a.isActive !== false,
+                        templateId: a.templateId ?? "",
                       });
                       setDialog({ mode: "edit", id: a.id });
                     }}>
@@ -126,6 +144,21 @@ export default function AddOns() {
             <div>
               <Label>Description</Label>
               <Textarea data-testid="input-addon-desc" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} className="mt-1" placeholder="What's included?" />
+            </div>
+            <div>
+              <Label>Linked Template</Label>
+              <Select value={form.templateId || "all"} onValueChange={v => setForm(f => ({ ...f, templateId: v === "all" ? "" : v }))}>
+                <SelectTrigger className="mt-1" data-testid="select-addon-template">
+                  <SelectValue placeholder="All templates" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All templates (no restriction)</SelectItem>
+                  {templates.map((t: any) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">Restrict this add-on to a specific booking duration, or leave as "All templates" to allow it for any trip.</p>
             </div>
             <div className="flex items-center gap-3 pt-1">
               <Switch
