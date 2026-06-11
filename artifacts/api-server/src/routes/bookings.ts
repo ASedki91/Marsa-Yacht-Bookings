@@ -152,7 +152,7 @@ router.post(
         ? await db
             .select()
             .from(addOnsTable)
-            .where(sql`${addOnsTable.id} = ANY(${body.addOnIds})`)
+            .where(inArray(addOnsTable.id, body.addOnIds))
         : [];
     for (const addOn of addOns) addOnTotal += parseFloat(addOn.priceEgp);
 
@@ -326,8 +326,8 @@ router.get(
 
       if (yachtIds.length > 0) {
         const hostWhere = status
-          ? and(sql`${bookingsTable.yachtId} = ANY(${yachtIds})`, eq(bookingsTable.status, status as any))
-          : sql`${bookingsTable.yachtId} = ANY(${yachtIds})`;
+          ? and(inArray(bookingsTable.yachtId, yachtIds), eq(bookingsTable.status, status as any))
+          : inArray(bookingsTable.yachtId, yachtIds);
 
         const [guestBookings, hostBookings] = await Promise.all([
           db.select().from(bookingsTable).where(guestWhere),
@@ -376,8 +376,8 @@ router.get(
 
       const yachtIds = hostYachts.map((y) => y.id);
       whereClause = status
-        ? and(sql`${bookingsTable.yachtId} = ANY(${yachtIds})`, eq(bookingsTable.status, status as any))
-        : sql`${bookingsTable.yachtId} = ANY(${yachtIds})`;
+        ? and(inArray(bookingsTable.yachtId, yachtIds), eq(bookingsTable.status, status as any))
+        : inArray(bookingsTable.yachtId, yachtIds);
     } else {
       whereClause = status
         ? and(eq(bookingsTable.guestId, user.id), eq(bookingsTable.status, status as any))

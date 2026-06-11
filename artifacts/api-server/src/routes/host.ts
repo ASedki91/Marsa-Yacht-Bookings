@@ -660,10 +660,12 @@ router.put(
     );
 
     const templateIds = upserted.flat().map((r) => r.templateId);
-    const templates = await db
-      .select()
-      .from(bookingTemplatesTable)
-      .where(sql`${bookingTemplatesTable.id} = ANY(${templateIds})`);
+    const templates = templateIds.length
+      ? await db
+          .select()
+          .from(bookingTemplatesTable)
+          .where(inArray(bookingTemplatesTable.id, templateIds))
+      : [];
 
     const result = upserted.flat().map((p) => {
       const tmpl = templates.find((t) => t.id === p.templateId);
