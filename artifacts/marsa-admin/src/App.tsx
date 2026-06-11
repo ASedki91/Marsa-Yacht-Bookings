@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { ClerkProvider, SignIn, Show, useClerk, useUser } from '@clerk/react';
+import { ClerkProvider, SignIn, Show, useClerk, useUser, useAuth } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from 'wouter';
@@ -7,7 +7,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useGetMe, useSyncUser, getGetMeQueryKey } from "@workspace/api-client-react";
+import { useGetMe, useSyncUser, getGetMeQueryKey, setAuthTokenGetter } from "@workspace/api-client-react";
 import { AdminLayout } from "./components/AdminLayout";
 import Dashboard from "./pages/Dashboard";
 import Hosts from "./pages/Hosts";
@@ -228,6 +228,18 @@ function ClerkQueryClientCacheInvalidator() {
   return null;
 }
 
+// Wires the Clerk session token into customFetch so every API call includes
+// "Authorization: Bearer <token>" — more reliable than cookies in Replit's
+// proxied dev environment where cookie forwarding can be inconsistent.
+function ClerkAuthTokenSetup() {
+  const { getToken, isSignedIn } = useAuth();
+  useEffect(() => {
+    setAuthTokenGetter(() => getToken());
+    return () => setAuthTokenGetter(null);
+  }, [getToken, isSignedIn]);
+  return null;
+}
+
 function ClerkProviderWithRoutes() {
   const [, setLocation] = useLocation();
 
@@ -241,6 +253,7 @@ function ClerkProviderWithRoutes() {
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
       <QueryClientProvider client={queryClient}>
+        <ClerkAuthTokenSetup />
         <ClerkQueryClientCacheInvalidator />
         <Switch>
           <Route path="/" component={HomeRedirect} />
