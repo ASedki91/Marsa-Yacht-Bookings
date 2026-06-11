@@ -770,6 +770,48 @@ router.post(
   },
 );
 
+// ── Document Request More Info ─────────────────────────────────────────────────
+router.post(
+  "/admin/documents/:id/request-info",
+  validateBody(z.object({ message: z.string().min(5).max(1000) })),
+  auditLog({
+    action: "admin.document_request_info",
+    entityType: "host_document",
+    getEntityId: (r) => String(r.params.id),
+  }),
+  async (req: Request, res: Response): Promise<void> => {
+    const adminUser = (req as any).localUser;
+    const id = String(req.params.id);
+    const { message } = req.body as { message: string };
+
+    const [document] = await db
+      .update(hostDocumentsTable)
+      .set({ status: "pending", reviewedBy: adminUser.id, reviewedAt: new Date() })
+      .where(eq(hostDocumentsTable.id, id))
+      .returning();
+
+    if (!document) { res.status(404).json({ error: "Document not found" }); return; }
+
+    const [profile] = await db
+      .select()
+      .from(hostProfilesTable)
+      .where(eq(hostProfilesTable.id, document.hostId))
+      .limit(1);
+
+    if (profile) {
+      notify({
+        userId: profile.userId,
+        type: "document.info_requested",
+        title: "Additional information needed",
+        message,
+        relatedEntityType: "host_document",
+        relatedEntityId: id,
+      });
+    }
+    res.json(document);
+  },
+);
+
 // ── Listing Moderation (request-changes / suspend) ────────────────────────────
 const requestChangesSchema = z.object({
   feedback: z.string().min(10).max(2000),

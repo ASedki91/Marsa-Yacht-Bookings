@@ -1,9 +1,9 @@
 import { useState } from "react";
 import {
   useAdminListDocuments, useAdminReviewDocument,
-  getAdminListDocumentsQueryKey
+  getAdminListDocumentsQueryKey, customFetch
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, XCircle, Clock, ExternalLink, MessageSquare } from "lucide-react";
 
-type DocAction = "approved" | "rejected" | "pending";
+type DocAction = "approved" | "rejected" | "request_info";
 
 const statusBadge: Record<string, React.ReactNode> = {
   pending: <Badge variant="outline" className="text-amber-400 border-amber-400/40"><Clock className="w-3 h-3 mr-1" />Pending</Badge>,
@@ -42,22 +42,33 @@ export default function Documents() {
     query: { queryKey: getAdminListDocumentsQueryKey(params) }
   });
 
+  const onMutateSuccess = (msg: string) => {
+    toast({ title: msg });
+    qc.invalidateQueries({ queryKey: getAdminListDocumentsQueryKey() });
+    setDialog(null);
+    setReason("");
+  };
+  const onMutateError = () => toast({ title: "Failed to update document", variant: "destructive" });
+
   const review = useAdminReviewDocument({
     mutation: {
-      onSuccess: () => {
-        const msg = dialog?.action === "approved" ? "Document approved"
-          : dialog?.action === "rejected" ? "Document rejected"
-          : "More information requested";
-        toast({ title: msg });
-        qc.invalidateQueries({ queryKey: getAdminListDocumentsQueryKey() });
-        setDialog(null);
-        setReason("");
-      },
-      onError: () => toast({ title: "Failed to update document", variant: "destructive" }),
+      onSuccess: () => onMutateSuccess(dialog?.action === "approved" ? "Document approved" : "Document rejected"),
+      onError: onMutateError,
     }
   });
 
+  const requestInfo = useMutation({
+    mutationFn: async ({ id, message }: { id: string; message: string }) =>
+      customFetch<unknown>(`/api/admin/documents/${id}/request-info`, {
+        method: "POST",
+        body: JSON.stringify({ message }),
+      }),
+    onSuccess: () => onMutateSuccess("Information requested"),
+    onError: onMutateError,
+  });
+
   const docs = (data as any)?.documents ?? [];
+  const anyPending = review.isPending || requestInfo.isPending;
 
   const dialogTitle = dialog?.action === "approved" ? "Approve Document"
     : dialog?.action === "rejected" ? "Reject Document"
@@ -116,7 +127,7 @@ export default function Documents() {
                       onClick={() => setDialog({ id: doc.id, action: "approved" })}>Approve</Button>
                     <Button size="sm" variant="outline" className="text-blue-400 border-blue-400/40 hover:bg-blue-400/10"
                       data-testid={`button-info-doc-${doc.id}`}
-                      onClick={() => setDialog({ id: doc.id, action: "pending" })}>
+                      onClick={() => setDialog({ id: doc.id, action: "request_info" })}>
                       <MessageSquare className="w-3 h-3 mr-1" />Request Info
                     </Button>
                     <Button size="sm" variant="outline" className="text-destructive border-destructive/40 hover:bg-destructive/10"
@@ -137,7 +148,7 @@ export default function Documents() {
           </DialogHeader>
           <div className="space-y-2">
             <Label htmlFor="doc-reason">
-              {dialog?.action === "pending" ? "What information is needed? (required)" : "Reason (optional)"}
+              {dialog?.action === "request_info" ? "What information is needed? (required)" : "Reason (optional)"}
             </Label>
             <Textarea
               id="doc-reason"
@@ -146,7 +157,7 @@ export default function Documents() {
               onChange={e => setReason(e.target.value)}
               rows={3}
               placeholder={
-                dialog?.action === "pending"
+                dialog?.action === "request_info"
                   ? "Describe what additional information or documents are needed..."
                   : "Reason..."
               }
@@ -156,13 +167,20 @@ export default function Documents() {
             <Button variant="outline" onClick={() => { setDialog(null); setReason(""); }}>Cancel</Button>
             <Button
               data-testid="button-confirm-doc-action"
-              variant={dialog?.action === "approved" ? "default" : dialog?.action === "pending" ? "outline" : "destructive"}
-              disabled={review.isPending || (dialog?.action === "pending" && !reason.trim())}
-              onClick={() => dialog && review.mutate({ id: dialog.id, data: { status: dialog.action, reason: reason || undefined } })}
+              variant={dialog?.action === "approved" ? "default" : dialog?.action === "request_info" ? "outline" : "destructive"}
+              disabled={anyPending || (dialog?.action === "request_info" && !reason.trim())}
+              onClick={() => {
+                if (!dialog) return;
+                if (dialog.action === "request_info") {
+                  requestInfo.mutate({ id: dialog.id, message: reason });
+                } else {
+                  review.mutate({ id: dialog.id, data: { status: dialog.action as "approved" | "rejected", reason: reason || undefined } });
+                }
+              }}
             >
-              {review.isPending ? "Processing..."
+              {anyPending ? "Processing..."
                 : dialog?.action === "approved" ? "Approve"
-                : dialog?.action === "pending" ? "Send Request"
+                : dialog?.action === "request_info" ? "Send Request"
                 : "Reject"}
             </Button>
           </DialogFooter>
