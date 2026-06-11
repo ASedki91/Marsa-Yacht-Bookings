@@ -231,10 +231,10 @@ export default function BecomeHostScreen() {
                   <Ionicons name="cash-outline" size={20} color={colors.light.gold} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.feeTitle, { color: colors.light.navy }]}>MARSA Service Fee: 15%</Text>
+                  <Text style={[styles.feeTitle, { color: colors.light.navy }]}>MARSA Service Fee: 20%</Text>
                   <Text style={[styles.feeSub, { color: c.mutedForeground }]}>
-                    You keep <Text style={{ fontFamily: "Inter_700Bold", color: "#22C55E" }}>85%</Text> of every booking.
-                    No hidden charges — just a simple 15% platform fee to cover payments, support, and marketing.
+                    You keep <Text style={{ fontFamily: "Inter_700Bold", color: "#22C55E" }}>80%</Text> of every booking.
+                    No hidden charges — just a simple 20% platform fee to cover payments, support, and marketing.
                   </Text>
                 </View>
               </View>

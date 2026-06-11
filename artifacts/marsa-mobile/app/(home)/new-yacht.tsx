@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView,
   Platform, ActivityIndicator, Alert, Switch, Image,
@@ -9,6 +9,8 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import {
   useCreateYacht,
+  useUpdateYacht,
+  useGetYacht,
   useListCategories,
   useSetYachtPricing,
   useListBookingTemplates,
@@ -63,9 +65,11 @@ export default function NewYachtScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ editId?: string }>();
-  const isEdit = !!params.editId;
+  const editId = params.editId ?? "";
+  const isEdit = !!editId;
 
   const createYacht = useCreateYacht();
+  const updateYacht = useUpdateYacht();
   const setYachtPricing = useSetYachtPricing();
   const submitForReview = useSubmitYachtForReview();
   const setYachtAvailability = useSetYachtAvailability();
@@ -76,8 +80,12 @@ export default function NewYachtScreen() {
   const categories = (categoriesData as any)?.categories ?? [];
   const templates = (templatesData as any)?.templates ?? [];
 
+  const { data: existingYachtData } = useGetYacht(editId, {
+    query: { enabled: isEdit },
+  });
+
   const [step, setStep] = useState(0);
-  const [yachtId, setYachtId] = useState<string | null>(null);
+  const [yachtId, setYachtId] = useState<string | null>(isEdit ? editId : null);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -102,6 +110,23 @@ export default function NewYachtScreen() {
   const [availStartTime, setAvailStartTime] = useState("09:00");
 
   const [loading, setLoading] = useState(false);
+
+  // Pre-populate form when editing an existing yacht
+  useEffect(() => {
+    if (!isEdit || !existingYachtData) return;
+    const y = existingYachtData as any;
+    if (y.title) setTitle(y.title);
+    if (y.description) setDescription(y.description);
+    if (y.location) setLocation(y.location);
+    if (y.categoryId) setCategoryId(y.categoryId);
+    if (y.capacity) setCapacity(String(y.capacity));
+    if (y.lengthFt) setLengthFt(String(y.lengthFt));
+    if (y.yearBuilt) setYearBuilt(String(y.yearBuilt));
+    if (y.manufacturer) setManufacturer(y.manufacturer);
+    if (y.features?.length) setSelectedFeatures(y.features);
+    const photos = y.photos?.map((p: any) => p.url ?? p.publicUrl ?? p) ?? [];
+    if (photos.length) setPhotoUris(photos);
+  }, [isEdit, existingYachtData]);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
@@ -160,23 +185,26 @@ export default function NewYachtScreen() {
     }
     setLoading(true);
     try {
-      const result = await createYacht.mutateAsync({
-        data: {
-          title: title.trim(),
-          description: description.trim() || undefined,
-          location: location.trim() || "El Gouna, Egypt",
-          categoryId: categoryId || undefined,
-          capacity: Number(capacity),
-          lengthFt: lengthFt ? Number(lengthFt) : undefined,
-          yearBuilt: yearBuilt ? Number(yearBuilt) : undefined,
-          manufacturer: manufacturer.trim() || undefined,
-          features: selectedFeatures,
-        },
-      });
-      setYachtId((result as any).id);
+      const payload = {
+        title: title.trim(),
+        description: description.trim() || undefined,
+        location: location.trim() || "El Gouna, Egypt",
+        categoryId: categoryId || undefined,
+        capacity: Number(capacity),
+        lengthFt: lengthFt ? Number(lengthFt) : undefined,
+        yearBuilt: yearBuilt ? Number(yearBuilt) : undefined,
+        manufacturer: manufacturer.trim() || undefined,
+        features: selectedFeatures,
+      };
+      if (isEdit && yachtId) {
+        await updateYacht.mutateAsync({ id: yachtId, data: payload });
+      } else {
+        const result = await createYacht.mutateAsync({ data: payload });
+        setYachtId((result as any).id);
+      }
       setStep(1);
     } catch (err: any) {
-      Alert.alert("Error", err?.errors?.[0]?.message ?? err?.message ?? "Could not create yacht.");
+      Alert.alert("Error", err?.errors?.[0]?.message ?? err?.message ?? "Could not save yacht.");
     } finally {
       setLoading(false);
     }
@@ -186,10 +214,14 @@ export default function NewYachtScreen() {
     if (!yachtId) { setStep(3); return; }
     const pricingItems = templates
       .filter((t: any) => pricing[t.id]?.trim())
-      .map((t: any) => ({ templateId: t.id, priceEgp: pricing[t.id].trim() }));
+      .map((t: any) => ({
+        templateId: t.id,
+        priceEgp: pricing[t.id].trim().replace(/,/g, "").replace(/[^\d.]/g, ""),
+      }))
+      .filter((item) => /^\d+(\.\d{1,2})?$/.test(item.priceEgp) && Number(item.priceEgp) > 0);
 
     if (pricingItems.length === 0) {
-      Alert.alert("Pricing Required", "Please set a price for at least one booking template.");
+      Alert.alert("Pricing Required", "Please set a valid price (numbers only) for at least one booking template.");
       return;
     }
     setLoading(true);
@@ -527,7 +559,7 @@ export default function NewYachtScreen() {
               </View>
             ) : (
               templates.map((t: any) => {
-                const earned = pricing[t.id] ? Math.round(Number(pricing[t.id]) * 0.85) : 0;
+                const earned = pricing[t.id] ? Math.round(Number(pricing[t.id]) * 0.80) : 0;
                 return (
                   <View key={t.id} style={[styles.pricingRow, { backgroundColor: c.card, borderColor: c.border }]}>
                     <View style={{ flex: 1 }}>
@@ -558,7 +590,7 @@ export default function NewYachtScreen() {
             <View style={[styles.feeNote, { backgroundColor: c.card, borderColor: c.border }]}>
               <Ionicons name="information-circle-outline" size={16} color={c.primary} />
               <Text style={[styles.feeNoteText, { color: c.mutedForeground }]}>
-                MARSA takes a 15% platform fee. You receive 85% of each booking. Prices shown above reflect your earnings.
+                MARSA takes a 20% platform fee. You receive 80% of each booking. Prices shown above reflect your earnings.
               </Text>
             </View>
           </View>

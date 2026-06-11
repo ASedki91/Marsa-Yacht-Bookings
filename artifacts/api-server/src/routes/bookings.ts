@@ -25,7 +25,7 @@ import { notify } from "../lib/notify";
 
 const router: IRouter = Router();
 
-const PLATFORM_FEE_PCT = 0.15;
+const PLATFORM_FEE_PCT = 0.20;
 
 // ── Enrich bookings with yacht + template display data ───────────────────────
 async function enrichBookings(bookings: (typeof bookingsTable.$inferSelect)[]) {

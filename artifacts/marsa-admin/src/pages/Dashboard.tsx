@@ -88,8 +88,8 @@ export default function Dashboard() {
 
   const pendingTotal = (s?.pendingHostApplications ?? 0) + (s?.pendingYachtReviews ?? 0) + (s?.pendingWithdrawals ?? 0);
 
-  const platformFeeEgp = parseFloat(s?.totalRevenueEgp ?? "0") * 0.15;
-  const payoutLiabilityEgp = parseFloat(s?.totalRevenueEgp ?? "0") * 0.85;
+  const platformFeeEgp = parseFloat(s?.totalRevenueEgp ?? "0") * 0.20;
+  const payoutLiabilityEgp = parseFloat(s?.totalRevenueEgp ?? "0") * 0.80;
 
   const statusCounts: Record<string, number> = {};
   bookings.forEach(b => {

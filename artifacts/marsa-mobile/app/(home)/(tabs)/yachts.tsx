@@ -12,7 +12,7 @@ import {
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useListHostYachts } from "@workspace/api-client-react";
+import { useListHostYachts, useDeleteHostYacht } from "@workspace/api-client-react";
 import { useColors } from "@/hooks/useColors";
 import { EmptyState } from "@/components/EmptyState";
 import { SkeletonYachtCard } from "@/components/SkeletonCard";
@@ -27,6 +27,8 @@ const STATUS_COLOR: Record<string, { label: string; color: string; bg: string }>
   rejected: { label: "Rejected", color: "#991B1B", bg: "#FEE2E2" },
 };
 
+const EDITABLE = ["draft", "changes_requested", "rejected"];
+
 export default function MyYachtsScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
@@ -35,12 +37,47 @@ export default function MyYachtsScreen() {
 
   const { data, isLoading, error, refetch } = useListHostYachts();
   const yachts = (data as any)?.yachts ?? [];
+  const deleteYacht = useDeleteHostYacht();
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await refetch();
     setRefreshing(false);
   }, [refetch]);
+
+  const handleEdit = (item: any) => {
+    router.push(`/(home)/new-yacht?editId=${item.id}`);
+  };
+
+  const handleDelete = (item: any) => {
+    Alert.alert(
+      "Delete Yacht",
+      `Are you sure you want to delete "${item.title}"? This cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteYacht.mutateAsync({ id: item.id });
+              refetch();
+            } catch {
+              Alert.alert("Error", "Could not delete yacht. Only draft or rejected listings can be deleted.");
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handlePress = (item: any) => {
+    if (EDITABLE.includes(item.status)) {
+      router.push(`/(home)/new-yacht?editId=${item.id}`);
+    } else {
+      router.push(`/(home)/yacht/${item.id}`);
+    }
+  };
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
@@ -87,16 +124,35 @@ export default function MyYachtsScreen() {
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => {
             const statusCfg = STATUS_COLOR[item.status] ?? { label: item.status, color: c.mutedForeground, bg: c.muted };
+            const canEdit = EDITABLE.includes(item.status);
             return (
               <View>
                 <YachtCard
                   yacht={item}
-                  onPress={() => {}}
+                  onPress={() => handlePress(item)}
                 />
                 <View style={[styles.statusRow, { backgroundColor: statusCfg.bg }]}>
                   <Text style={[styles.statusText, { color: statusCfg.color }]}>
                     {statusCfg.label}
                   </Text>
+                  {canEdit && (
+                    <View style={styles.actionBtns}>
+                      <Pressable
+                        style={[styles.actionBtn, { backgroundColor: colors.light.navy + "18" }]}
+                        onPress={() => handleEdit(item)}
+                      >
+                        <Ionicons name="pencil-outline" size={14} color={colors.light.navy} />
+                        <Text style={[styles.actionBtnText, { color: colors.light.navy }]}>Edit</Text>
+                      </Pressable>
+                      <Pressable
+                        style={[styles.actionBtn, { backgroundColor: "#FEE2E2" }]}
+                        onPress={() => handleDelete(item)}
+                      >
+                        <Ionicons name="trash-outline" size={14} color="#991B1B" />
+                        <Text style={[styles.actionBtnText, { color: "#991B1B" }]}>Delete</Text>
+                      </Pressable>
+                    </View>
+                  )}
                 </View>
               </View>
             );
@@ -148,6 +204,19 @@ const styles = StyleSheet.create({
     marginHorizontal: 1,
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   statusText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  actionBtns: { flexDirection: "row", gap: 8 },
+  actionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  actionBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
 });

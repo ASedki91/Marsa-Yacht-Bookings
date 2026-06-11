@@ -151,6 +151,7 @@ export default function ProfileScreen() {
   const emailName = user?.email
     ? user.email
         .split("@")[0]
+        .replace(/\+.*$/, "")
         .split(/[._-]+/)
         .filter(Boolean)
         .map((p: string) => p.charAt(0).toUpperCase() + p.slice(1))

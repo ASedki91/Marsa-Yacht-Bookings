@@ -237,7 +237,7 @@ export default function DashboardScreen() {
           <View style={[styles.feeNote, { backgroundColor: c.card, borderColor: c.border }]}>
             <Ionicons name="information-circle-outline" size={16} color={c.primary} />
             <Text style={[styles.feeText, { color: c.mutedForeground }]}>
-              MARSA earns a 15% platform fee per booking. You receive 85% of every confirmed booking.
+              MARSA earns a 20% platform fee per booking. You receive 80% of every confirmed booking.
             </Text>
           </View>
         </>
