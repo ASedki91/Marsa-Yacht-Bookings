@@ -101,7 +101,7 @@ export default function Dashboard() {
     fill: BOOKING_STATUS_COLORS[status] ?? "#6B7280",
   }));
 
-  const pendingHostBookings = bookings.filter(b => b.status === "pending_host");
+  const pendingHostBookings = bookings.filter(b => b.status === "paid_under_review");
   const slaBreached = pendingHostBookings.filter(b => {
     const ageMs = Date.now() - new Date(b.createdAt).getTime();
     return ageMs > 12 * 3600 * 1000;

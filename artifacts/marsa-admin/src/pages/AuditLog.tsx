@@ -12,22 +12,24 @@ import { ScrollText, Download } from "lucide-react";
 
 const entityColor: Record<string, string> = {
   host: "text-blue-400 border-blue-400/40",
+  host_profile: "text-blue-400 border-blue-400/40",
   yacht: "text-green-400 border-green-400/40",
   booking: "text-purple-400 border-purple-400/40",
   user: "text-amber-400 border-amber-400/40",
-  withdrawal: "text-orange-400 border-orange-400/40",
+  withdrawal_request: "text-orange-400 border-orange-400/40",
   review: "text-pink-400 border-pink-400/40",
+  host_document: "text-cyan-400 border-cyan-400/40",
 };
 
 function exportCsv(logs: any[]) {
-  const header = ["id", "action", "entityType", "entityId", "adminId", "createdAt", "details"].join(",");
+  const header = ["id", "action", "entityType", "entityId", "userId", "createdAt", "details"].join(",");
   const rows = logs.map(log =>
     [
       log.id,
       log.action,
       log.entityType,
       log.entityId ?? "",
-      log.adminId ?? "",
+      log.userId ?? "",
       log.createdAt,
       JSON.stringify(log.details ?? {}).replace(/,/g, ";"),
     ].join(",")
@@ -51,27 +53,18 @@ export default function AuditLog() {
   const [page, setPage] = useState(1);
 
   const params: any = { page };
-  if (actionFilter) params.action = actionFilter;
-  if (entityFilter) params.entityType = entityFilter;
+  if (actionFilter.trim()) params.action = actionFilter.trim();
+  if (entityFilter.trim()) params.entityType = entityFilter.trim();
+  if (userFilter.trim()) params.userId = userFilter.trim();
+  if (dateFrom) params.dateFrom = dateFrom;
+  if (dateTo) params.dateTo = dateTo;
 
   const { data, isLoading } = useAdminListAuditLogs(params, {
     query: { queryKey: getAdminListAuditLogsQueryKey(params) }
   });
 
-  let logs: any[] = (data as any)?.logs ?? [];
+  const logs: any[] = (data as any)?.logs ?? [];
   const total = (data as any)?.total ?? 0;
-
-  if (userFilter) {
-    logs = logs.filter(l => l.adminId?.toLowerCase().includes(userFilter.toLowerCase()));
-  }
-  if (dateFrom) {
-    const from = new Date(dateFrom).getTime();
-    logs = logs.filter(l => new Date(l.createdAt).getTime() >= from);
-  }
-  if (dateTo) {
-    const to = new Date(dateTo).getTime() + 86400000;
-    logs = logs.filter(l => new Date(l.createdAt).getTime() <= to);
-  }
 
   const resetFilters = useCallback(() => {
     setActionFilter(""); setEntityFilter(""); setUserFilter(""); setDateFrom(""); setDateTo(""); setPage(1);
@@ -98,7 +91,6 @@ export default function AuditLog() {
         </Button>
       </div>
 
-      {/* Filters */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-4">
         <div>
           <Label className="text-xs text-muted-foreground">Action</Label>
@@ -121,11 +113,11 @@ export default function AuditLog() {
           />
         </div>
         <div>
-          <Label className="text-xs text-muted-foreground">Admin (user ID)</Label>
+          <Label className="text-xs text-muted-foreground">Admin User ID</Label>
           <Input
             data-testid="input-audit-user"
             value={userFilter}
-            onChange={e => setUserFilter(e.target.value)}
+            onChange={e => { setUserFilter(e.target.value); setPage(1); }}
             placeholder="User ID..."
             className="h-8 text-sm mt-0.5"
           />
@@ -136,7 +128,7 @@ export default function AuditLog() {
             data-testid="input-audit-date-from"
             type="date"
             value={dateFrom}
-            onChange={e => setDateFrom(e.target.value)}
+            onChange={e => { setDateFrom(e.target.value); setPage(1); }}
             className="h-8 text-sm mt-0.5"
           />
         </div>
@@ -146,7 +138,7 @@ export default function AuditLog() {
             data-testid="input-audit-date-to"
             type="date"
             value={dateTo}
-            onChange={e => setDateTo(e.target.value)}
+            onChange={e => { setDateTo(e.target.value); setPage(1); }}
             className="h-8 text-sm mt-0.5"
           />
         </div>
@@ -170,7 +162,7 @@ export default function AuditLog() {
                 <CardContent className="flex items-center justify-between py-2.5 px-4">
                   <div className="flex items-center gap-3 min-w-0">
                     <Badge variant="outline" className={`text-xs shrink-0 ${entityColor[log.entityType] ?? "text-muted-foreground border-muted/40"}`}>
-                      {log.entityType}
+                      {log.entityType?.replace(/_/g, " ")}
                     </Badge>
                     <div className="min-w-0">
                       <span className="text-sm font-medium text-foreground">{log.action}</span>
@@ -185,22 +177,22 @@ export default function AuditLog() {
                     </div>
                   </div>
                   <div className="text-right ml-4 shrink-0">
-                    <p className="text-xs text-muted-foreground font-mono">{log.adminId?.slice(0, 8)}</p>
+                    <p className="text-xs text-muted-foreground font-mono">{log.userId?.slice(0, 8) ?? "—"}</p>
                     <p className="text-xs text-muted-foreground">{new Date(log.createdAt).toLocaleString()}</p>
                   </div>
                 </CardContent>
               </Card>
             ))}
           </div>
-          {total > 50 && (
+          {total > 100 && (
             <div className="flex justify-between items-center mt-4">
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
                 data-testid="button-audit-prev"
                 className="text-sm text-muted-foreground disabled:opacity-50 hover:text-foreground">
                 &larr; Previous
               </button>
-              <span className="text-sm text-muted-foreground">Page {page}</span>
-              <button onClick={() => setPage(p => p + 1)} disabled={logs.length < 50}
+              <span className="text-sm text-muted-foreground">Page {page} · {total} total</span>
+              <button onClick={() => setPage(p => p + 1)} disabled={logs.length < 100}
                 data-testid="button-audit-next"
                 className="text-sm text-muted-foreground disabled:opacity-50 hover:text-foreground">
                 Next &rarr;

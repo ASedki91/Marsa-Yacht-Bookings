@@ -13,7 +13,39 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, XCircle, Clock, ExternalLink, MessageSquare } from "lucide-react";
+import { CheckCircle, XCircle, Clock, ExternalLink, MessageSquare, ChevronDown, ChevronRight, FileText, Image } from "lucide-react";
+
+function isImageUrl(url: string) {
+  return /\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?|$)/i.test(url);
+}
+
+function DocPreview({ url }: { url: string }) {
+  if (!url) return null;
+  if (isImageUrl(url)) {
+    return (
+      <div className="mt-2 rounded-md overflow-hidden border border-border max-w-xs">
+        <img
+          src={url}
+          alt="Document preview"
+          className="w-full object-cover max-h-48"
+          onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+        />
+      </div>
+    );
+  }
+  return (
+    <div className="mt-2 flex items-center gap-2 p-2.5 rounded-md border border-border bg-muted/30 max-w-xs">
+      <FileText className="w-6 h-6 text-muted-foreground shrink-0" />
+      <div className="min-w-0">
+        <p className="text-xs text-foreground truncate">{url.split("/").pop() ?? "Document"}</p>
+        <a href={url} target="_blank" rel="noreferrer"
+          className="text-xs text-primary hover:underline flex items-center gap-0.5">
+          <ExternalLink className="w-3 h-3" />Open in new tab
+        </a>
+      </div>
+    </div>
+  );
+}
 
 type DocAction = "approved" | "rejected" | "request_info";
 
@@ -34,6 +66,7 @@ export default function Documents() {
   const [statusFilter, setStatusFilter] = useState("pending");
   const [dialog, setDialog] = useState<{ id: string; action: DocAction } | null>(null);
   const [reason, setReason] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -97,47 +130,62 @@ export default function Documents() {
         <div className="text-center text-muted-foreground py-16">No documents found</div>
       ) : (
         <div className="space-y-2">
-          {docs.map((doc: any) => (
-            <Card key={doc.id} data-testid={`card-doc-${doc.id}`}>
-              <CardContent className="flex items-center justify-between py-3 px-4">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-foreground text-sm">{docTypeLabels[doc.documentType] ?? doc.documentType}</span>
-                    {statusBadge[doc.status]}
-                  </div>
-                  <div className="flex items-center gap-3 mt-0.5">
-                    <span className="text-xs text-muted-foreground">Host: {doc.hostId?.slice(0, 8)}</span>
-                    {doc.fileUrl && (
-                      <a href={doc.fileUrl} target="_blank" rel="noreferrer"
-                        className="text-xs text-primary flex items-center gap-1 hover:underline">
-                        <ExternalLink className="w-3 h-3" />View file
-                      </a>
+          {docs.map((doc: any) => {
+            const isExpanded = expandedId === doc.id;
+            return (
+              <Card key={doc.id} data-testid={`card-doc-${doc.id}`}>
+                <CardContent className="py-3 px-4">
+                  <div className="flex items-center justify-between">
+                    <button
+                      className="min-w-0 text-left flex items-start gap-2 flex-1"
+                      onClick={() => setExpandedId(isExpanded ? null : doc.id)}
+                      data-testid={`expand-doc-${doc.id}`}
+                    >
+                      {isExpanded
+                        ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                        : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-foreground text-sm">{docTypeLabels[doc.documentType] ?? doc.documentType}</span>
+                          {statusBadge[doc.status]}
+                        </div>
+                        <div className="flex items-center gap-3 mt-0.5">
+                          <span className="text-xs text-muted-foreground">Host: {doc.hostId?.slice(0, 8)}</span>
+                          {doc.fileUrl && (
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                              {isImageUrl(doc.fileUrl) ? <Image className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
+                              {isImageUrl(doc.fileUrl) ? "Image" : "Document"}
+                            </span>
+                          )}
+                          {doc.reviewedAt && (
+                            <span className="text-xs text-muted-foreground">
+                              Reviewed {new Date(doc.reviewedAt).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                    {doc.status === "pending" && (
+                      <div className="flex gap-2 ml-4 shrink-0">
+                        <Button size="sm" variant="outline" className="text-green-400 border-green-400/40 hover:bg-green-400/10"
+                          data-testid={`button-approve-doc-${doc.id}`}
+                          onClick={() => setDialog({ id: doc.id, action: "approved" })}>Approve</Button>
+                        <Button size="sm" variant="outline" className="text-blue-400 border-blue-400/40 hover:bg-blue-400/10"
+                          data-testid={`button-info-doc-${doc.id}`}
+                          onClick={() => setDialog({ id: doc.id, action: "request_info" })}>
+                          <MessageSquare className="w-3 h-3 mr-1" />Request Info
+                        </Button>
+                        <Button size="sm" variant="outline" className="text-destructive border-destructive/40 hover:bg-destructive/10"
+                          data-testid={`button-reject-doc-${doc.id}`}
+                          onClick={() => setDialog({ id: doc.id, action: "rejected" })}>Reject</Button>
+                      </div>
                     )}
-                    {doc.reviewedAt && (
-                      <span className="text-xs text-muted-foreground">
-                        Reviewed {new Date(doc.reviewedAt).toLocaleDateString()}
-                      </span>
-                    )}
                   </div>
-                </div>
-                {doc.status === "pending" && (
-                  <div className="flex gap-2 ml-4 shrink-0">
-                    <Button size="sm" variant="outline" className="text-green-400 border-green-400/40 hover:bg-green-400/10"
-                      data-testid={`button-approve-doc-${doc.id}`}
-                      onClick={() => setDialog({ id: doc.id, action: "approved" })}>Approve</Button>
-                    <Button size="sm" variant="outline" className="text-blue-400 border-blue-400/40 hover:bg-blue-400/10"
-                      data-testid={`button-info-doc-${doc.id}`}
-                      onClick={() => setDialog({ id: doc.id, action: "request_info" })}>
-                      <MessageSquare className="w-3 h-3 mr-1" />Request Info
-                    </Button>
-                    <Button size="sm" variant="outline" className="text-destructive border-destructive/40 hover:bg-destructive/10"
-                      data-testid={`button-reject-doc-${doc.id}`}
-                      onClick={() => setDialog({ id: doc.id, action: "rejected" })}>Reject</Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                  {isExpanded && doc.fileUrl && <DocPreview url={doc.fileUrl} />}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 

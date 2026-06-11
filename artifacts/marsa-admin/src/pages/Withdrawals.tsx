@@ -72,6 +72,7 @@ function EarningsBreakdown({ earnings }: { earnings: any[] }) {
 export default function Withdrawals() {
   const [dialog, setDialog] = useState<{ id: string; action: WithdrawalAction } | null>(null);
   const [txRef, setTxRef] = useState("");
+  const [rejectReason, setRejectReason] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -85,7 +86,7 @@ export default function Withdrawals() {
       onSuccess: () => {
         toast({ title: "Withdrawal processed" });
         qc.invalidateQueries({ queryKey: getAdminListWithdrawalsQueryKey() });
-        setDialog(null); setTxRef("");
+        setDialog(null); setTxRef(""); setRejectReason("");
       },
       onError: () => toast({ title: "Failed to process withdrawal", variant: "destructive" }),
     }
@@ -167,26 +168,46 @@ export default function Withdrawals() {
         </div>
       )}
 
-      <Dialog open={!!dialog} onOpenChange={() => { setDialog(null); setTxRef(""); }}>
+      <Dialog open={!!dialog} onOpenChange={() => { setDialog(null); setTxRef(""); setRejectReason(""); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{dialog?.action === "paid" ? "Mark as Paid" : "Reject Withdrawal"}</DialogTitle>
           </DialogHeader>
-          {dialog?.action === "paid" && (
+          {dialog?.action === "paid" ? (
             <div className="space-y-2">
               <Label htmlFor="tx-ref">Payout Reference (optional)</Label>
-              <Input id="tx-ref" data-testid="input-tx-ref" value={txRef} onChange={e => setTxRef(e.target.value)} placeholder="Bank reference..." />
+              <Input id="tx-ref" data-testid="input-tx-ref" value={txRef} onChange={e => setTxRef(e.target.value)} placeholder="Bank reference or transfer ID..." />
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="reject-reason">Rejection Reason (required)</Label>
+              <textarea
+                id="reject-reason"
+                data-testid="textarea-withdrawal-reject-reason"
+                value={rejectReason}
+                onChange={e => setRejectReason(e.target.value)}
+                rows={3}
+                placeholder="Explain why this withdrawal request is being rejected..."
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+              />
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setDialog(null); setTxRef(""); }}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setDialog(null); setTxRef(""); setRejectReason(""); }}>Cancel</Button>
             <Button
               data-testid="button-confirm-withdrawal"
               variant={dialog?.action === "paid" ? "default" : "destructive"}
-              disabled={process.isPending}
-              onClick={() => dialog && process.mutate({ id: dialog.id, data: { status: dialog.action, payoutReference: txRef || undefined } })}
+              disabled={process.isPending || (dialog?.action === "rejected" && !rejectReason.trim())}
+              onClick={() => dialog && process.mutate({
+                id: dialog.id,
+                data: {
+                  status: dialog.action,
+                  payoutReference: txRef || undefined,
+                  notes: rejectReason || undefined,
+                }
+              })}
             >
-              {process.isPending ? "Processing..." : "Confirm"}
+              {process.isPending ? "Processing..." : dialog?.action === "paid" ? "Confirm Payment" : "Reject"}
             </Button>
           </DialogFooter>
         </DialogContent>

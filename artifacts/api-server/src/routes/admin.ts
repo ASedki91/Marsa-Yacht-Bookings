@@ -536,6 +536,10 @@ router.post(
 const auditLogsQuery = z.object({
   entityType: z.string().optional(),
   entityId: z.string().optional(),
+  action: z.string().optional(),
+  userId: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
   page: z.coerce.number().int().positive().optional().default(1),
 });
 
@@ -543,13 +547,17 @@ router.get(
   "/admin/audit-logs",
   validateQuery(auditLogsQuery),
   async (req: Request, res: Response): Promise<void> => {
-    const { entityType, entityId, page } = req.query as unknown as z.infer<typeof auditLogsQuery>;
+    const { entityType, entityId, action, userId, dateFrom, dateTo, page } = req.query as unknown as z.infer<typeof auditLogsQuery>;
     const limit = 100;
     const offset = (page - 1) * limit;
 
     const conditions: any[] = [];
     if (entityType) conditions.push(eq(auditLogsTable.entityType, entityType));
     if (entityId) conditions.push(eq(auditLogsTable.entityId, entityId));
+    if (action) conditions.push(sql`${auditLogsTable.action} ILIKE ${"%" + action + "%"}`);
+    if (userId) conditions.push(eq(auditLogsTable.userId, userId));
+    if (dateFrom) conditions.push(sql`${auditLogsTable.createdAt} >= ${new Date(dateFrom).toISOString()}::timestamptz`);
+    if (dateTo) conditions.push(sql`${auditLogsTable.createdAt} < ${new Date(new Date(dateTo).getTime() + 86400000).toISOString()}::timestamptz`);
     const where = conditions.length > 0 ? and(...conditions) : sql`true`;
 
     const [logs, [countRow]] = await Promise.all([
