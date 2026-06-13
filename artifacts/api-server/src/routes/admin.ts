@@ -7,6 +7,8 @@ import {
   hostDocumentsTable,
   yachtsTable,
   bookingsTable,
+  paymentsTable,
+  refundsTable,
   reviewsTable,
   withdrawalRequestsTable,
   earningsLedgerTable,
@@ -27,6 +29,7 @@ import {
   auditLog,
 } from "../middlewares/index";
 import { notify } from "../lib/notify";
+import { getStripeClient } from "../lib/stripe";
 
 const router: IRouter = Router();
 
@@ -355,7 +358,52 @@ router.post(
 
     const hoursOld = (Date.now() - new Date(String(booking.createdAt)).getTime()) / 3600000;
     const feePct = hoursOld < 24 ? 0.05 : 0;
-    const cancellationFeeEgp = (parseFloat(String(booking.totalAmountEgp ?? "0")) * feePct).toFixed(2);
+    const totalEgp = parseFloat(String(booking.totalAmountEgp ?? "0"));
+    const cancellationFeeEgp = (totalEgp * feePct).toFixed(2);
+    const refundEgp = (totalEgp * (1 - feePct)).toFixed(2);
+
+    // Issue Stripe refund (full or partial) when approving a cancellation
+    if (action === "approve") {
+      const [payment] = await db
+        .select()
+        .from(paymentsTable)
+        .where(and(eq(paymentsTable.bookingId, id), eq(paymentsTable.status, "succeeded")))
+        .limit(1);
+
+      if (payment?.stripePaymentIntentId) {
+        try {
+          const stripeClient = await getStripeClient();
+          // For < 24h cancellations charge 5% fee → refund 95% of USD amount
+          const amountUsd = parseFloat(String(payment.amountUsd ?? "0"));
+          const refundAmountCents = Math.round(amountUsd * (1 - feePct) * 100);
+
+          const stripeRefund = await stripeClient.refunds.create({
+            payment_intent: payment.stripePaymentIntentId,
+            ...(feePct > 0 ? { amount: refundAmountCents } : {}),
+          });
+
+          await db
+            .insert(refundsTable)
+            .values({
+              id: randomUUID(),
+              paymentId: payment.id,
+              bookingId: id,
+              stripeRefundId: stripeRefund.id,
+              amountEgp: refundEgp,
+              reason: feePct > 0 ? "Cancellation with fee (< 24h)" : "Cancellation approved",
+              status: "pending",
+              initiatedBy: (req as any).localUser?.id ?? null,
+            })
+            .catch(() => {});
+        } catch (err) {
+          req.log.error({ err }, "Stripe refund failed during cancellation approval");
+          res.status(502).json({
+            error: "Refund could not be initiated with Stripe. Cancellation status unchanged — please retry.",
+          });
+          return;
+        }
+      }
+    }
 
     const newStatus = action === "approve" ? "cancelled" : "confirmed";
     const [updated] = await db
@@ -369,13 +417,13 @@ router.post(
       type: `booking.cancellation_${action === "approve" ? "approved" : "rejected"}`,
       title: action === "approve" ? "Cancellation approved" : "Cancellation request rejected",
       message: action === "approve"
-        ? `Your booking has been cancelled.${feePct > 0 ? ` A ${feePct * 100}% cancellation fee (EGP ${cancellationFeeEgp}) applies.` : ""}`
+        ? `Your booking has been cancelled.${feePct > 0 ? ` A ${feePct * 100}% cancellation fee (EGP ${cancellationFeeEgp}) applies — EGP ${refundEgp} will be refunded.` : " A full refund has been initiated."}`
         : (notes ?? "Your cancellation request was reviewed — the booking remains confirmed."),
       relatedEntityType: "booking",
       relatedEntityId: id,
     });
 
-    res.json({ ...updated, cancellationFeeEgp });
+    res.json({ ...updated, cancellationFeeEgp, refundEgp });
   },
 );
 

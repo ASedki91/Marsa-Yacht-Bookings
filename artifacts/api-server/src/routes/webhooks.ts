@@ -11,7 +11,7 @@ import {
 } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { stripe } from "../lib/stripe";
+import { getStripeClient } from "../lib/stripe";
 import { notify } from "../lib/notify";
 import { logger } from "../lib/logger";
 
@@ -31,15 +31,19 @@ const router: IRouter = Router();
  */
 router.post("/webhooks/stripe", async (req: Request, res: Response): Promise<void> => {
   const sig = req.headers["stripe-signature"] as string | undefined;
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   const rawBody = (req as any).rawBody as string | undefined;
   const isProd = process.env.NODE_ENV === "production";
+
+  // Fetch webhook secret from connector or env var
+  const { getStripeWebhookSecret } = await import("../lib/stripe");
+  const webhookSecret = await getStripeWebhookSecret();
 
   let event;
   try {
     if (webhookSecret && sig && rawBody) {
       // Full verification path — always preferred
-      event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+      const stripeClient = await getStripeClient();
+      event = stripeClient.webhooks.constructEvent(rawBody, sig, webhookSecret);
     } else if (isProd) {
       // Production requires a verified signature — reject forged/unsigned events
       logger.warn(

@@ -7,7 +7,6 @@ import {
   Pressable,
   TextInput,
   ActivityIndicator,
-  Alert,
   Platform,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -85,6 +84,7 @@ export default function BookScreen() {
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const { user } = useUser();
   const [step, setStep] = useState(0);
+  const [payError, setPayError] = useState<string | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -156,6 +156,7 @@ export default function BookScreen() {
   };
 
   const handlePay = async () => {
+    setPayError(null);
     try {
       const result = await createBooking.mutateAsync({
         data: {
@@ -184,15 +185,15 @@ export default function BookScreen() {
         });
 
         if (initError) {
-          Alert.alert("Payment Setup Failed", initError.message);
+          setPayError(initError.message ?? "Payment setup failed. Please try again.");
           return;
         }
 
-        const { error: payError } = await presentPaymentSheet();
+        const { error: sheetError } = await presentPaymentSheet();
 
-        if (payError) {
-          if (payError.code === "Canceled") return;
-          Alert.alert("Payment Failed", payError.message);
+        if (sheetError) {
+          if (sheetError.code === "Canceled") return;
+          setPayError(sheetError.message ?? "Payment failed. Please try again.");
           return;
         }
       }
@@ -200,8 +201,7 @@ export default function BookScreen() {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setStep(5);
     } catch (err: any) {
-      Alert.alert(
-        "Booking Failed",
+      setPayError(
         (err as any)?.errors?.[0]?.message ?? (err as any)?.message ?? "Could not create booking. Please try again.",
       );
     }
@@ -650,6 +650,12 @@ export default function BookScreen() {
           },
         ]}
       >
+        {payError && (
+          <View style={[styles.errorBox, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]}>
+            <Ionicons name="alert-circle-outline" size={16} color="#DC2626" />
+            <Text style={styles.errorText}>{payError}</Text>
+          </View>
+        )}
         {step > 0 && (
           <Pressable
             style={[styles.backBtn, { borderColor: c.border }]}
@@ -799,4 +805,15 @@ const styles = StyleSheet.create({
   confirmSub: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center" },
   doneBtn: { borderRadius: 14, paddingVertical: 15, paddingHorizontal: 32, marginTop: 8 },
   doneBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  errorBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 8,
+    width: "100%",
+  },
+  errorText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", color: "#DC2626", lineHeight: 18 },
 });

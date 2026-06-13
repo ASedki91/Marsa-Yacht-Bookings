@@ -9,7 +9,7 @@ import {
 import { and, eq } from "drizzle-orm";
 import { z } from "zod/v4";
 import { requireAuth, validateBody } from "../middlewares/index";
-import { stripe } from "../lib/stripe";
+import { getStripeClient } from "../lib/stripe";
 
 const router: IRouter = Router();
 
@@ -116,7 +116,8 @@ router.post(
     }
 
     try {
-      const pi = await stripe.paymentIntents.retrieve(payment.stripePaymentIntentId);
+      const stripeClient = await getStripeClient();
+      const pi = await stripeClient.paymentIntents.retrieve(payment.stripePaymentIntentId);
       res.json({
         clientSecret: pi.client_secret,
         paymentIntentId: pi.id,

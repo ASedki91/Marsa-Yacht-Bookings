@@ -19,7 +19,7 @@ import {
 import { and, eq, sql, desc, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { requireAuth, requireRole, validateBody, validateQuery } from "../middlewares/index";
-import { stripe } from "../lib/stripe";
+import { getStripeClient } from "../lib/stripe";
 import { egpToUsdCents, getEgpUsdRate } from "../lib/exchange";
 import { notify } from "../lib/notify";
 
@@ -167,7 +167,8 @@ router.post(
     // Create Stripe PaymentIntent
     let paymentIntent;
     try {
-      paymentIntent = await stripe.paymentIntents.create({
+      const stripeClient = await getStripeClient();
+      paymentIntent = await stripeClient.paymentIntents.create({
         amount: amountUsdCents,
         currency: "usd",
         metadata: {
@@ -666,7 +667,8 @@ router.post(
 
     if (payment?.stripePaymentIntentId) {
       try {
-        const stripeRefund = await stripe.refunds.create({
+        const stripeClient = await getStripeClient();
+        const stripeRefund = await stripeClient.refunds.create({
           payment_intent: payment.stripePaymentIntentId,
         });
         await db

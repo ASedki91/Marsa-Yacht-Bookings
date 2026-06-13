@@ -89,14 +89,18 @@ router.post(
           .reduce((sum, e) => sum + parseFloat(e.amountEgp), 0)
           .toFixed(2);
 
-        await notify({
-          userId: profile.userId,
-          type: "earnings.available",
-          title: "Earnings Available!",
-          message: `EGP ${totalEgp} from ${entries.length} booking(s) is now available for withdrawal.`,
-          relatedEntityType: "earnings_ledger",
-          relatedEntityId: entries[0]?.id ?? "",
-        }).catch(() => {});
+        try {
+          notify({
+            userId: profile.userId,
+            type: "earnings.available",
+            title: "Earnings Available!",
+            message: `EGP ${totalEgp} from ${entries.length} booking(s) is now available for withdrawal.`,
+            relatedEntityType: "earnings_ledger",
+            relatedEntityId: entries[0]?.id ?? "",
+          });
+        } catch (_notifyErr) {
+          // notification failure should not abort the earnings release
+        }
       }
 
       res.json({
