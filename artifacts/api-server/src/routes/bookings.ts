@@ -558,8 +558,10 @@ router.post(
       .where(eq(bookingsTable.id, id))
       .returning();
 
-    // Create earnings ledger (3-day hold)
-    const eligibleAt = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+    // Create earnings ledger: hold releases 3 days after the booking date
+    // (not 3 days from confirmation — ensures trip has occurred before funds release).
+    const tripDate = new Date(booking.bookingDate);
+    const eligibleAt = new Date(tripDate.getTime() + 3 * 24 * 60 * 60 * 1000);
     const [yacht] = await db
       .select()
       .from(yachtsTable)

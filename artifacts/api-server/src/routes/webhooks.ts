@@ -5,8 +5,7 @@ import {
   paymentsTable,
   refundsTable,
   availabilitySlotsTable,
-  yachtsTable,
-  hostProfilesTable,
+  usersTable,
   auditLogsTable,
 } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
@@ -99,39 +98,33 @@ router.post("/webhooks/stripe", async (req: Request, res: Response): Promise<voi
           .returning();
 
         if (booking) {
+          // Notify guest that payment succeeded
           notify({
             userId: booking.guestId,
             type: "payment.succeeded",
             title: "Payment received",
             message:
-              "Your payment was successful. Your booking is under review by the host.",
+              "Your payment was successful. Your booking is now under review.",
             relatedEntityType: "booking",
             relatedEntityId: booking.id,
           });
 
-          const [yacht] = await db
-            .select()
-            .from(yachtsTable)
-            .where(eq(yachtsTable.id, booking.yachtId))
-            .limit(1);
+          // Notify admin users that a new booking needs review
+          const adminUsers = await db
+            .select({ id: usersTable.id })
+            .from(usersTable)
+            .where(eq(usersTable.role, "admin"))
+            .limit(10);
 
-          if (yacht) {
-            const [hostProfile] = await db
-              .select()
-              .from(hostProfilesTable)
-              .where(eq(hostProfilesTable.id, yacht.hostId))
-              .limit(1);
-
-            if (hostProfile) {
-              notify({
-                userId: hostProfile.userId,
-                type: "booking.new",
-                title: "New booking to review",
-                message: `New booking received for ${booking.bookingDate}. Please confirm or reject.`,
-                relatedEntityType: "booking",
-                relatedEntityId: booking.id,
-              });
-            }
+          for (const admin of adminUsers) {
+            notify({
+              userId: admin.id,
+              type: "booking.new",
+              title: "New booking to review",
+              message: `New paid booking received for ${booking.bookingDate}. Please confirm or reject.`,
+              relatedEntityType: "booking",
+              relatedEntityId: booking.id,
+            });
           }
 
           await db
@@ -164,21 +157,17 @@ router.post("/webhooks/stripe", async (req: Request, res: Response): Promise<voi
             .set({ status: "failed" })
             .where(eq(paymentsTable.id, payment.id));
 
+          // Keep booking in pending_payment (not cancelled) so guest can retry.
+          // The slot stays reserved so they can re-present the payment sheet.
           const [booking] = await db
-            .update(bookingsTable)
-            .set({ status: "cancelled" })
+            .select()
+            .from(bookingsTable)
             .where(eq(bookingsTable.id, payment.bookingId))
-            .returning();
+            .limit(1);
 
           if (booking) {
-            // Release the reserved slot so it becomes bookable again.
-            if (booking.slotId) {
-              await db
-                .update(availabilitySlotsTable)
-                .set({ isAvailable: true })
-                .where(eq(availabilitySlotsTable.id, booking.slotId));
-            }
-
+            // Booking stays in pending_payment — guest can retry.
+            // Slot remains reserved for their session.
             notify({
               userId: booking.guestId,
               type: "payment.failed",

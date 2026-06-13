@@ -10,11 +10,19 @@ const INTERNAL_TOKEN = process.env.INTERNAL_SECRET_TOKEN;
 
 function requireInternalToken(req: Request, res: Response, next: () => void): void {
   if (!INTERNAL_TOKEN) {
-    next();
+    // Fail-closed: if no secret is configured, mutation endpoints are unavailable.
+    // Only allow through on explicitly read-only paths (exchange-rate GET).
+    if (req.method === "GET" && req.path === "/internal/exchange-rate") {
+      next();
+      return;
+    }
+    res.status(503).json({
+      error: "Internal endpoint unavailable: INTERNAL_SECRET_TOKEN is not configured",
+    });
     return;
   }
   const auth = req.headers["authorization"] ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : req.query.token as string;
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : (req.query.token as string);
   if (token !== INTERNAL_TOKEN) {
     res.status(401).json({ error: "Unauthorized" });
     return;
