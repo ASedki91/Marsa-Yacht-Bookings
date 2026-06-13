@@ -47,7 +47,10 @@ export default function SignInScreen() {
     setError(null);
     setLoading(true);
     try {
-      const result = await signIn.create({ identifier: email, password });
+      let result = await signIn.create({ identifier: email, password });
+      if (result.status === "needs_first_factor") {
+        result = await signIn.attemptFirstFactor({ strategy: "password", password });
+      }
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
         router.replace("/(home)/(tabs)/explore");
