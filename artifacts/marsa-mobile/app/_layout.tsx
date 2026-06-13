@@ -3,8 +3,8 @@ import {
   Inter_500Medium,
   Inter_600SemiBold,
   Inter_700Bold,
-  useFonts,
 } from "@expo-google-fonts/inter";
+import * as Font from "expo-font";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Feather from "@expo/vector-icons/Feather";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -14,7 +14,7 @@ import * as SecureStore from "expo-secure-store";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -64,23 +64,35 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-    ...Ionicons.font,
-    ...Feather.font,
-    ...MaterialIcons.font,
-  });
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded, fontError]);
+    (async () => {
+      try {
+        await Font.loadAsync({
+          Inter_400Regular,
+          Inter_500Medium,
+          Inter_600SemiBold,
+          Inter_700Bold,
+          ...Ionicons.font,
+          ...Feather.font,
+          ...MaterialIcons.font,
+        });
+        console.log("[MARSA] fonts loaded OK", {
+          ionicons: Font.isLoaded("ionicons"),
+          feather: Font.isLoaded("feather"),
+          material: Font.isLoaded("material"),
+        });
+      } catch (e) {
+        console.log("[MARSA] FONT LOAD FAILED:", e);
+      } finally {
+        setLoaded(true);
+        SplashScreen.hideAsync();
+      }
+    })();
+  }, []);
 
-  if (!fontsLoaded && !fontError) return null;
+  if (!loaded) return null;
 
   return (
     <ClerkProvider
