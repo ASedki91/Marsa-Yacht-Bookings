@@ -508,6 +508,7 @@ router.get("/admin/withdrawals", async (_req: Request, res: Response): Promise<v
             userId: hostProfilesTable.userId,
             fullName: usersTable.fullName,
             email: usersTable.email,
+            bankInfoEncrypted: hostProfilesTable.bankInfoEncrypted,
           })
           .from(hostProfilesTable)
           .innerJoin(usersTable, eq(usersTable.id, hostProfilesTable.userId))
@@ -521,17 +522,29 @@ router.get("/admin/withdrawals", async (_req: Request, res: Response): Promise<v
     earningsByHost[e.hostId].push(e);
   }
 
-  const hostInfoById: Record<string, { fullName: string | null; email: string }> = {};
+  const hostInfoById: Record<string, { fullName: string | null; email: string; bankInfoEncrypted: string | null }> = {};
   for (const h of hostRows) {
-    hostInfoById[h.hostId] = { fullName: h.fullName, email: h.email };
+    hostInfoById[h.hostId] = { fullName: h.fullName, email: h.email, bankInfoEncrypted: h.bankInfoEncrypted };
   }
 
-  const enriched = withdrawals.map(w => ({
-    ...w,
-    hostName: hostInfoById[w.hostId]?.fullName ?? null,
-    hostEmail: hostInfoById[w.hostId]?.email ?? null,
-    earningsBreakdown: earningsByHost[w.hostId] ?? [],
-  }));
+  const enriched = withdrawals.map(w => {
+    const hostInfo = hostInfoById[w.hostId];
+    let payoutDetails: Record<string, string> | null = null;
+    if (hostInfo?.bankInfoEncrypted) {
+      try {
+        payoutDetails = JSON.parse(hostInfo.bankInfoEncrypted);
+      } catch {
+        payoutDetails = { raw: hostInfo.bankInfoEncrypted };
+      }
+    }
+    return {
+      ...w,
+      hostName: hostInfo?.fullName ?? null,
+      hostEmail: hostInfo?.email ?? null,
+      payoutDetails,
+      earningsBreakdown: earningsByHost[w.hostId] ?? [],
+    };
+  });
 
   res.json({ withdrawals: enriched, total: enriched.length });
 });

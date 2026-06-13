@@ -12,13 +12,46 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, XCircle, Clock, ChevronDown, ChevronRight, TrendingUp } from "lucide-react";
+import { CheckCircle, XCircle, Clock, ChevronDown, ChevronRight, TrendingUp, Building2 } from "lucide-react";
 
 type WithdrawalAction = "paid" | "rejected";
 
 function formatEgp(v: string | number | undefined) {
   const n = typeof v === "string" ? parseFloat(v) : (v ?? 0);
   return `EGP ${n.toLocaleString("en-EG", { maximumFractionDigits: 0 })}`;
+}
+
+function PayoutDetailsBlock({ details }: { details: Record<string, string> | null | undefined }) {
+  if (!details) return null;
+  const { raw, ...rest } = details;
+  const entries = Object.entries(rest).filter(([, v]) => v);
+  if (raw && entries.length === 0) {
+    return (
+      <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+        <Building2 className="w-3 h-3 shrink-0" />
+        <span>{raw}</span>
+      </p>
+    );
+  }
+  const labels: Record<string, string> = {
+    bankName: "Bank",
+    accountName: "Account Name",
+    accountNumber: "Acct",
+    iban: "IBAN",
+    swiftBic: "SWIFT/BIC",
+    routingNumber: "Routing",
+    branch: "Branch",
+  };
+  return (
+    <p className="text-xs text-muted-foreground mt-0.5 flex items-start gap-1">
+      <Building2 className="w-3 h-3 shrink-0 mt-0.5" />
+      <span>
+        {entries.map(([k, v], i) => (
+          <span key={k}>{i > 0 && " · "}<span className="text-foreground/60">{labels[k] ?? k}:</span> {v}</span>
+        ))}
+      </span>
+    </p>
+  );
 }
 
 function EarningsBreakdown({ earnings }: { earnings: any[] }) {
@@ -133,9 +166,10 @@ export default function Withdrawals() {
                           {w.hostName
                             ? <><span className="text-foreground/80 font-medium">{w.hostName}</span>{w.hostEmail && <span> · {w.hostEmail}</span>}</>
                             : <span className="font-mono">{w.hostId?.slice(0, 8)}</span>}
-                          {w.payoutMethod && ` · ${w.payoutMethod}`}
-                          {w.payoutReference && ` · Ref: ${w.payoutReference}`}
+                          {w.payoutMethod && <span> · <span className="text-foreground/70">{w.payoutMethod}</span></span>}
+                          {w.payoutReference && <span> · Ref: {w.payoutReference}</span>}
                         </p>
+                        <PayoutDetailsBlock details={w.payoutDetails} />
                         {w.notes && <p className="text-xs text-muted-foreground italic mt-0.5">Note: {w.notes}</p>}
                       </div>
                     </button>
