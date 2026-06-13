@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import colors from "@/constants/colors";
+import { devBypass } from "@/lib/devBypass";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -225,6 +226,19 @@ export default function SignInScreen() {
             <Text style={[styles.linkText, { color: c.primary }]}>Sign up</Text>
           </Link>
         </View>
+
+        {__DEV__ && (
+          <Pressable
+            style={[styles.devBtn]}
+            onPress={() => {
+              devBypass.enable();
+              router.replace("/(home)/(tabs)/explore");
+            }}
+          >
+            <Ionicons name="construct-outline" size={14} color="#6b7280" />
+            <Text style={styles.devBtnText}>Dev: Skip Sign In</Text>
+          </Pressable>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -255,4 +269,6 @@ const styles = StyleSheet.create({
   linkText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   errorBox: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 10, borderWidth: 1 },
   errorText: { color: "#ef4444", fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
+  devBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, marginTop: 4, opacity: 0.6 },
+  devBtnText: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#6b7280" },
 });

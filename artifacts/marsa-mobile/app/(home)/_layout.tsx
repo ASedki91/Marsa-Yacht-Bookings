@@ -4,6 +4,7 @@ import { useAuth } from "@clerk/expo";
 import { setAuthTokenGetter, setBaseUrl } from "@workspace/api-client-react";
 import { UserProvider } from "@/contexts/UserContext";
 import { useColors } from "@/hooks/useColors";
+import { devBypass } from "@/lib/devBypass";
 
 const domain = process.env.EXPO_PUBLIC_DOMAIN;
 if (domain) setBaseUrl(`https://${domain}`);
@@ -16,8 +17,8 @@ export default function HomeLayout() {
     setAuthTokenGetter(() => getToken());
   }, [getToken]);
 
-  if (!isLoaded) return null;
-  if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
+  if (!isLoaded && !(__DEV__ && devBypass.active)) return null;
+  if (!isSignedIn && !(__DEV__ && devBypass.active)) return <Redirect href="/(auth)/sign-in" />;
 
   return (
     <UserProvider>
