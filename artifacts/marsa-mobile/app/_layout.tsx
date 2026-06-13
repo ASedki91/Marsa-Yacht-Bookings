@@ -21,10 +21,31 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 SplashScreen.preventAutoHideAsync();
 
+// Wrap SecureStore in try/catch — some Android emulators reject key names
+// that contain special characters (e.g. Clerk's "__clerk_client_jwt:..."),
+// which would crash the tokenCache and silently block sign-in.
 const tokenCache: TokenCache = {
-  getToken: (key: string) => SecureStore.getItemAsync(key),
-  saveToken: (key: string, token: string) => SecureStore.setItemAsync(key, token),
-  clearToken: (key: string) => SecureStore.deleteItemAsync(key),
+  getToken: async (key: string) => {
+    try {
+      return await SecureStore.getItemAsync(key);
+    } catch {
+      return null;
+    }
+  },
+  saveToken: async (key: string, token: string) => {
+    try {
+      await SecureStore.setItemAsync(key, token);
+    } catch {
+      // Ignore — session still works, just won't persist across restarts
+    }
+  },
+  clearToken: async (key: string) => {
+    try {
+      await SecureStore.deleteItemAsync(key);
+    } catch {
+      // Ignore
+    }
+  },
 };
 
 const queryClient = new QueryClient();
