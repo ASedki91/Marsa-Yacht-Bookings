@@ -5,6 +5,9 @@ import {
   Inter_700Bold,
   useFonts,
 } from "@expo-google-fonts/inter";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import Feather from "@expo/vector-icons/Feather";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { ClerkProvider } from "@clerk/expo";
 import type { TokenCache } from "@clerk/expo";
 import * as SecureStore from "expo-secure-store";
@@ -66,6 +69,9 @@ export default function RootLayout() {
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
+    ...Ionicons.font,
+    ...Feather.font,
+    ...MaterialIcons.font,
   });
 
   useEffect(() => {
