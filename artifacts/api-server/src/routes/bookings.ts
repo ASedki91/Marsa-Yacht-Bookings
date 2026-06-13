@@ -441,7 +441,44 @@ router.get(
       }
     }
 
-    res.json(booking);
+    // Fetch add-ons and payment info in parallel for receipt display
+    const [bookingAddOnRows, payment, template] = await Promise.all([
+      db
+        .select({
+          id: addOnsTable.id,
+          name: addOnsTable.name,
+          priceEgp: addOnsTable.priceEgp,
+        })
+        .from(bookingAddOnsTable)
+        .innerJoin(addOnsTable, eq(bookingAddOnsTable.addOnId, addOnsTable.id))
+        .where(eq(bookingAddOnsTable.bookingId, id)),
+      db
+        .select({
+          stripePaymentIntentId: paymentsTable.stripePaymentIntentId,
+          status: paymentsTable.status,
+          amountEgp: paymentsTable.amountEgp,
+          amountUsd: paymentsTable.amountUsd,
+          receiptUrl: paymentsTable.receiptUrl,
+        })
+        .from(paymentsTable)
+        .where(eq(paymentsTable.bookingId, id))
+        .limit(1),
+      db
+        .select({ name: bookingTemplatesTable.name, durationHours: bookingTemplatesTable.durationHours })
+        .from(bookingTemplatesTable)
+        .where(eq(bookingTemplatesTable.id, booking.templateId))
+        .limit(1),
+    ]);
+
+    res.json({
+      ...booking,
+      addOns: bookingAddOnRows,
+      paymentStatus: payment[0]?.status ?? null,
+      stripePaymentIntentId: payment[0]?.stripePaymentIntentId ?? null,
+      receiptUrl: payment[0]?.receiptUrl ?? null,
+      totalAmountUsd: payment[0]?.amountUsd ?? null,
+      templateName: template[0]?.name ?? null,
+    });
   },
 );
 

@@ -229,26 +229,61 @@ export default function BookingDetailScreen() {
         </View>
 
         <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={[styles.sectionTitle, { color: c.foreground }]}>Payment Summary</Text>
+          <Text style={[styles.sectionTitle, { color: c.foreground }]}>Payment Receipt</Text>
+
+          {/* Base charter price */}
+          <DetailRow
+            label="Charter price"
+            value={booking.baseAmountEgp ? `EGP ${Number(booking.baseAmountEgp).toLocaleString("en-EG")}` : `EGP ${totalEgp}`}
+            icon="boat-outline"
+          />
+
+          {/* Add-ons breakdown */}
+          {Array.isArray(booking.addOns) && booking.addOns.length > 0 && (
+            booking.addOns.map((addOn: any) => (
+              <DetailRow
+                key={addOn.id}
+                label={addOn.name}
+                value={`EGP ${Number(addOn.priceEgp).toLocaleString("en-EG")}`}
+                icon="add-circle-outline"
+              />
+            ))
+          )}
+
+          {/* Divider + Total */}
+          <View style={[styles.receiptDivider, { backgroundColor: c.border }]} />
           <View style={styles.totalRow}>
             <Text style={[styles.totalLabel, { color: c.foreground }]}>Total</Text>
             <View style={{ alignItems: "flex-end" }}>
-              <Text style={[styles.totalEgp, { color: c.foreground }]}>EGP {totalEgp}</Text>
+              <Text style={[styles.totalEgp, { color: c.foreground }]}>EGP {typeof totalEgp === "number" ? Number(totalEgp).toLocaleString("en-EG") : totalEgp}</Text>
               {totalUsd !== "—" && (
                 <Text style={[styles.totalUsd, { color: c.mutedForeground }]}>≈ ${totalUsd} USD</Text>
               )}
             </View>
           </View>
-          <View style={[styles.paymentBadge, { backgroundColor: booking.paymentStatus === "paid" ? "#D1FAE5" : "#FEF3C7" }]}>
+
+          {/* Payment status badge */}
+          <View style={[styles.paymentBadge, { backgroundColor: booking.paymentStatus === "succeeded" || booking.paymentStatus === "paid" ? "#D1FAE5" : "#FEF3C7" }]}>
             <Ionicons
-              name={booking.paymentStatus === "paid" ? "checkmark-circle-outline" : "card-outline"}
+              name={booking.paymentStatus === "succeeded" || booking.paymentStatus === "paid" ? "checkmark-circle-outline" : "card-outline"}
               size={16}
-              color={booking.paymentStatus === "paid" ? "#065F46" : "#92400E"}
+              color={booking.paymentStatus === "succeeded" || booking.paymentStatus === "paid" ? "#065F46" : "#92400E"}
             />
-            <Text style={[styles.paymentText, { color: booking.paymentStatus === "paid" ? "#065F46" : "#92400E" }]}>
-              {booking.paymentStatus === "paid" ? "Payment received" : "Payment pending"}
+            <Text style={[styles.paymentText, { color: booking.paymentStatus === "succeeded" || booking.paymentStatus === "paid" ? "#065F46" : "#92400E" }]}>
+              {booking.paymentStatus === "succeeded" || booking.paymentStatus === "paid" ? "Payment received" : "Payment pending"}
             </Text>
           </View>
+
+          {/* Stripe reference */}
+          {booking.stripePaymentIntentId ? (
+            <View style={[styles.stripeRef, { backgroundColor: c.muted, borderColor: c.border }]}>
+              <Ionicons name="shield-checkmark-outline" size={13} color={c.mutedForeground} />
+              <Text style={[styles.stripeRefLabel, { color: c.mutedForeground }]}>Ref:</Text>
+              <Text style={[styles.stripeRefValue, { color: c.mutedForeground }]} numberOfLines={1}>
+                {booking.stripePaymentIntentId}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         <Timeline status={status} />
@@ -317,4 +352,12 @@ const styles = StyleSheet.create({
   reviewBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
   cancelBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 12, paddingVertical: 14, borderWidth: 1.5 },
   cancelBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  receiptDivider: { height: 1, marginVertical: 8 },
+  stripeRef: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 10, paddingVertical: 7,
+    borderRadius: 8, borderWidth: 1, marginTop: 8,
+  },
+  stripeRefLabel: { fontSize: 11, fontFamily: "Inter_500Medium" },
+  stripeRefValue: { fontSize: 11, fontFamily: "Inter_400Regular", flex: 1 },
 });
