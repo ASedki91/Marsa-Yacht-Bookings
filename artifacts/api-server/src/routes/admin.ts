@@ -496,15 +496,42 @@ router.get("/admin/withdrawals", async (_req: Request, res: Response): Promise<v
     .limit(200);
 
   const hostIds = [...new Set(withdrawals.map(w => w.hostId))];
-  const earnings = hostIds.length
-    ? await db.select().from(earningsLedgerTable).where(inArray(earningsLedgerTable.hostId, hostIds))
-    : [];
+
+  const [earnings, hostRows] = await Promise.all([
+    hostIds.length
+      ? db.select().from(earningsLedgerTable).where(inArray(earningsLedgerTable.hostId, hostIds))
+      : Promise.resolve([]),
+    hostIds.length
+      ? db
+          .select({
+            hostId: hostProfilesTable.id,
+            userId: hostProfilesTable.userId,
+            fullName: usersTable.fullName,
+            email: usersTable.email,
+          })
+          .from(hostProfilesTable)
+          .innerJoin(usersTable, eq(usersTable.id, hostProfilesTable.userId))
+          .where(inArray(hostProfilesTable.id, hostIds))
+      : Promise.resolve([]),
+  ]);
+
   const earningsByHost: Record<string, typeof earnings> = {};
   for (const e of earnings) {
     if (!earningsByHost[e.hostId]) earningsByHost[e.hostId] = [];
     earningsByHost[e.hostId].push(e);
   }
-  const enriched = withdrawals.map(w => ({ ...w, earningsBreakdown: earningsByHost[w.hostId] ?? [] }));
+
+  const hostInfoById: Record<string, { fullName: string | null; email: string }> = {};
+  for (const h of hostRows) {
+    hostInfoById[h.hostId] = { fullName: h.fullName, email: h.email };
+  }
+
+  const enriched = withdrawals.map(w => ({
+    ...w,
+    hostName: hostInfoById[w.hostId]?.fullName ?? null,
+    hostEmail: hostInfoById[w.hostId]?.email ?? null,
+    earningsBreakdown: earningsByHost[w.hostId] ?? [],
+  }));
 
   res.json({ withdrawals: enriched, total: enriched.length });
 });

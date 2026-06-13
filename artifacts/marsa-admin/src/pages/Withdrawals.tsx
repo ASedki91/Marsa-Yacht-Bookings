@@ -130,9 +130,11 @@ export default function Withdrawals() {
                           {statusIcon[w.status]}
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Host: {w.hostId?.slice(0, 8)}
+                          {w.hostName
+                            ? <><span className="text-foreground/80 font-medium">{w.hostName}</span>{w.hostEmail && <span> · {w.hostEmail}</span>}</>
+                            : <span className="font-mono">{w.hostId?.slice(0, 8)}</span>}
                           {w.payoutMethod && ` · ${w.payoutMethod}`}
-                          {w.transactionRef && ` · Ref: ${w.transactionRef}`}
+                          {w.payoutReference && ` · Ref: ${w.payoutReference}`}
                         </p>
                         {w.notes && <p className="text-xs text-muted-foreground italic mt-0.5">Note: {w.notes}</p>}
                       </div>
