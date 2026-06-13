@@ -1,10 +1,13 @@
 import { BlurView } from "expo-blur";
-import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs, useRouter } from "expo-router";
-import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
-import { SymbolView } from "expo-symbols";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { Platform, StyleSheet, View, useColorScheme, Pressable } from "react-native";
+
+// expo-symbols and expo-glass-effect are iOS-only — require conditionally
+// so Android doesn't crash on the static import
+const { SymbolView } = Platform.OS === "ios" ? require("expo-symbols") : { SymbolView: () => null };
+const { isLiquidGlassAvailable } = Platform.OS === "ios" ? require("expo-glass-effect") : { isLiquidGlassAvailable: () => false };
+const { Icon, Label, NativeTabs } = Platform.OS === "ios" ? require("expo-router/unstable-native-tabs") : { Icon: () => null, Label: () => null, NativeTabs: () => null };
 import { useColors } from "@/hooks/useColors";
 import { useUser } from "@/contexts/UserContext";
 
