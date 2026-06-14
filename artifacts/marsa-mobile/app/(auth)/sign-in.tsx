@@ -48,19 +48,16 @@ export default function SignInScreen() {
     setLoading(true);
     try {
       const { error: pwError } = await signIn.password({ identifier: email, password });
-      console.log("[SIGNIN-DEBUG] after password() — error:", JSON.stringify(pwError), "status:", signIn?.status);
       if (pwError) {
         setError((pwError as any)?.errors?.[0]?.longMessage ?? (pwError as any)?.message ?? "Sign in failed. Please try again.");
         return;
       }
-      console.log("[SIGNIN-DEBUG] status branch:", signIn?.status, "signIn keys:", signIn ? Object.keys(signIn) : null);
       if (signIn.status === "complete") {
         await signIn.finalize();
         router.replace("/(home)/(tabs)/explore");
       } else if (signIn.status === "needs_second_factor") {
         setPendingVerification(true);
       } else {
-        console.log("[SIGNIN-DEBUG] UNHANDLED status:", signIn?.status, "full signIn:", JSON.stringify(signIn, null, 2));
         setError("Sign in could not be completed. Please try again.");
       }
     } catch (err: any) {
