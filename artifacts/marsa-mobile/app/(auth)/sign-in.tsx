@@ -3,8 +3,7 @@ import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView,
   Platform, KeyboardAvoidingView, ActivityIndicator,
 } from "react-native";
-import { useSignIn } from "@clerk/expo/legacy";
-import { useSSO } from "@clerk/expo";
+import { useSignIn, useAuth, useSSO } from "@clerk/expo";
 import * as WebBrowser from "expo-web-browser";
 import * as AuthSession from "expo-auth-session";
 import { Link, useRouter } from "expo-router";
@@ -30,7 +29,8 @@ export default function SignInScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const { isLoaded, signIn, setActive } = useSignIn();
+  const { signIn } = useSignIn();
+  const { isLoaded } = useAuth();
   const { startSSOFlow } = useSSO();
 
   const [email, setEmail] = useState("");
@@ -47,15 +47,18 @@ export default function SignInScreen() {
     setError(null);
     setLoading(true);
     try {
-      let result = await signIn.create({ identifier: email, password });
-      if (result.status === "needs_first_factor") {
-        result = await signIn.attemptFirstFactor({ strategy: "password", password });
+      const { error: pwError } = await signIn.password({ identifier: email, password });
+      if (pwError) {
+        setError((pwError as any)?.errors?.[0]?.longMessage ?? (pwError as any)?.message ?? "Sign in failed. Please try again.");
+        return;
       }
-      if (result.status === "complete") {
-        await setActive({ session: result.createdSessionId });
+      if (signIn.status === "complete") {
+        await signIn.finalize();
         router.replace("/(home)/(tabs)/explore");
-      } else if (result.status === "needs_second_factor") {
+      } else if (signIn.status === "needs_second_factor") {
         setPendingVerification(true);
+      } else {
+        setError("Sign in could not be completed. Please try again.");
       }
     } catch (err: any) {
       setError(err?.errors?.[0]?.longMessage ?? err?.message ?? "Sign in failed. Please try again.");
@@ -69,9 +72,13 @@ export default function SignInScreen() {
     setError(null);
     setLoading(true);
     try {
-      const result = await signIn.attemptSecondFactor({ strategy: "phone_code", code });
-      if (result.status === "complete") {
-        await setActive({ session: result.createdSessionId });
+      const { error: mfaError } = await signIn.mfa.verifyPhoneCode({ code });
+      if (mfaError) {
+        setError((mfaError as any)?.errors?.[0]?.longMessage ?? "Invalid code.");
+        return;
+      }
+      if (signIn.status === "complete") {
+        await signIn.finalize();
         router.replace("/(home)/(tabs)/explore");
       }
     } catch (err: any) {

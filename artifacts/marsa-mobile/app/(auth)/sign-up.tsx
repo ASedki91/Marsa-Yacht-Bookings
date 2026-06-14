@@ -3,8 +3,7 @@ import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView,
   Platform, KeyboardAvoidingView, ActivityIndicator,
 } from "react-native";
-import { useSignUp } from "@clerk/expo/legacy";
-import { useSSO } from "@clerk/expo";
+import { useSignUp, useAuth, useSSO } from "@clerk/expo";
 import * as WebBrowser from "expo-web-browser";
 import * as AuthSession from "expo-auth-session";
 import { Link, useRouter } from "expo-router";
@@ -20,7 +19,8 @@ export default function SignUpScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const { isLoaded, signUp, setActive } = useSignUp();
+  const { signUp } = useSignUp();
+  const { isLoaded } = useAuth();
   const { startSSOFlow } = useSSO();
 
   const [email, setEmail] = useState("");
@@ -38,12 +38,20 @@ export default function SignUpScreen() {
     setError(null);
     setLoading(true);
     try {
-      await signUp.create({
+      const { error: pwError } = await signUp.password({
         emailAddress: email,
         password,
         ...(name.trim() ? { unsafeMetadata: { fullName: name.trim() } } : {}),
       });
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      if (pwError) {
+        setError((pwError as any)?.errors?.[0]?.longMessage ?? (pwError as any)?.message ?? "Sign up failed. Please try again.");
+        return;
+      }
+      const { error: codeError } = await signUp.verifications.sendEmailCode();
+      if (codeError) {
+        setError((codeError as any)?.errors?.[0]?.longMessage ?? "Could not send verification code.");
+        return;
+      }
       setPendingVerification(true);
     } catch (err: any) {
       setError(err?.errors?.[0]?.longMessage ?? err?.message ?? "Sign up failed. Please try again.");
@@ -57,9 +65,13 @@ export default function SignUpScreen() {
     setError(null);
     setLoading(true);
     try {
-      const result = await signUp.attemptEmailAddressVerification({ code });
-      if (result.status === "complete") {
-        await setActive({ session: result.createdSessionId });
+      const { error: verifyError } = await signUp.verifications.verifyEmailCode({ code });
+      if (verifyError) {
+        setError((verifyError as any)?.errors?.[0]?.longMessage ?? "Invalid code. Please try again.");
+        return;
+      }
+      if (signUp.status === "complete") {
+        await signUp.finalize();
         router.replace("/(home)/(tabs)/explore");
       }
     } catch (err: any) {
@@ -120,7 +132,7 @@ export default function SignUpScreen() {
         >
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Verify & Create Account</Text>}
         </Pressable>
-        <Pressable onPress={() => { setError(null); signUp?.prepareEmailAddressVerification({ strategy: "email_code" }); }}>
+        <Pressable onPress={() => { setError(null); signUp.verifications.sendEmailCode(); }}>
           <Text style={[styles.linkText, { color: c.primary }]}>Resend code</Text>
         </Pressable>
       </View>

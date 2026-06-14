@@ -3,7 +3,7 @@ import {
   View, Text, TextInput, Pressable, StyleSheet,
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
 } from "react-native";
-import { useSignIn } from "@clerk/expo/legacy";
+import { useSignIn, useAuth } from "@clerk/expo";
 import { Link, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,7 +17,8 @@ export default function ForgotPasswordScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const { isLoaded, signIn, setActive } = useSignIn();
+  const { signIn } = useSignIn();
+  const { isLoaded } = useAuth();
 
   const [stage, setStage] = useState<Stage>("email");
   const [email, setEmail] = useState("");
@@ -30,7 +31,16 @@ export default function ForgotPasswordScreen() {
     if (!isLoaded || !email) return;
     setLoading(true);
     try {
-      await signIn.create({ strategy: "reset_password_email_code", identifier: email });
+      const { error: createError } = await signIn.create({ identifier: email });
+      if (createError) {
+        Alert.alert("Error", (createError as any)?.errors?.[0]?.longMessage ?? "Could not send reset email.");
+        return;
+      }
+      const { error: sendError } = await signIn.resetPasswordEmailCode.sendCode();
+      if (sendError) {
+        Alert.alert("Error", (sendError as any)?.errors?.[0]?.longMessage ?? "Could not send reset email.");
+        return;
+      }
       setStage("code");
     } catch (err: any) {
       Alert.alert("Error", err?.errors?.[0]?.longMessage ?? "Could not send reset email.");
@@ -43,13 +53,18 @@ export default function ForgotPasswordScreen() {
     if (!isLoaded || !code || !newPassword) return;
     setLoading(true);
     try {
-      const result = await signIn.attemptFirstFactor({
-        strategy: "reset_password_email_code",
-        code,
-        password: newPassword,
-      });
-      if (result.status === "complete") {
-        await setActive({ session: result.createdSessionId });
+      const { error: verifyError } = await signIn.resetPasswordEmailCode.verifyCode({ code });
+      if (verifyError) {
+        Alert.alert("Error", (verifyError as any)?.errors?.[0]?.longMessage ?? "Invalid code or password.");
+        return;
+      }
+      const { error: submitError } = await signIn.resetPasswordEmailCode.submitPassword({ password: newPassword });
+      if (submitError) {
+        Alert.alert("Error", (submitError as any)?.errors?.[0]?.longMessage ?? "Invalid code or password.");
+        return;
+      }
+      if (signIn.status === "complete") {
+        await signIn.finalize();
         router.replace("/(home)/(tabs)/explore");
       }
     } catch (err: any) {
