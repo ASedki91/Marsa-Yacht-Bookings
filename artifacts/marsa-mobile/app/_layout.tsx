@@ -65,6 +65,26 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   const [loaded, setLoaded] = useState(false);
+  const [stripeKey, setStripeKey] = useState("");
+
+  // Fetch the Stripe publishable key from the API at runtime. The key lives in
+  // the Replit Stripe connector (server-side), so the client never depends on a
+  // build-time env var that would otherwise fall back to a placeholder.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(
+          `https://${process.env.EXPO_PUBLIC_DOMAIN}/api/payments/config`,
+        );
+        if (res.ok) {
+          const data = (await res.json()) as { publishableKey?: string };
+          if (data.publishableKey) setStripeKey(data.publishableKey);
+        }
+      } catch {
+        // Leave key empty — payment screens will surface a clear error if unset.
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -100,7 +120,7 @@ export default function RootLayout() {
       tokenCache={tokenCache}
     >
       <StripeProvider
-        publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "pk_test_placeholder"}
+        publishableKey={stripeKey}
         merchantIdentifier="merchant.com.marsa"
       >
         <SafeAreaProvider>

@@ -9,9 +9,19 @@ import {
 import { and, eq } from "drizzle-orm";
 import { z } from "zod/v4";
 import { requireAuth, validateBody } from "../middlewares/index";
-import { getStripeClient } from "../lib/stripe";
+import { getStripeClient, getStripePublishableKey } from "../lib/stripe";
 
 const router: IRouter = Router();
+
+// ── GET /payments/config ──────────────────────────────────────────────────────
+/**
+ * Public Stripe config for clients. The publishable key is safe to expose and is
+ * sourced from the Replit Stripe connector, so clients never need a build-time key.
+ */
+router.get("/payments/config", async (_req: Request, res: Response): Promise<void> => {
+  const publishableKey = await getStripePublishableKey();
+  res.json({ publishableKey });
+});
 
 // ── GET /payments/:bookingId ──────────────────────────────────────────────────
 /**
