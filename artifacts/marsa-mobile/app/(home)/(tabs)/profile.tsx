@@ -9,9 +9,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useUser } from "@/contexts/UserContext";
+import { API_BASE_URL } from "@/lib/env";
 import colors from "@/constants/colors";
 
-const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 const WHATSAPP_NUMBER = "201030303030";
 const PRIVACY_URL = "https://marsa.app/privacy";
 const TERMS_URL = "https://marsa.app/terms";
@@ -86,7 +86,7 @@ export default function ProfileScreen() {
     setSaving(true);
     try {
       const token = await getToken();
-      const res = await fetch(`${BASE_URL}/api/users/me`, {
+      const res = await fetch(`${API_BASE_URL}/api/users/me`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -129,7 +129,7 @@ export default function ProfileScreen() {
     setHostLoading(true);
     try {
       const token = await getToken();
-      const res = await fetch(`${BASE_URL}/api/dev/become-host`, {
+      const res = await fetch(`${API_BASE_URL}/api/dev/become-host`, {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });

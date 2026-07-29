@@ -72,7 +72,7 @@ export default function SignUpScreen() {
       }
       if (signUp.status === "complete") {
         await signUp.finalize();
-        router.replace("/(home)/(tabs)/explore");
+        router.replace("/(home)" as any);
       }
     } catch (err: any) {
       setError(err?.errors?.[0]?.longMessage ?? "Invalid code. Please try again.");
@@ -91,7 +91,7 @@ export default function SignUpScreen() {
       });
       if (createdSessionId && ssoSetActive) {
         await ssoSetActive({ session: createdSessionId });
-        router.replace("/(home)/(tabs)/explore");
+        router.replace("/(home)" as any);
       }
     } catch (err: any) {
       setError(err?.errors?.[0]?.longMessage ?? "Could not sign in with Google.");

@@ -1,17 +1,31 @@
 import { useState } from "react";
 import {
-  useAdminListUsers, useAdminSetUserRole,
-  getAdminListUsersQueryKey
+  useAdminListUsers,
+  useAdminSetUserRole,
+  getAdminListUsersQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useAdminSectionSeen } from "@/hooks/useAdminSectionSeen";
 
 const roleBadge: Record<string, string> = {
   guest: "text-muted-foreground border-muted/40",
@@ -21,7 +35,11 @@ const roleBadge: Record<string, string> = {
 
 export default function Users() {
   const [roleFilter, setRoleFilter] = useState("all");
-  const [dialog, setDialog] = useState<{ id: string; currentRole: string; name: string } | null>(null);
+  const [dialog, setDialog] = useState<{
+    id: string;
+    currentRole: string;
+    name: string;
+  } | null>(null);
   const [newRole, setNewRole] = useState<string>("guest");
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -29,9 +47,10 @@ export default function Users() {
   const params: any = {};
   if (roleFilter !== "all") params.role = roleFilter;
 
-  const { data, isLoading } = useAdminListUsers(params, {
-    query: { queryKey: getAdminListUsersQueryKey(params) }
+  const { data, isLoading, isSuccess } = useAdminListUsers(params, {
+    query: { queryKey: getAdminListUsersQueryKey(params) },
   });
+  useAdminSectionSeen("users", isSuccess);
 
   const setRole = useAdminSetUserRole({
     mutation: {
@@ -40,8 +59,9 @@ export default function Users() {
         qc.invalidateQueries({ queryKey: getAdminListUsersQueryKey() });
         setDialog(null);
       },
-      onError: () => toast({ title: "Failed to update role", variant: "destructive" }),
-    }
+      onError: () =>
+        toast({ title: "Failed to update role", variant: "destructive" }),
+    },
   });
 
   const users = (data as any)?.users ?? [];
@@ -64,9 +84,15 @@ export default function Users() {
       </div>
 
       {isLoading ? (
-        <div className="space-y-2">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
+        <div className="space-y-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-14 w-full" />
+          ))}
+        </div>
       ) : users.length === 0 ? (
-        <div className="text-center text-muted-foreground py-16">No users found</div>
+        <div className="text-center text-muted-foreground py-16">
+          No users found
+        </div>
       ) : (
         <div className="space-y-2">
           {users.map((u: any) => (
@@ -74,14 +100,34 @@ export default function Users() {
               <CardContent className="flex items-center justify-between py-3 px-4">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-foreground text-sm truncate">{u.fullName || u.email}</span>
-                    <Badge variant="outline" className={`text-xs ${roleBadge[u.role] ?? ""}`}>{u.role}</Badge>
+                    <span className="font-medium text-foreground text-sm truncate">
+                      {u.fullName || u.email}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className={`text-xs ${roleBadge[u.role] ?? ""}`}
+                    >
+                      {u.role}
+                    </Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{u.email} · {new Date(u.createdAt).toLocaleDateString()}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                    {u.email} · {new Date(u.createdAt).toLocaleDateString()}
+                  </p>
                 </div>
-                <Button size="sm" variant="outline" className="ml-4 shrink-0 text-xs"
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="ml-4 shrink-0 text-xs"
                   data-testid={`button-role-user-${u.id}`}
-                  onClick={() => { setDialog({ id: u.id, currentRole: u.role, name: u.fullName || u.email }); setNewRole(u.role); }}>
+                  onClick={() => {
+                    setDialog({
+                      id: u.id,
+                      currentRole: u.role,
+                      name: u.fullName || u.email,
+                    });
+                    setNewRole(u.role);
+                  }}
+                >
                   Change Role
                 </Button>
               </CardContent>
@@ -109,11 +155,19 @@ export default function Users() {
             </Select>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setDialog(null)}>
+              Cancel
+            </Button>
             <Button
               data-testid="button-confirm-role"
               disabled={setRole.isPending || newRole === dialog?.currentRole}
-              onClick={() => dialog && setRole.mutate({ id: dialog.id, data: { role: newRole as any } })}
+              onClick={() =>
+                dialog &&
+                setRole.mutate({
+                  id: dialog.id,
+                  data: { role: newRole as any },
+                })
+              }
             >
               {setRole.isPending ? "Saving..." : "Save"}
             </Button>

@@ -26,6 +26,12 @@ tags:
     description: Notifications
   - name: finance
     description: Earnings and withdrawals
+  - name: discovery
+    description: Guest discovery and locations
+  - name: wishlist
+    description: Guest wishlist
+  - name: payments
+    description: Payment gateway configuration
 
 paths:
   /healthz:
@@ -141,6 +147,15 @@ paths:
         - name: categoryId
           in: query
           schema: { type: string }
+        - name: locationId
+          in: query
+          schema: { type: string }
+        - name: intent
+          in: query
+          schema:
+            type: string
+            enum: [rent, buy]
+            default: rent
         - name: capacity
           in: query
           schema: { type: integer }
@@ -302,6 +317,119 @@ paths:
               schema:
                 $ref: "#/components/schemas/ExchangeRateResponse"
 
+  /locations:
+    get:
+      operationId: listLocations
+      tags: [discovery]
+      summary: List active booking locations
+      responses:
+        "200":
+          description: Active locations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocationListResponse"
+
+  /discovery/home:
+    get:
+      operationId: getDiscoveryHome
+      tags: [discovery]
+      summary: Get location-grouped guest Home content
+      responses:
+        "200":
+          description: Discovery rails
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscoveryHomeResponse"
+
+  /wishlist:
+    get:
+      operationId: listWishlist
+      tags: [wishlist]
+      summary: List the current guest's live wishlist yachts
+      responses:
+        "200":
+          description: Wishlist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WishlistResponse"
+
+  /wishlist/ids:
+    get:
+      operationId: listWishlistIds
+      tags: [wishlist]
+      summary: List live wishlisted yacht IDs
+      responses:
+        "200":
+          description: Wishlist IDs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WishlistIdsResponse"
+
+  /wishlist/{yachtId}:
+    parameters:
+      - name: yachtId
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      operationId: addWishlistItem
+      tags: [wishlist]
+      summary: Add a live yacht to the wishlist
+      responses:
+        "201":
+          description: Added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WishlistMutationResponse"
+    delete:
+      operationId: removeWishlistItem
+      tags: [wishlist]
+      summary: Remove a yacht from the wishlist
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WishlistMutationResponse"
+
+  /payments/config:
+    get:
+      operationId: getPaymentConfig
+      tags: [payments]
+      summary: Get the selected server payment gateway configuration
+      responses:
+        "200":
+          description: Payment configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentConfig"
+
+  /cancellation-policy/current:
+    get:
+      operationId: getCurrentCancellationPolicy
+      tags: [bookings]
+      summary: Get the active customer-facing cancellation policy
+      responses:
+        "200":
+          description: Active cancellation policy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CancellationPolicy"
+        "503":
+          description: No active policy is configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   # ── Bookings ────────────────────────────────────────────────────────────────
   /bookings/me:
     get:
@@ -407,6 +535,30 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /bookings/{id}/cancellation-quote:
+    get:
+      operationId: getBookingCancellationQuote
+      tags: [bookings]
+      summary: Get a fresh server-calculated cancellation quote
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Cancellation quote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CancellationQuote"
+        "404":
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /bookings/{id}/cancel:
     post:
       operationId: cancelBooking
@@ -429,7 +581,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Booking"
+                $ref: "#/components/schemas/BookingCancellation"
+        "409":
+          description: Quote changed before confirmation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CancellationQuoteConflict"
 
   /bookings/{id}/confirm:
     post:
@@ -578,6 +736,28 @@ paths:
                 $ref: "#/components/schemas/Yacht"
 
   /host/yachts/{id}:
+    get:
+      operationId: getHostYacht
+      tags: [host]
+      summary: Get an owned yacht in any workflow status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Owned yacht detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YachtDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     patch:
       operationId: updateYacht
       tags: [host]
@@ -622,6 +802,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /host/yacht-availability:
+    get:
+      operationId: getHostYachtAvailability
+      tags: [host]
+      summary: Get owned yacht slots and computed calendar state
+      parameters:
+        - name: yachtId
+          in: query
+          required: true
+          schema: { type: string }
+        - name: from
+          in: query
+          required: true
+          schema: { type: string }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Host calendar slots
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvailabilityListResponse"
         "404":
           description: Not found
           content:
@@ -860,6 +1066,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Notification"
+
+  /push-tokens:
+    post:
+      operationId: registerPushToken
+      tags: [notifications]
+      summary: Register or refresh the current user's Expo push token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushTokenInput"
+      responses:
+        "200":
+          description: Token registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushToken"
+
+  /push-tokens/{id}:
+    delete:
+      operationId: deactivatePushToken
+      tags: [notifications]
+      summary: Deactivate one owned push token
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Token deactivated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushToken"
 
   # ── Storage ─────────────────────────────────────────────────────────────────
   /storage/uploads/request-url:
@@ -1644,6 +1887,336 @@ paths:
               schema:
                 $ref: "#/components/schemas/DeletedResponse"
 
+  /admin/locations:
+    get:
+      operationId: adminListLocations
+      tags: [admin]
+      summary: List all managed locations
+      responses:
+        "200":
+          description: Locations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocationListResponse"
+    post:
+      operationId: adminCreateLocation
+      tags: [admin]
+      summary: Create a managed location
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LocationInput"
+      responses:
+        "201":
+          description: Location created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Location"
+
+  /admin/locations/{id}:
+    patch:
+      operationId: adminUpdateLocation
+      tags: [admin]
+      summary: Update a managed location
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LocationUpdate"
+      responses:
+        "200":
+          description: Location updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Location"
+
+  /admin/locations/{id}/deactivate:
+    post:
+      operationId: adminDeactivateLocation
+      tags: [admin]
+      summary: Deactivate a non-default location
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Location deactivated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Location"
+
+  /admin/yachts/{id}/reactivate:
+    post:
+      operationId: adminReactivateYacht
+      tags: [admin]
+      summary: Reactivate a suspended yacht
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Yacht reactivated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Yacht"
+
+  /admin/yachts/{id}/featured:
+    patch:
+      operationId: adminUpdateYachtFeatured
+      tags: [admin]
+      summary: Configure featured-yacht placement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeaturedYachtInput"
+      responses:
+        "200":
+          description: Featured configuration updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Yacht"
+
+  /admin/activity/unseen-counts:
+    get:
+      operationId: adminGetUnseenCounts
+      tags: [admin]
+      summary: Get per-section unseen activity counts for the current admin
+      responses:
+        "200":
+          description: Unseen counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUnseenCounts"
+
+  /admin/activity/sections/{sectionKey}/seen:
+    post:
+      operationId: adminMarkSectionSeen
+      tags: [admin]
+      summary: Mark an admin section seen
+      parameters:
+        - name: sectionKey
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Section marked seen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSectionSeen"
+
+  /admin/notification-campaigns:
+    get:
+      operationId: adminListNotificationCampaigns
+      tags: [admin]
+      summary: List broadcast notification campaigns
+      responses:
+        "200":
+          description: Campaign list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationCampaignListResponse"
+    post:
+      operationId: adminCreateNotificationCampaign
+      tags: [admin]
+      summary: Queue a broadcast for all users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationCampaignInput"
+      responses:
+        "201":
+          description: Campaign queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationCampaign"
+
+  /admin/notification-campaigns/{id}:
+    get:
+      operationId: adminGetNotificationCampaign
+      tags: [admin]
+      summary: Get campaign status and delivery totals
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Campaign
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationCampaign"
+
+  /admin/cancellation-policies:
+    get:
+      operationId: adminListCancellationPolicies
+      tags: [admin]
+      summary: List cancellation-policy history
+      responses:
+        "200":
+          description: Policies
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CancellationPolicyListResponse"
+    post:
+      operationId: adminCreateCancellationPolicy
+      tags: [admin]
+      summary: Create a cancellation-policy draft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancellationPolicyCreateInput"
+      responses:
+        "201":
+          description: Draft created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CancellationPolicy"
+
+  /admin/cancellation-policies/{id}:
+    patch:
+      operationId: adminUpdateCancellationPolicy
+      tags: [admin]
+      summary: Update a draft cancellation policy
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancellationPolicyUpdateInput"
+      responses:
+        "200":
+          description: Draft updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CancellationPolicy"
+
+  /admin/cancellation-policies/{id}/rules:
+    put:
+      operationId: adminReplaceCancellationPolicyRules
+      tags: [admin]
+      summary: Replace all rules on a draft policy
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancellationPolicyRulesInput"
+      responses:
+        "200":
+          description: Draft rules replaced
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CancellationPolicy"
+
+  /admin/cancellation-policies/{id}/activate:
+    post:
+      operationId: adminActivateCancellationPolicy
+      tags: [admin]
+      summary: Activate a validated draft and retire the prior policy
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Policy activated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CancellationPolicy"
+
+  /admin/cancellations:
+    get:
+      operationId: adminListCancellations
+      tags: [admin]
+      summary: List durable cancellation requests
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Cancellation requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingCancellationListResponse"
+
+  /admin/cancellations/{id}/process:
+    post:
+      operationId: adminProcessCancellation
+      tags: [admin]
+      summary: Approve, reject, or retry a cancellation request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancellationProcessInput"
+      responses:
+        "200":
+          description: Cancellation processed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingCancellation"
+
   /webhooks/stripe:
     post:
       operationId: stripeWebhook
@@ -1888,6 +2461,157 @@ components:
         - fetchedAt
 
     # ── Yachts ─────────────────────────────────────────────────────────────────
+    Location:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        city: { type: string }
+        country: { type: string }
+        timeZone: { type: string }
+        slug: { type: string }
+        isActive: { type: boolean }
+        isDefault: { type: boolean }
+        sortOrder: { type: integer }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+      required:
+        [
+          id,
+          name,
+          city,
+          country,
+          timeZone,
+          slug,
+          isActive,
+          isDefault,
+          sortOrder,
+          createdAt,
+          updatedAt,
+        ]
+
+    LocationListResponse:
+      type: object
+      properties:
+        locations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Location"
+        allowCustomLocation:
+          type: boolean
+      required: [locations, allowCustomLocation]
+
+    LocationInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        city: { type: string, minLength: 1 }
+        country: { type: string, minLength: 1 }
+        timeZone: { type: string, minLength: 1 }
+        isDefault: { type: boolean }
+        sortOrder: { type: integer, minimum: 0 }
+      required: [name, city, country, timeZone]
+
+    LocationUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        city: { type: string, minLength: 1 }
+        country: { type: string, minLength: 1 }
+        timeZone: { type: string, minLength: 1 }
+        isActive: { type: boolean }
+        isDefault: { type: boolean }
+        sortOrder: { type: integer, minimum: 0 }
+
+    DiscoveryListing:
+      type: object
+      properties:
+        listingType:
+          type: string
+          enum: [rental_yacht]
+        listingId: { type: string }
+        yachtId: { type: string }
+        title: { type: string }
+        location: { type: string }
+        primaryPhotoUrl:
+          type: ["string", "null"]
+        capacity: { type: integer }
+        rating: { type: string }
+        reviewCount: { type: integer }
+        fromPriceEgp:
+          type: ["string", "null"]
+        isFeatured: { type: boolean }
+      required:
+        [
+          listingType,
+          listingId,
+          yachtId,
+          title,
+          location,
+          capacity,
+          rating,
+          reviewCount,
+          isFeatured,
+        ]
+
+    DiscoveryLocationRail:
+      type: object
+      properties:
+        location:
+          $ref: "#/components/schemas/Location"
+        listings:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiscoveryListing"
+      required: [location, listings]
+
+    DiscoveryHomeResponse:
+      type: object
+      properties:
+        defaultLocationId:
+          type: ["string", "null"]
+        rails:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiscoveryLocationRail"
+      required: [defaultLocationId, rails]
+
+    WishlistResponse:
+      type: object
+      properties:
+        yachts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Yacht"
+      required: [yachts]
+
+    WishlistIdsResponse:
+      type: object
+      properties:
+        yachtIds:
+          type: array
+          items: { type: string }
+      required: [yachtIds]
+
+    WishlistMutationResponse:
+      type: object
+      properties:
+        yachtId: { type: string }
+        wishlisted: { type: boolean }
+      required: [yachtId, wishlisted]
+
+    PaymentConfig:
+      type: object
+      properties:
+        gateway:
+          type: string
+          enum: [test, stripe, disabled]
+        checkoutEnabled: { type: boolean }
+        testMode: { type: boolean }
+        publishableKey:
+          type: ["string", "null"]
+      required: [gateway, checkoutEnabled, testMode, publishableKey]
+
     Yacht:
       type: object
       properties:
@@ -1896,6 +2620,10 @@ components:
         hostId:
           type: string
         categoryId:
+          type: ["string", "null"]
+        locationId:
+          type: ["string", "null"]
+        customLocationName:
           type: ["string", "null"]
         title:
           type: string
@@ -1919,6 +2647,14 @@ components:
             type: string
         status:
           type: string
+        isFeatured:
+          type: boolean
+        featuredSortOrder:
+          type: integer
+        featuredFrom:
+          type: ["string", "null"]
+        featuredUntil:
+          type: ["string", "null"]
         avgRating:
           type: string
         reviewCount:
@@ -1935,6 +2671,8 @@ components:
         - city
         - capacity
         - status
+        - isFeatured
+        - featuredSortOrder
         - avgRating
         - reviewCount
         - createdAt
@@ -2028,6 +2766,10 @@ components:
           type: string
         location:
           type: string
+        locationId:
+          type: string
+        customLocationName:
+          type: string
         categoryId:
           type: string
         capacity:
@@ -2045,7 +2787,6 @@ components:
             type: string
       required:
         - title
-        - location
         - capacity
 
     YachtUpdate:
@@ -2057,6 +2798,10 @@ components:
           type: string
         location:
           type: string
+        locationId:
+          type: ["string", "null"]
+        customLocationName:
+          type: ["string", "null"]
         categoryId:
           type: string
         capacity:
@@ -2082,6 +2827,17 @@ components:
           type: string
         isAvailable:
           type: boolean
+        priceOverrideEgp:
+          type: ["string", "null"]
+        effectivePriceEgp:
+          type: ["string", "null"]
+        displayStatus:
+          type: string
+          enum: [available, blocked, held, booked, past]
+        editable:
+          type: boolean
+        bookingId:
+          type: ["string", "null"]
       required:
         - id
         - yachtId
@@ -2089,6 +2845,9 @@ components:
         - date
         - startTime
         - isAvailable
+        - effectivePriceEgp
+        - displayStatus
+        - editable
 
     AvailabilityListResponse:
       type: object
@@ -2116,13 +2875,39 @@ components:
                 type: string
               isAvailable:
                 type: boolean
+              priceOverrideEgp:
+                type: ["string", "null"]
             required:
               - templateId
               - date
               - startTime
               - isAvailable
-      required:
-        - slots
+        upsert:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              templateId:
+                type: string
+              date:
+                type: string
+              startTime:
+                type: string
+              isAvailable:
+                type: boolean
+              priceOverrideEgp:
+                type: ["string", "null"]
+            required:
+              - templateId
+              - date
+              - startTime
+              - isAvailable
+        deleteIds:
+          type: array
+          items:
+            type: string
 
     PricingItem:
       type: object
@@ -2219,6 +3004,8 @@ components:
     BookingInput:
       type: object
       properties:
+        slotId:
+          type: string
         yachtId:
           type: string
         templateId:
@@ -2245,29 +3032,29 @@ components:
           type: array
           items:
             type: string
+        acceptedCancellationPolicyId:
+          type: string
       required:
-        - yachtId
-        - templateId
-        - bookingDate
-        - startTime
+        - slotId
         - guestCount
         - guestName
         - guestPhone
         - guestEmail
+        - acceptedCancellationPolicyId
 
     BookingCreateResponse:
       type: object
       properties:
         booking:
           $ref: "#/components/schemas/Booking"
-        clientSecret:
-          type: string
-        paymentIntentId:
-          type: string
+        cancellationTerms:
+          $ref: "#/components/schemas/CancellationTermsSummary"
+        payment:
+          $ref: "#/components/schemas/PaymentCheckout"
       required:
         - booking
-        - clientSecret
-        - paymentIntentId
+        - cancellationTerms
+        - payment
 
     BookingListResponse:
       type: object
@@ -2290,6 +3077,239 @@ components:
       properties:
         reason:
           type: string
+        acceptedRuleId:
+          type: string
+        acceptedFeeAmountEgp:
+          type: string
+
+    PaymentAction:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [none, stripe_payment_sheet]
+        clientSecret:
+          type: string
+      required: [type]
+
+    PaymentCheckout:
+      type: object
+      properties:
+        gateway:
+          type: string
+          enum: [test, stripe]
+        testMode:
+          type: boolean
+        status:
+          type: string
+          enum: [created, succeeded, failed]
+        action:
+          $ref: "#/components/schemas/PaymentAction"
+        providerPaymentId:
+          type: string
+      required: [gateway, testMode, status, action, providerPaymentId]
+
+    CancellationPolicyRule:
+      type: object
+      properties:
+        id: { type: string }
+        minimumMinutesBeforeTrip: { type: integer, minimum: 0 }
+        feePercentage: { type: string }
+      required: [id, minimumMinutesBeforeTrip, feePercentage]
+
+    CancellationPolicy:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        version: { type: integer }
+        status:
+          type: string
+          enum: [draft, active, retired]
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/CancellationPolicyRule"
+        createdBy: { type: string }
+        activatedAt:
+          type: ["string", "null"]
+        retiredAt:
+          type: ["string", "null"]
+        createdAt: { type: string }
+        updatedAt: { type: string }
+      required:
+        [id, name, version, status, rules, createdBy, createdAt, updatedAt]
+
+    CancellationPolicyListResponse:
+      type: object
+      properties:
+        policies:
+          type: array
+          items:
+            $ref: "#/components/schemas/CancellationPolicy"
+      required: [policies]
+
+    CancellationPolicyRuleInput:
+      type: object
+      properties:
+        minimumMinutesBeforeTrip: { type: integer, minimum: 0 }
+        feePercentage:
+          type: number
+          minimum: 0
+          maximum: 100
+      required: [minimumMinutesBeforeTrip, feePercentage]
+
+    CancellationPolicyCreateInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        clonePolicyId: { type: string }
+      required: [name]
+
+    CancellationPolicyUpdateInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+      required: [name]
+
+    CancellationPolicyRulesInput:
+      type: object
+      properties:
+        rules:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/CancellationPolicyRuleInput"
+      required: [rules]
+
+    CancellationTermsSummary:
+      type: object
+      properties:
+        policyName: { type: string }
+        policyVersion: { type: integer }
+        tripStartsAt: { type: string }
+        timeZone: { type: string }
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/CancellationPolicyRule"
+      required: [policyName, policyVersion, tripStartsAt, timeZone, rules]
+
+    CancellationQuote:
+      type: object
+      properties:
+        bookingId: { type: string }
+        tripStartsAt: { type: string }
+        requestedAt: { type: string }
+        remainingMinutes: { type: integer }
+        matchedRuleId:
+          type: ["string", "null"]
+        feePercentage:
+          type: ["string", "null"]
+        originalAmountEgp: { type: string }
+        feeAmountEgp:
+          type: ["string", "null"]
+        refundAmountEgp:
+          type: ["string", "null"]
+        manualReviewRequired: { type: boolean }
+      required:
+        [
+          bookingId,
+          tripStartsAt,
+          requestedAt,
+          remainingMinutes,
+          matchedRuleId,
+          feePercentage,
+          originalAmountEgp,
+          feeAmountEgp,
+          refundAmountEgp,
+          manualReviewRequired,
+        ]
+
+    CancellationQuoteConflict:
+      allOf:
+        - $ref: "#/components/schemas/ErrorResponse"
+        - type: object
+          properties:
+            quote:
+              $ref: "#/components/schemas/CancellationQuote"
+          required: [quote]
+
+    BookingCancellation:
+      type: object
+      properties:
+        id: { type: string }
+        bookingId: { type: string }
+        requestedBy: { type: string }
+        reason:
+          type: ["string", "null"]
+        requestedAt: { type: string }
+        tripStartsAt: { type: string }
+        remainingMinutes: { type: integer }
+        policyVersion:
+          type: ["integer", "null"]
+        matchedRuleId:
+          type: ["string", "null"]
+        feePercentage:
+          type: ["string", "null"]
+        originalAmountEgp: { type: string }
+        feeAmountEgp:
+          type: ["string", "null"]
+        refundAmountEgp:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [pending, processing, approved, rejected, refund_failed]
+        reviewedBy:
+          type: ["string", "null"]
+        reviewedAt:
+          type: ["string", "null"]
+        reviewNotes:
+          type: ["string", "null"]
+        manualReviewRequired: { type: boolean }
+      required:
+        [
+          id,
+          bookingId,
+          requestedBy,
+          requestedAt,
+          tripStartsAt,
+          remainingMinutes,
+          policyVersion,
+          matchedRuleId,
+          feePercentage,
+          originalAmountEgp,
+          feeAmountEgp,
+          refundAmountEgp,
+          status,
+          reviewedBy,
+          reviewedAt,
+          reviewNotes,
+          manualReviewRequired,
+        ]
+
+    BookingCancellationListResponse:
+      type: object
+      properties:
+        cancellations:
+          type: array
+          items:
+            $ref: "#/components/schemas/BookingCancellation"
+      required: [cancellations]
+
+    CancellationProcessInput:
+      type: object
+      properties:
+        decision:
+          type: string
+          enum: [approve, reject]
+        notes:
+          type: string
+        manualFeePercentage:
+          type: number
+          minimum: 0
+          maximum: 100
+      required: [decision]
 
     RejectionInput:
       type: object
@@ -2640,6 +3660,114 @@ components:
         - total
 
     # ── Notifications ──────────────────────────────────────────────────────────
+    FeaturedYachtInput:
+      type: object
+      properties:
+        isFeatured: { type: boolean }
+        featuredSortOrder: { type: integer, minimum: 0 }
+        featuredFrom:
+          type: ["string", "null"]
+        featuredUntil:
+          type: ["string", "null"]
+      required: [isFeatured]
+
+    AdminUnseenCounts:
+      type: object
+      properties:
+        counts:
+          type: object
+          additionalProperties:
+            type: integer
+      required: [counts]
+
+    AdminSectionSeen:
+      type: object
+      properties:
+        sectionKey: { type: string }
+        lastSeenAt: { type: string }
+      required: [sectionKey, lastSeenAt]
+
+    PushTokenInput:
+      type: object
+      properties:
+        expoPushToken: { type: string }
+        deviceId: { type: string }
+        platform:
+          type: string
+          enum: [ios, android]
+        appVersion: { type: string }
+      required: [expoPushToken, platform]
+
+    PushToken:
+      type: object
+      properties:
+        id: { type: string }
+        platform:
+          type: string
+          enum: [ios, android]
+        deviceId:
+          type: ["string", "null"]
+        appVersion:
+          type: ["string", "null"]
+        isActive: { type: boolean }
+        lastRegisteredAt: { type: string }
+      required: [id, platform, deviceId, appVersion, isActive, lastRegisteredAt]
+
+    NotificationCampaignInput:
+      type: object
+      properties:
+        title: { type: string, minLength: 1, maxLength: 120 }
+        message: { type: string, minLength: 1, maxLength: 1000 }
+        audience:
+          type: string
+          enum: [all]
+          default: all
+      required: [title, message]
+
+    NotificationCampaign:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        message: { type: string }
+        audience: { type: string }
+        status:
+          type: string
+          enum: [queued, sending, completed, partial_failed, failed]
+        createdBy: { type: string }
+        totalRecipients: { type: integer }
+        inAppSentCount: { type: integer }
+        pushSentCount: { type: integer }
+        pushFailedCount: { type: integer }
+        createdAt: { type: string }
+        startedAt:
+          type: ["string", "null"]
+        completedAt:
+          type: ["string", "null"]
+      required:
+        [
+          id,
+          title,
+          message,
+          audience,
+          status,
+          createdBy,
+          totalRecipients,
+          inAppSentCount,
+          pushSentCount,
+          pushFailedCount,
+          createdAt,
+        ]
+
+    NotificationCampaignListResponse:
+      type: object
+      properties:
+        campaigns:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationCampaign"
+      required: [campaigns]
+
     Notification:
       type: object
       properties:

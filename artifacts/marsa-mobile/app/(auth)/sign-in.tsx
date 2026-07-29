@@ -54,7 +54,7 @@ export default function SignInScreen() {
       }
       if (signIn.status === "complete") {
         await signIn.finalize();
-        router.replace("/(home)/(tabs)/explore");
+        router.replace("/(home)" as any);
       } else if (signIn.status === "needs_second_factor") {
         setPendingVerification(true);
       } else {
@@ -79,7 +79,7 @@ export default function SignInScreen() {
       }
       if (signIn.status === "complete") {
         await signIn.finalize();
-        router.replace("/(home)/(tabs)/explore");
+        router.replace("/(home)" as any);
       }
     } catch (err: any) {
       setError(err?.errors?.[0]?.longMessage ?? "Invalid code.");
@@ -98,7 +98,7 @@ export default function SignInScreen() {
       });
       if (createdSessionId && ssoSetActive) {
         await ssoSetActive({ session: createdSessionId });
-        router.replace("/(home)/(tabs)/explore");
+        router.replace("/(home)" as any);
       }
     } catch (err: any) {
       setError(err?.errors?.[0]?.longMessage ?? "Could not sign in with Google.");
@@ -242,7 +242,7 @@ export default function SignInScreen() {
             style={[styles.devBtn]}
             onPress={() => {
               devBypass.enable();
-              router.replace("/(home)/(tabs)/explore");
+              router.replace("/(home)" as any);
             }}
           >
             <Ionicons name="construct-outline" size={14} color="#6b7280" />

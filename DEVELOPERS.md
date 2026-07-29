@@ -33,11 +33,20 @@ MARSA is a yacht charter marketplace MVP for El Gouna, Egypt. The product has th
 
 | Persona | Core journey |
 |---------|-------------|
-| **Guest** | Browse yachts → pick a date/template → add extras → pay via Stripe → review the experience |
+| **Guest** | Search by location/date → browse or wishlist yachts → book through the configured payment gateway → review the experience |
 | **Host** | Apply to list → upload documents → add yachts → set availability & pricing → confirm/reject bookings → withdraw earnings |
 | **Admin** | Approve/reject hosts and yachts → moderate reviews → process withdrawal requests → view platform stats and audit logs |
 
-Prices are displayed in **EGP** (Egyptian Pound). Stripe charges are settled in **USD** using a live exchange rate fetched at booking time.
+Prices are displayed in **EGP** (Egyptian Pound). New checkout uses a
+provider-neutral gateway. The development-only test gateway records successful
+EGP test payments without charging a card; the preserved Stripe adapter still
+uses a stored EGP/USD exchange-rate snapshot when explicitly enabled.
+
+The active marketplace-preparation architecture and Replit rollout procedure
+are documented in
+[`MARKETPLACE_UPDATE_IMPLEMENTATION_GUIDE.md`](MARKETPLACE_UPDATE_IMPLEMENTATION_GUIDE.md).
+The future sale-listing module is not implemented yet; only neutral discovery
+seams and a disabled **Buy — Soon** choice are present.
 
 ---
 
@@ -76,7 +85,7 @@ Each `artifacts/*` package is a standalone deployable application. They share li
 | Database | PostgreSQL + Drizzle ORM |
 | Validation | Zod v4, `drizzle-zod` |
 | API contract | OpenAPI 3.1 → Orval codegen → React Query hooks + Zod schemas |
-| Payments | Stripe (PaymentIntents in USD; displayed in EGP) |
+| Payments | Provider adapter (`test`, `disabled`, preserved `stripe`) |
 | File storage | Google Cloud Storage (via object storage lib) |
 | Mobile | Expo SDK 54, React Native 0.81, expo-router v6 |
 | Admin UI | React 19, Vite, TailwindCSS v4, shadcn/ui (Radix primitives), Wouter |
@@ -100,9 +109,13 @@ Each `artifacts/*` package is a standalone deployable application. They share li
 | `PRIVATE_OBJECT_DIR` | API server | Private object storage prefix |
 | `PUBLIC_OBJECT_SEARCH_PATHS` | API server | Public object storage search paths |
 | `SESSION_SECRET` | API server | Session signing secret |
-| `STRIPE_SECRET_KEY` | API server | Stripe secret key (via Replit connector) |
+| `INTERNAL_SECRET_TOKEN` | API workers | Bearer token for scheduled delivery/hold workers |
+| `PAYMENT_GATEWAY` | API server | `test`, `disabled`, or `stripe`; use `test` only for local/Replit development |
+| `ENABLE_TEST_PAYMENT_GATEWAY` | API server | Must be exactly `true` to permit test checkout outside a published deployment |
+| `DEFAULT_MARKET_TIME_ZONE` | API server | Fallback IANA time zone, normally `Africa/Cairo` |
+| `STRIPE_SECRET_KEY` | API server | Optional; only needed when the preserved Stripe adapter is selected or historical Stripe refunds are processed |
 | `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` | Mobile | Injected at dev time from `$CLERK_PUBLISHABLE_KEY` |
-| `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Mobile | Stripe publishable key for client |
+| `EXPO_PUBLIC_EAS_PROJECT_ID` | Mobile | Required in a development build when testing Expo push notifications |
 
 All secrets are managed through Replit Secrets (never committed to code).
 
@@ -115,12 +128,20 @@ pnpm install
 # Push the DB schema to the database (dev only — uses DATABASE_URL)
 pnpm --filter @workspace/db run push
 
+# Backfill additive marketplace fields (safe and idempotent)
+pnpm --filter @workspace/scripts run backfill:marketplace-update
+
 # Seed the database with booking templates, categories, add-ons, and example photos
 pnpm --filter @workspace/scripts run seed
 
 # (Optional) Re-run API codegen if you changed the OpenAPI spec
 pnpm --filter @workspace/api-spec run codegen
 ```
+
+Schema application is intentionally not part of `scripts/post-merge.sh`.
+After syncing to Replit, apply it deliberately to the **development** database
+using the prompt in the implementation guide. Do not run the general seed
+command against an existing business database.
 
 ---
 
@@ -198,6 +219,14 @@ All schema files are in `lib/db/src/schema/`. The DB client is exported from `@w
 | `referral_codes` | `misc.ts` | Referral code system (scaffolded) |
 | `example_yacht_photos` | `misc.ts` | Admin-curated example photos for listings |
 | `exchange_rates` | `misc.ts` | Cached EGP/USD exchange rates |
+| `locations` | `locations.ts` | Admin-managed searchable locations and IANA time zones |
+| `wishlist_items` | `wishlistItems.ts` | Per-user saved rental yachts |
+| `admin_events`, `admin_section_views` | `adminActivity.ts` | Per-admin unseen activity |
+| `user_push_tokens` | `userPushTokens.ts` | Owned Expo device tokens |
+| `notification_campaigns`, `notification_deliveries` | `notificationCampaigns.ts` | Broadcast queue and channel delivery history |
+| `cancellation_policies`, `cancellation_policy_rules` | `cancellationPolicies.ts` | Immutable, versioned fee tiers |
+| `booking_cancellation_terms` | `bookingCancellationTerms.ts` | Policy snapshot accepted with each new booking |
+| `booking_cancellations` | `bookingCancellations.ts` | Durable cancellation request, quote, review, and refund state |
 
 ### Key schema details
 
@@ -400,6 +429,25 @@ All admin routes require `role = admin`.
 | `POST` | `/api/dev/complete-booking/:id` | Force-complete a booking for testing |
 | `POST` | `/api/dev/seed` | Trigger DB seed |
 
+### Marketplace preparation endpoints
+
+- Guest discovery: `GET /api/locations`, `GET /api/discovery/home`, live-only
+  yacht filters, and authenticated `/api/wishlist` routes.
+- Host calendar: `GET /api/host/yacht-availability` and
+  `POST /api/host/yachts/:id/availability` with per-slot prices.
+- Payments: `GET /api/payments/config` returns the active provider,
+  checkout availability, and test-mode status. `POST /api/bookings` requires a
+  concrete slot and accepted cancellation-policy ID.
+- Cancellation: current policy, per-booking quote/request routes, versioned
+  admin policy routes, and durable admin cancellation processing.
+- Admin operations: managed locations, yacht reactivation/featuring,
+  per-admin activity counts, notification campaigns, and campaign status.
+- Push: authenticated push-token registration/deactivation and internal
+  bounded delivery/receipt workers.
+
+`lib/api-spec/openapi.yaml` remains the exact contract source of truth; consult
+the generated hooks rather than copying endpoint shapes from this overview.
+
 ---
 
 ## 8. Mobile App (Expo)
@@ -423,25 +471,32 @@ app/
 │   └── forgot-password.tsx      → Password reset (send code → verify → new password)
 │
 └── (home)/
-    ├── _layout.tsx              → Authenticated root (header, notification bell)
+    ├── _layout.tsx              → Authenticated providers and shared detail routes
+    ├── index.tsx                → Redirect to the remembered permitted app mode
     ├── notifications.tsx        → In-app notification list
     ├── profile.tsx              → Full profile edit screen
     ├── become-host.tsx          → Host application flow (bio, documents)
     ├── new-yacht.tsx            → Create a new yacht listing (host only)
-    ├── book/[id].tsx            → Booking flow: pick template, date, add-ons, pay
-    ├── booking/[id].tsx         → Booking detail + receipt (payment history, receipt PDF link)
+    ├── book/[id].tsx            → Slot checkout + accepted cancellation terms
+    ├── booking/[id].tsx         → Booking detail, test/Stripe receipt, cancellation quote
     ├── review/[id].tsx          → Post-trip review submission
     ├── yacht/[id].tsx           → Public yacht detail page
     │
-    └── (tabs)/
-        ├── _layout.tsx          → Bottom tab bar (Explore, Bookings, Earnings, Yachts, Dashboard)
-        ├── explore.tsx          → Yacht discovery (search, filters, map)
-        ├── bookings.tsx         → My bookings list (guest + host views)
-        ├── earnings.tsx         → Host earnings summary + withdrawal request
-        ├── yachts.tsx           → Host's own yacht listings
-        ├── dashboard.tsx        → Host dashboard (stats, quick actions)
-        └── profile.tsx          → Quick profile tab (links to full edit)
+    ├── guest/(tabs)/
+    │   ├── home.tsx             → Location/date search + discovery rails
+    │   ├── explore.tsx          → Live-only rental search and filters
+    │   ├── wishlist.tsx         → Saved yachts
+    │   ├── bookings.tsx         → Guest bookings
+    │   └── profile.tsx          → Guest profile and Host-mode switch
+    └── host/
+        ├── (tabs)/              → Dashboard, bookings, yachts, earnings, profile
+        └── yacht/[id]/calendar.tsx → Explicit date/time slots and per-slot price
 ```
+
+The legacy `(home)/(tabs)` files are compatibility implementations reused by
+the separated route trees; they are no longer presented as one mixed tab bar.
+Mode is client state persisted per Clerk user, while the server role remains
+the authorization capability.
 
 ### Key dependencies
 
@@ -451,7 +506,8 @@ app/
 | `expo-secure-store` | Clerk token cache |
 | `@tanstack/react-query` | Server state |
 | `@workspace/api-client-react` | Generated API hooks |
-| `@stripe/stripe-react-native` | Payment sheet (platform-specific stub for web) |
+| `@stripe/stripe-react-native` | Preserved optional Stripe payment sheet (platform-specific web stub) |
+| `expo-notifications` | Device permission, Expo token registration, and push deep links |
 | `expo-image-picker` | Yacht photo upload |
 | `react-native-reanimated` | Animations |
 | `expo-router` v6 | File-based routing |
@@ -469,13 +525,15 @@ if (signIn.status === "complete") { /* setActive and navigate */ }
 
 See `.agents/memory/clerk-expo-v3-api.md` for the full canonical pattern.
 
-### Stripe on mobile
+### Payment provider on mobile
 
 `@stripe/stripe-react-native` cannot be bundled for web. The project uses platform-specific files:
 - `StripeProvider.tsx` — re-exports the real Stripe provider (used on native)
 - `StripeProvider.web.tsx` — no-op stub (used in web/Expo Go web builds)
 
-The Stripe publishable key is fetched at runtime from `/api/payments/config` — not from a build-time env var.
+The selected provider and optional Stripe publishable key are fetched at
+runtime from `/api/payments/config`. Test mode never mounts Stripe or collects
+fake card details.
 
 ---
 
@@ -492,7 +550,7 @@ The Stripe publishable key is fetched at runtime from `/api/payments/config` —
 | `Dashboard.tsx` | `/` | Platform stats: revenue, bookings count, pending items |
 | `Users.tsx` | `/users` | All users list; role management |
 | `Hosts.tsx` | `/hosts` | Host applications; approve / reject; shows bank details on withdrawal cards |
-| `Yachts.tsx` | `/yachts` | All yacht listings; approve / reject / request changes / suspend |
+| `Yachts.tsx` | `/yachts` | Moderation, suspension/reactivation, and featured placement |
 | `Bookings.tsx` | `/bookings` | All bookings across platform |
 | `Withdrawals.tsx` | `/withdrawals` | Withdrawal requests; mark paid / rejected |
 | `Reviews.tsx` | `/reviews` | Review moderation (approve / reject / hide) |
@@ -503,7 +561,10 @@ The Stripe publishable key is fetched at runtime from `/api/payments/config` —
 | `Categories.tsx` | `/categories` | Yacht category management |
 | `AddOns.tsx` | `/add-ons` | Add-on catalogue management |
 | `BookingTemplates.tsx` | `/booking-templates` | Duration package management |
-| `Cancellations.tsx` | `/cancellations` | Cancellation request review |
+| `Cancellations.tsx` | `/cancellations` | Durable cancellation/refund request review |
+| `CancellationPolicies.tsx` | `/cancellation-policy` | Draft, validate, activate, and inspect policy versions |
+| `Locations.tsx` | `/locations` | Managed/default locations and ordering |
+| `NotificationCampaigns.tsx` | `/notifications` | Broadcast compose, confirmation, and delivery history |
 | `not-found.tsx` | `*` | 404 fallback |
 
 ### Key dependencies
@@ -560,19 +621,26 @@ Roles are stored in the local `users` table and set by admins via `PATCH /api/ad
 
 ### Flow
 
-1. Guest creates a booking → API calculates total in EGP
-2. API fetches live EGP→USD rate (cached in `exchange_rates` table, refreshed if stale)
-3. API converts EGP total to USD cents via `egpToUsdCents()` (`lib/exchange.ts`)
-4. Stripe `PaymentIntents.create({ amount: usdCents, currency: "usd" })` is called
-5. Client receives `clientSecret` → presents Stripe payment sheet
-6. Stripe webhook `payment_intent.succeeded` fires → API marks booking `paid_under_review`
-7. Host confirms → booking moves to `confirmed`
-8. Booking completes → earnings ledger entry created (status: `pending`)
-9. After hold period → earnings status → `available` → host can request withdrawal
+1. Client fetches `/api/payments/config`; the server alone selects `test`,
+   `disabled`, or `stripe`.
+2. Guest chooses a concrete available slot and accepts the current
+   cancellation-policy version.
+3. The API atomically claims the slot, snapshots slot/add-on prices and
+   cancellation terms, and creates booking/payment rows.
+4. The development test adapter returns a successful EGP test payment without
+   a card or external call. It is disabled whenever `NODE_ENV=production` or
+   `REPLIT_DEPLOYMENT=1`.
+5. The preserved Stripe adapter alone fetches EGP/USD, creates a PaymentIntent,
+   and returns a payment-sheet action.
+6. Successful payment moves the booking to `paid_under_review`; host
+   confirmation, earnings, cancellation, rejection, and audit logic are
+   provider-neutral.
 
 ### Platform fee
 
-20% platform fee. Host earns 80% of total.
+The server currently snapshots a 20% platform fee and 80% host earning. The
+host listing UI shows only the resulting **You receive** calculation, not
+redundant fee copy.
 
 ```typescript
 const PLATFORM_FEE_PCT = 0.20;
@@ -580,13 +648,23 @@ const platformFeeEgp = totalAmount * PLATFORM_FEE_PCT;
 const hostEarningsEgp = totalAmount - platformFeeEgp;
 ```
 
-### Refunds
+### Refunds and cancellation
 
-Rejected bookings trigger a Stripe refund via the `charge.refund` API. Refund records are stored in the `refunds` table.
+Refunds resolve the adapter from the payment row so historical Stripe payments
+remain refundable after new Stripe checkout is disabled. The test adapter
+records a logical test refund. Approved cancellations use the immutable policy
+snapshot and reopen a future slot only after refund processing succeeds (or
+when no provider refund is required).
 
-### Stripe publishable key
+### Runtime safety
 
-The Stripe publishable key is **not** a build-time env var. Clients call `GET /api/payments/config` at runtime. This is because the key comes from the Replit Stripe connector and isn't available in `EXPO_PUBLIC_*` at build time.
+- `PAYMENT_GATEWAY=test` also requires
+  `ENABLE_TEST_PAYMENT_GATEWAY=true`.
+- Published Replit or production environments fail closed to `disabled`.
+- Stripe dependencies, schema fields, webhooks, and native plugin remain in
+  place but new checkout does not use them unless `PAYMENT_GATEWAY=stripe`.
+- A Stripe publishable key, when needed, is returned at runtime by
+  `/api/payments/config`; it is not required for local test checkout.
 
 ---
 
@@ -605,11 +683,18 @@ Relevant env vars: `DEFAULT_OBJECT_STORAGE_BUCKET_ID`, `PRIVATE_OBJECT_DIR`, `PU
 
 ## 13. Notifications
 
-In-app only (no push notifications or email yet — see Task #21 in progress tracker).
-
-- `notify()` helper in `lib/notify.ts` — call from any route handler
-- Notifications are per-user, typed, with `relatedEntityType` / `relatedEntityId` for deep linking
-- Mobile: notification bell in the home layout header → `notifications.tsx` screen
+- `notify()` creates ordinary per-user in-app notifications.
+- Admin broadcasts create one in-app notification per current user and durable
+  push deliveries per active device token.
+- Internal-token workers claim push rows in bounded, concurrency-safe batches,
+  record Expo tickets/receipts, retry temporary failures, and deactivate
+  unregistered devices.
+- Mobile push is opt-in and requires an Expo project ID plus a native
+  development/production build; web preview intentionally reports push as
+  unsupported.
+- Notification data uses validated related-entity fields for deep links.
+- The delivery channel model already permits `email`, but no email provider or
+  email delivery is enabled in this release.
 
 ---
 
@@ -650,11 +735,13 @@ const booking = useGetBooking(id, { query: { enabled: !!id } });
 
 | Decision | Rationale |
 |----------|-----------|
-| Prices in EGP, Stripe in USD | El Gouna market uses EGP; Stripe Egypt support requires USD. Live rate fetched at booking time and stored on the booking for audit. |
+| Provider-neutral payment rows | New checkout can move from the test adapter to a replacement gateway while historical Stripe references and refunds remain usable. |
+| Test gateway fails closed | Free test checkout is allowed only with an explicit development flag and is disabled in production or published Replit deployments. |
+| Immutable cancellation terms | New bookings snapshot the active policy/rules and trip-start instant, so later admin policy versions are never retroactive. |
 | Roles additive, not exclusive | Hosts need to be able to book as guests. A single `role` column with `guest < host < admin` hierarchy would block this; the current enum + middleware check allows any role to access lower-tier endpoints. |
 | Auth sync endpoint | Clerk is the identity source; we keep a local `users` table for FKs, roles, and profile data Clerk doesn't own. Sync is explicit (called by client after login) not implicit (webhook), to avoid cold-start race conditions. |
 | Booking templates | Duration packages (e.g. "3-hour trip", "full day") are platform-wide and admin-managed. Hosts set a price per template. This lets the platform control the product surface while hosts set rates. |
-| Availability as explicit slots | Hosts create explicit `availability_slots` (date + startTime + templateId). No automatic recurring logic. This is intentionally simple for MVP. |
+| Availability as explicit slots | Hosts create explicit date/time/template slots in a per-yacht calendar; each slot may override its template price. |
 | Drizzle `inArray` not `ANY` | `sql\`col = ANY(${array})\`` generates invalid SQL in Drizzle. Always use `inArray(col, array)` from `drizzle-orm`. |
 | `@stripe/stripe-react-native` web stub | The native Stripe SDK cannot be bundled for web builds. A `.web.tsx` no-op file is resolved by the Metro bundler on web/Expo Go web. |
 
@@ -680,7 +767,17 @@ const booking = useGetBooking(id, { query: { enabled: !!id } });
 
 9. **Typecheck, not build** — Verify packages with `pnpm --filter @workspace/<slug> run typecheck`, not `build`. `build` requires workflow-provided `PORT` and `BASE_PATH` env vars that aren't available in a plain shell.
 
-10. **Stripe publishable key** — Not available at build time. Always fetch from `/api/payments/config` at runtime.
+10. **Payment selection is server-side** — Clients must never choose the test
+    gateway or claim payment success. Always fetch runtime state from
+    `/api/payments/config`.
+
+11. **No automatic schema push after sync** — `scripts/post-merge.sh` installs
+    dependencies only. Apply additive schema and the marketplace backfill
+    deliberately to Replit Development using the implementation guide.
+
+12. **Cancellation policies are versioned** — Never edit active/retired rules
+    or calculate fees in React. Activate a new draft and use each booking's
+    stored quote/terms.
 
 ---
 
@@ -693,15 +790,15 @@ const booking = useGetBooking(id, { query: { enabled: !!id } });
 | User authentication (email/password + Google) | Clerk Expo Future API; sign-in, sign-up, forgot-password |
 | Yacht browsing & search | Filter by category, capacity, date |
 | Yacht detail page | Photos, templates, availability, reviews |
-| Booking flow with Stripe payment | PaymentIntent in USD, displayed in EGP |
+| Provider-neutral booking flow | Development test gateway; Stripe preserved but disabled by configuration |
 | Booking confirmation / rejection by host | With refund on rejection |
 | Guest booking history | With booking detail and receipt |
-| Host yacht management | Create, edit, photos, availability, pricing, submit for review |
+| Host yacht management | Create/edit listings plus explicit per-yacht slot calendar and slot price overrides |
 | Host earnings & withdrawal | Ledger, summary, withdrawal request |
 | Host documents upload | national_id, yacht_ownership, yacht_license, insurance |
 | Host become-host onboarding | Bio + document upload flow |
 | Bidirectional reviews | Guest → host, host → guest; per booking |
-| In-app notifications | Typed, per-user, read/unread |
+| In-app and push notifications | Typed feed, owned device tokens, broadcast queue, Expo tickets/receipts |
 | Admin dashboard | Platform stats (revenue, bookings, pending items) |
 | Admin: user management | List, role change |
 | Admin: yacht moderation | Approve, reject, request changes, suspend |
@@ -717,6 +814,13 @@ const booking = useGetBooking(id, { query: { enabled: !!id } });
 | Payment receipt in mobile | Receipt URL shown on booking detail screen |
 | Booking history in mobile | Full payment history per booking |
 | Host name + bank details on withdrawal (admin) | Shown on admin withdrawal card |
+| Guest/host mode split | Separate five-tab interfaces with per-user remembered mode |
+| Guest discovery home | Location/date search, disabled Buy — Soon seam, featured/most-booked rails |
+| Wishlist | Live-only saved yachts across Home, Explore, detail, and Wishlist |
+| Managed locations | Admin activation/default/order plus host custom “Other” location |
+| Cancellation policies | Dynamic immutable tiers, checkout snapshot, quote, durable admin processing |
+| Admin unseen badges | Per-admin event counters cleared after successful section load |
+| Yacht reactivation/featuring | Admin controls with audit logs and host notification |
 
 ### 🔲 Proposed / pending tasks
 
@@ -741,12 +845,12 @@ const booking = useGetBooking(id, { query: { enabled: !!id } });
 ### 🚧 Known limitations / not yet built
 
 - No email sending (email receipts, booking confirmations) — Task #21
-- No push notifications — only in-app
+- Push cannot be tested in Expo web/Expo Go; use a configured native development build
 - No photographer booking system (requests exist but scheduling is manual)
 - Referral code system is scaffolded in DB but has no UI or logic
 - No recurring availability rules — hosts set slots day-by-day
 - Earnings auto-release is manual — Task #17 would automate this
-- No guest-facing cancellation policy display
+- No boat-sale listings or owner sale-subscription portal yet; Buy remains disabled
 - No multi-currency support beyond EGP/USD
 
 ---

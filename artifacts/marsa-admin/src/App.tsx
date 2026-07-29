@@ -15,6 +15,9 @@ import Documents from "./pages/Documents";
 import Yachts from "./pages/Yachts";
 import Bookings from "./pages/Bookings";
 import Cancellations from "./pages/Cancellations";
+import CancellationPolicies from "./pages/CancellationPolicies";
+import Locations from "./pages/Locations";
+import NotificationCampaigns from "./pages/NotificationCampaigns";
 import Withdrawals from "./pages/Withdrawals";
 import Users from "./pages/Users";
 import Reviews from "./pages/Reviews";
@@ -190,6 +193,9 @@ function AdminApp() {
           <Route path="/yachts" component={Yachts} />
           <Route path="/bookings" component={Bookings} />
           <Route path="/cancellations" component={Cancellations} />
+          <Route path="/cancellation-policy" component={CancellationPolicies} />
+          <Route path="/locations" component={Locations} />
+          <Route path="/notifications" component={NotificationCampaigns} />
           <Route path="/withdrawals" component={Withdrawals} />
           <Route path="/users" component={Users} />
           <Route path="/reviews" component={Reviews} />

@@ -65,7 +65,7 @@ export default function ForgotPasswordScreen() {
       }
       if (signIn.status === "complete") {
         await signIn.finalize();
-        router.replace("/(home)/(tabs)/explore");
+        router.replace("/(home)" as any);
       }
     } catch (err: any) {
       Alert.alert("Error", err?.errors?.[0]?.longMessage ?? "Invalid code or password.");

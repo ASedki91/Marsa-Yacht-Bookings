@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
+    "dev:local": "pnpm run build && node --env-file-if-exists=../../.env --enable-source-maps ./dist/index.mjs",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "node --env-file-if-exists=../../.env ./node_modules/vitest/vitest.mjs run"
   },
   "dependencies": {
     "@clerk/express": "^2.1.23",

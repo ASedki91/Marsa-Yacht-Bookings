@@ -6,7 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AvailabilityBatchInputSlotsItem } from './availabilityBatchInputSlotsItem';
+import type { AvailabilityBatchInputUpsertItem } from './availabilityBatchInputUpsertItem';
 
 export interface AvailabilityBatchInput {
-  slots: AvailabilityBatchInputSlotsItem[];
+  slots?: AvailabilityBatchInputSlotsItem[];
+  upsert?: AvailabilityBatchInputUpsertItem[];
+  deleteIds?: string[];
 }

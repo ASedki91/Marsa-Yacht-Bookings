@@ -159,14 +159,18 @@ export default function ProfileScreen() {
               icon="boat-outline"
               label="My Yachts"
               iconColor={colors.light.ocean}
-              onPress={() => router.replace("/(home)/(tabs)/yachts")}
+              onPress={() =>
+                router.replace("/(home)/host/(tabs)/yachts" as any)
+              }
             />
             <View style={[styles.separator, { backgroundColor: c.border }]} />
             <SettingRow
               icon="cash-outline"
               label="Earnings"
               iconColor="#10B981"
-              onPress={() => router.replace("/(home)/(tabs)/earnings")}
+              onPress={() =>
+                router.replace("/(home)/host/(tabs)/earnings" as any)
+              }
             />
           </View>
         </View>

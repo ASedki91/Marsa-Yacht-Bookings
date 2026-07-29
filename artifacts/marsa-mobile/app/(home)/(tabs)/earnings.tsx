@@ -141,7 +141,7 @@ export default function EarningsScreen() {
 
         <Pressable
           style={[styles.dashboardBanner, { backgroundColor: colors.light.navy }]}
-          onPress={() => router.push("/(home)/(tabs)/dashboard")}
+          onPress={() => router.push("/(home)/host/(tabs)/dashboard" as any)}
         >
           <View style={styles.dashboardBannerLeft}>
             <Ionicons name="grid-outline" size={20} color={colors.light.gold} />

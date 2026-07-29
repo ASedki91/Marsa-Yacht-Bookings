@@ -7,12 +7,14 @@ import {
   availabilitySlotsTable,
   usersTable,
   auditLogsTable,
+  bookingCancellationsTable,
 } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { getStripeClient } from "../lib/stripe";
 import { notify } from "../lib/notify";
 import { logger } from "../lib/logger";
+import { reopenAvailabilityAfterCancellation } from "../lib/bookings/reopenAvailability";
 
 const router: IRouter = Router();
 
@@ -28,224 +30,337 @@ const router: IRouter = Router();
  *   - In development: if STRIPE_WEBHOOK_SECRET is missing we warn and fall through
  *     (allows local testing without a Stripe CLI tunnel secret).
  */
-router.post("/webhooks/stripe", async (req: Request, res: Response): Promise<void> => {
-  const sig = req.headers["stripe-signature"] as string | undefined;
-  const rawBody = (req as any).rawBody as string | undefined;
-  const isProd = process.env.NODE_ENV === "production";
+router.post(
+  "/webhooks/stripe",
+  async (req: Request, res: Response): Promise<void> => {
+    const sig = req.headers["stripe-signature"] as string | undefined;
+    const rawBody = (req as any).rawBody as string | undefined;
+    const isProd = process.env.NODE_ENV === "production";
 
-  // Fetch webhook secret from connector or env var
-  const { getStripeWebhookSecret } = await import("../lib/stripe");
-  const webhookSecret = await getStripeWebhookSecret();
+    // Fetch webhook secret from connector or env var
+    const { getStripeWebhookSecret } = await import("../lib/stripe");
+    const webhookSecret = await getStripeWebhookSecret();
 
-  let event;
-  try {
-    if (webhookSecret && sig && rawBody) {
-      // Full verification path — always preferred
-      const stripeClient = await getStripeClient();
-      event = stripeClient.webhooks.constructEvent(rawBody, sig, webhookSecret);
-    } else if (isProd) {
-      // Production requires a verified signature — reject forged/unsigned events
-      logger.warn(
-        { hasSig: !!sig, hasSecret: !!webhookSecret, hasRawBody: !!rawBody },
-        "Stripe webhook rejected: signature missing or unverifiable in production",
-      );
-      res.status(400).json({ error: "Missing Stripe signature — cannot process webhook in production" });
-      return;
-    } else {
-      // Development fallback: accept unsigned JSON body with a warning
-      event = req.body;
-      if (!event?.type) {
-        res.status(400).json({ error: "Missing event type" });
-        return;
-      }
-      logger.warn(
-        { hasSig: !!sig, hasSecret: !!webhookSecret },
-        "Stripe webhook: signature validation skipped (development mode only)",
-      );
-    }
-  } catch (err: any) {
-    logger.error({ err }, "Stripe webhook signature verification failed");
-    res.status(400).json({ error: `Webhook signature error: ${err.message}` });
-    return;
-  }
-
-  try {
-    switch (event.type) {
-      // ── Payment succeeded ──────────────────────────────────────────────────
-      case "payment_intent.succeeded": {
-        const pi = event.data.object as { id: string };
-
-        const [payment] = await db
-          .update(paymentsTable)
-          .set({ status: "succeeded" })
-          .where(eq(paymentsTable.stripePaymentIntentId, pi.id))
-          .returning();
-
-        if (!payment) {
-          logger.warn({ piId: pi.id }, "Webhook: no payment row for PI");
-          break;
-        }
-
-        const [booking] = await db
-          .update(bookingsTable)
-          .set({ status: "paid_under_review" })
-          .where(
-            and(
-              eq(bookingsTable.id, payment.bookingId),
-              eq(bookingsTable.status, "pending_payment"),
-            ),
-          )
-          .returning();
-
-        if (booking) {
-          // Notify guest that payment succeeded
-          notify({
-            userId: booking.guestId,
-            type: "payment.succeeded",
-            title: "Payment received",
-            message:
-              "Your payment was successful. Your booking is now under review.",
-            relatedEntityType: "booking",
-            relatedEntityId: booking.id,
+    let event;
+    try {
+      if (webhookSecret && sig && rawBody) {
+        // Full verification path — always preferred
+        const stripeClient = await getStripeClient();
+        event = stripeClient.webhooks.constructEvent(
+          rawBody,
+          sig,
+          webhookSecret,
+        );
+      } else if (isProd) {
+        // Production requires a verified signature — reject forged/unsigned events
+        logger.warn(
+          { hasSig: !!sig, hasSecret: !!webhookSecret, hasRawBody: !!rawBody },
+          "Stripe webhook rejected: signature missing or unverifiable in production",
+        );
+        res
+          .status(400)
+          .json({
+            error:
+              "Missing Stripe signature — cannot process webhook in production",
           });
-
-          // Notify admin users that a new booking needs review
-          const adminUsers = await db
-            .select({ id: usersTable.id })
-            .from(usersTable)
-            .where(eq(usersTable.role, "admin"))
-            .limit(10);
-
-          for (const admin of adminUsers) {
-            notify({
-              userId: admin.id,
-              type: "booking.new",
-              title: "New booking to review",
-              message: `New paid booking received for ${booking.bookingDate}. Please confirm or reject.`,
-              relatedEntityType: "booking",
-              relatedEntityId: booking.id,
-            });
-          }
-
-          await db
-            .insert(auditLogsTable)
-            .values({
-              id: randomUUID(),
-              action: "payment.succeeded",
-              entityType: "booking",
-              entityId: booking.id,
-              newValue: { stripePaymentIntentId: pi.id },
-            })
-            .catch(() => {});
+        return;
+      } else {
+        // Development fallback: accept unsigned JSON body with a warning
+        event = req.body;
+        if (!event?.type) {
+          res.status(400).json({ error: "Missing event type" });
+          return;
         }
-        break;
+        logger.warn(
+          { hasSig: !!sig, hasSecret: !!webhookSecret },
+          "Stripe webhook: signature validation skipped (development mode only)",
+        );
       }
+    } catch (err: any) {
+      logger.error({ err }, "Stripe webhook signature verification failed");
+      res
+        .status(400)
+        .json({ error: `Webhook signature error: ${err.message}` });
+      return;
+    }
 
-      // ── Payment failed ─────────────────────────────────────────────────────
-      case "payment_intent.payment_failed": {
-        const pi = event.data.object as { id: string };
+    try {
+      switch (event.type) {
+        // ── Payment succeeded ──────────────────────────────────────────────────
+        case "payment_intent.succeeded": {
+          const pi = event.data.object as { id: string };
 
-        const [payment] = await db
-          .select()
-          .from(paymentsTable)
-          .where(eq(paymentsTable.stripePaymentIntentId, pi.id))
-          .limit(1);
-
-        if (payment) {
-          await db
+          const [payment] = await db
             .update(paymentsTable)
-            .set({ status: "failed" })
-            .where(eq(paymentsTable.id, payment.id));
-
-          // Keep booking in pending_payment (not cancelled) so guest can retry.
-          // The slot stays reserved so they can re-present the payment sheet.
-          const [booking] = await db
-            .select()
-            .from(bookingsTable)
-            .where(eq(bookingsTable.id, payment.bookingId))
-            .limit(1);
-
-          if (booking) {
-            // Booking stays in pending_payment — guest can retry.
-            // Slot remains reserved for their session.
-            notify({
-              userId: booking.guestId,
-              type: "payment.failed",
-              title: "Payment failed",
-              message: "Your payment could not be processed. Please try again.",
-              relatedEntityType: "booking",
-              relatedEntityId: booking.id,
-            });
-          }
-        }
-        break;
-      }
-
-      // ── Charge refunded ────────────────────────────────────────────────────
-      case "charge.refunded": {
-        const charge = event.data.object as {
-          payment_intent?: string;
-          refunds?: { data?: { id: string }[] };
-        };
-        const piId = charge.payment_intent;
-        if (!piId) break;
-
-        const stripeRefundId = charge.refunds?.data?.[0]?.id ?? null;
-
-        const [refundedPayment] = await db
-          .update(paymentsTable)
-          .set({ status: "refunded" })
-          .where(eq(paymentsTable.stripePaymentIntentId, piId))
-          .returning();
-
-        if (stripeRefundId) {
-          await db
-            .update(refundsTable)
-            .set({ status: "succeeded" })
-            .where(eq(refundsTable.stripeRefundId, stripeRefundId));
-        }
-
-        // Also move the booking to the terminal refunded state
-        if (refundedPayment) {
-          const [refundedBooking] = await db
-            .update(bookingsTable)
-            .set({ status: "rejected_refunded" })
+            .set({
+              provider: "stripe",
+              providerPaymentId: pi.id,
+              status: "succeeded",
+              succeededAt: new Date(),
+            })
             .where(
               and(
-                eq(bookingsTable.id, refundedPayment.bookingId),
-                // Only transition from states where a refund is expected
-                sql`${bookingsTable.status} NOT IN ('confirmed','completed','closed')`,
+                eq(paymentsTable.stripePaymentIntentId, pi.id),
+                eq(paymentsTable.provider, "stripe"),
               ),
             )
             .returning();
 
-          if (refundedBooking) {
-            notify({
-              userId: refundedBooking.guestId,
-              type: "payment.refunded",
-              title: "Refund processed",
-              message: "Your refund has been processed and should arrive within 5–10 business days.",
-              relatedEntityType: "booking",
-              relatedEntityId: refundedBooking.id,
-            });
+          if (!payment) {
+            logger.warn({ piId: pi.id }, "Webhook: no payment row for PI");
+            break;
           }
+
+          const [booking] = await db
+            .update(bookingsTable)
+            .set({ status: "paid_under_review" })
+            .where(
+              and(
+                eq(bookingsTable.id, payment.bookingId),
+                eq(bookingsTable.status, "pending_payment"),
+              ),
+            )
+            .returning();
+
+          if (booking) {
+            if (booking.slotId) {
+              await db
+                .update(availabilitySlotsTable)
+                .set({ holdExpiresAt: null })
+                .where(eq(availabilitySlotsTable.id, booking.slotId));
+            }
+            // Notify guest that payment succeeded
+            notify({
+              userId: booking.guestId,
+              type: "payment.succeeded",
+              title: "Payment received",
+              message:
+                "Your payment was successful. Your booking is now under review.",
+              relatedEntityType: "booking",
+              relatedEntityId: booking.id,
+            });
+
+            // Notify admin users that a new booking needs review
+            const adminUsers = await db
+              .select({ id: usersTable.id })
+              .from(usersTable)
+              .where(eq(usersTable.role, "admin"))
+              .limit(10);
+
+            for (const admin of adminUsers) {
+              notify({
+                userId: admin.id,
+                type: "booking.new",
+                title: "New booking to review",
+                message: `New paid booking received for ${booking.bookingDate}. Please confirm or reject.`,
+                relatedEntityType: "booking",
+                relatedEntityId: booking.id,
+              });
+            }
+
+            await db
+              .insert(auditLogsTable)
+              .values({
+                id: randomUUID(),
+                action: "payment.succeeded",
+                entityType: "booking",
+                entityId: booking.id,
+                newValue: { provider: "stripe", providerPaymentId: pi.id },
+              })
+              .catch(() => {});
+          }
+          break;
         }
-        break;
+
+        // ── Payment failed ─────────────────────────────────────────────────────
+        case "payment_intent.payment_failed": {
+          const pi = event.data.object as { id: string };
+
+          const [payment] = await db
+            .select()
+            .from(paymentsTable)
+            .where(eq(paymentsTable.stripePaymentIntentId, pi.id))
+            .limit(1);
+
+          if (payment) {
+            await db
+              .update(paymentsTable)
+              .set({ status: "failed" })
+              .where(eq(paymentsTable.id, payment.id));
+
+            // Keep booking in pending_payment (not cancelled) so guest can retry.
+            // The slot stays reserved so they can re-present the payment sheet.
+            const [booking] = await db
+              .select()
+              .from(bookingsTable)
+              .where(eq(bookingsTable.id, payment.bookingId))
+              .limit(1);
+
+            if (booking) {
+              // Booking stays in pending_payment — guest can retry.
+              // Slot remains reserved for their session.
+              notify({
+                userId: booking.guestId,
+                type: "payment.failed",
+                title: "Payment failed",
+                message:
+                  "Your payment could not be processed. Please try again.",
+                relatedEntityType: "booking",
+                relatedEntityId: booking.id,
+              });
+            }
+          }
+          break;
+        }
+
+        // ── Charge refunded ────────────────────────────────────────────────────
+        case "charge.refunded": {
+          const charge = event.data.object as {
+            payment_intent?: string;
+            refunds?: { data?: { id: string }[] };
+          };
+          const piId = charge.payment_intent;
+          if (!piId) break;
+
+          const stripeRefundId = charge.refunds?.data?.[0]?.id ?? null;
+
+          const [refundedPayment] = await db
+            .update(paymentsTable)
+            .set({ status: "refunded" })
+            .where(
+              and(
+                eq(paymentsTable.stripePaymentIntentId, piId),
+                eq(paymentsTable.provider, "stripe"),
+              ),
+            )
+            .returning();
+
+          if (stripeRefundId) {
+            await db
+              .update(refundsTable)
+              .set({
+                provider: "stripe",
+                providerRefundId: stripeRefundId,
+                status: "succeeded",
+              })
+              .where(eq(refundsTable.stripeRefundId, stripeRefundId));
+          }
+
+          // Also move the booking to the terminal refunded state
+          if (refundedPayment) {
+            const [refundRecord] = stripeRefundId
+              ? await db
+                  .select()
+                  .from(refundsTable)
+                  .where(eq(refundsTable.stripeRefundId, stripeRefundId))
+                  .limit(1)
+              : [];
+            const [cancellation] = refundRecord
+              ? await db
+                  .select()
+                  .from(bookingCancellationsTable)
+                  .where(
+                    eq(bookingCancellationsTable.refundId, refundRecord.id),
+                  )
+                  .limit(1)
+              : [];
+            const [currentBooking] = await db
+              .select()
+              .from(bookingsTable)
+              .where(eq(bookingsTable.id, refundedPayment.bookingId))
+              .limit(1);
+            if (!currentBooking) break;
+
+            const refundedBooking = await db.transaction(async (tx) => {
+              if (cancellation) {
+                await tx
+                  .update(bookingCancellationsTable)
+                  .set({ status: "approved", reviewedAt: new Date() })
+                  .where(eq(bookingCancellationsTable.id, cancellation.id));
+                const [cancelled] = await tx
+                  .update(bookingsTable)
+                  .set({ status: "cancelled" })
+                  .where(eq(bookingsTable.id, currentBooking.id))
+                  .returning();
+                await reopenAvailabilityAfterCancellation(tx, {
+                  bookingId: currentBooking.id,
+                  slotId: currentBooking.slotId,
+                  tripStartsAt: cancellation.tripStartsAt,
+                });
+                return cancelled;
+              }
+
+              const [rejected] = await tx
+                .update(bookingsTable)
+                .set({ status: "rejected_refunded" })
+                .where(
+                  and(
+                    eq(bookingsTable.id, currentBooking.id),
+                    sql`${bookingsTable.status} NOT IN ('confirmed','completed','closed','cancelled')`,
+                  ),
+                )
+                .returning();
+              if (rejected?.slotId) {
+                const [oldSlot] = await tx
+                  .update(availabilitySlotsTable)
+                  .set({ holdExpiresAt: null })
+                  .where(eq(availabilitySlotsTable.id, rejected.slotId))
+                  .returning();
+                if (oldSlot) {
+                  await tx
+                    .insert(availabilitySlotsTable)
+                    .values({
+                      id: randomUUID(),
+                      yachtId: oldSlot.yachtId,
+                      templateId: oldSlot.templateId,
+                      date: oldSlot.date,
+                      startTime: oldSlot.startTime,
+                      isAvailable: true,
+                      priceOverrideEgp: oldSlot.priceOverrideEgp,
+                    })
+                    .onConflictDoNothing();
+                }
+              }
+              return rejected;
+            });
+
+            if (refundedBooking) {
+              notify({
+                userId: refundedBooking.guestId,
+                type: "payment.refunded",
+                title: "Refund processed",
+                message:
+                  "Your refund has been processed and should arrive within 5–10 business days.",
+                relatedEntityType: "booking",
+                relatedEntityId: refundedBooking.id,
+              });
+            }
+          }
+          break;
+        }
+
+        default:
+          logger.info(
+            { eventType: event.type },
+            "Stripe webhook: unhandled event type",
+          );
       }
-
-      default:
-        logger.info({ eventType: event.type }, "Stripe webhook: unhandled event type");
+    } catch (err) {
+      logger.error(
+        { err, eventType: event.type },
+        "Error processing Stripe webhook event",
+      );
+      // Return 500 so Stripe retries on transient failures (DB outages, etc.).
+      // Signature is already verified so this is safe — Stripe will re-deliver
+      // only until the event is acknowledged with 2xx.
+      res
+        .status(500)
+        .json({ error: "Internal error processing webhook event" });
+      return;
     }
-  } catch (err) {
-    logger.error({ err, eventType: event.type }, "Error processing Stripe webhook event");
-    // Return 500 so Stripe retries on transient failures (DB outages, etc.).
-    // Signature is already verified so this is safe — Stripe will re-deliver
-    // only until the event is acknowledged with 2xx.
-    res.status(500).json({ error: "Internal error processing webhook event" });
-    return;
-  }
 
-  res.json({ received: true });
-});
+    res.json({ received: true });
+  },
+);
 
 export default router;

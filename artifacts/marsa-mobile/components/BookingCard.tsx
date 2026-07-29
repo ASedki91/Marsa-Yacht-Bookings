@@ -6,21 +6,62 @@ import colors from "@/constants/colors";
 
 const STATUS_CONFIG: Record<
   string,
-  { label: string; color: string; bg: string; icon: keyof typeof Ionicons.glyphMap }
+  {
+    label: string;
+    color: string;
+    bg: string;
+    icon: keyof typeof Ionicons.glyphMap;
+  }
 > = {
-  pending_payment:   { label: "Pending Payment",  color: "#92400E", bg: "#FEF3C7", icon: "card-outline" },
-  paid_under_review: { label: "Under Review",     color: "#1E40AF", bg: "#DBEAFE", icon: "search-outline" },
-  confirmed:         { label: "Confirmed",         color: "#065F46", bg: "#D1FAE5", icon: "checkmark-circle-outline" },
-  completed:         { label: "Completed",         color: "#1E40AF", bg: "#DBEAFE", icon: "checkmark-done-circle-outline" },
-  cancel_requested:  { label: "Cancel Requested", color: "#92400E", bg: "#FEF3C7", icon: "alert-outline" },
-  cancelled:         { label: "Cancelled",         color: "#991B1B", bg: "#FEE2E2", icon: "close-circle-outline" },
-  rejected_refunded: { label: "Rejected",          color: "#6B7280", bg: "#F1F5F9", icon: "ban-outline" },
+  pending_payment: {
+    label: "Pending Payment",
+    color: "#92400E",
+    bg: "#FEF3C7",
+    icon: "card-outline",
+  },
+  paid_under_review: {
+    label: "Under Review",
+    color: "#1E40AF",
+    bg: "#DBEAFE",
+    icon: "search-outline",
+  },
+  confirmed: {
+    label: "Confirmed",
+    color: "#065F46",
+    bg: "#D1FAE5",
+    icon: "checkmark-circle-outline",
+  },
+  completed: {
+    label: "Completed",
+    color: "#1E40AF",
+    bg: "#DBEAFE",
+    icon: "checkmark-done-circle-outline",
+  },
+  cancel_requested: {
+    label: "Cancel Requested",
+    color: "#92400E",
+    bg: "#FEF3C7",
+    icon: "alert-outline",
+  },
+  cancelled: {
+    label: "Cancelled",
+    color: "#991B1B",
+    bg: "#FEE2E2",
+    icon: "close-circle-outline",
+  },
+  rejected_refunded: {
+    label: "Rejected",
+    color: "#6B7280",
+    bg: "#F1F5F9",
+    icon: "ban-outline",
+  },
 };
 
 interface BookingCardProps {
   booking: {
     id: string;
     status: string;
+    bookingDate?: string;
     startTime?: string;
     endTime?: string;
     totalAmountEgp?: string;
@@ -53,8 +94,8 @@ export function BookingCard({
     icon: "ellipse-outline" as keyof typeof Ionicons.glyphMap,
   };
 
-  const startDate = booking.startTime
-    ? new Date(booking.startTime).toLocaleDateString("en-EG", {
+  const startDate = booking.bookingDate
+    ? new Date(`${booking.bookingDate}T12:00:00`).toLocaleDateString("en-EG", {
         month: "short",
         day: "numeric",
         year: "numeric",
@@ -69,13 +110,20 @@ export function BookingCard({
     <Pressable
       style={({ pressed }) => [
         styles.card,
-        { backgroundColor: c.card, borderColor: c.border, opacity: pressed ? 0.9 : 1 },
+        {
+          backgroundColor: c.card,
+          borderColor: c.border,
+          opacity: pressed ? 0.9 : 1,
+        },
       ]}
       onPress={onPress}
     >
       <View style={styles.top}>
         <View style={styles.nameBlock}>
-          <Text style={[styles.yachtName, { color: c.foreground }]} numberOfLines={1}>
+          <Text
+            style={[styles.yachtName, { color: c.foreground }]}
+            numberOfLines={1}
+          >
             {booking.yacht?.name ?? "Unknown Yacht"}
           </Text>
           {booking.template && (
@@ -86,20 +134,32 @@ export function BookingCard({
         </View>
         <View style={[styles.statusBadge, { backgroundColor: cfg.bg }]}>
           <Ionicons name={cfg.icon} size={12} color={cfg.color} />
-          <Text style={[styles.statusText, { color: cfg.color }]}>{cfg.label}</Text>
+          <Text style={[styles.statusText, { color: cfg.color }]}>
+            {cfg.label}
+          </Text>
         </View>
       </View>
 
       <View style={styles.details}>
         {startDate && (
           <View style={styles.detail}>
-            <Ionicons name="calendar-outline" size={13} color={c.mutedForeground} />
-            <Text style={[styles.detailText, { color: c.mutedForeground }]}>{startDate}</Text>
+            <Ionicons
+              name="calendar-outline"
+              size={13}
+              color={c.mutedForeground}
+            />
+            <Text style={[styles.detailText, { color: c.mutedForeground }]}>
+              {startDate}
+            </Text>
           </View>
         )}
         {booking.guestCount && (
           <View style={styles.detail}>
-            <Ionicons name="people-outline" size={13} color={c.mutedForeground} />
+            <Ionicons
+              name="people-outline"
+              size={13}
+              color={c.mutedForeground}
+            />
             <Text style={[styles.detailText, { color: c.mutedForeground }]}>
               {booking.guestCount} guests
             </Text>
@@ -108,7 +168,12 @@ export function BookingCard({
         {amount && (
           <View style={styles.detail}>
             <Ionicons name="cash-outline" size={13} color={c.mutedForeground} />
-            <Text style={[styles.detailText, { color: c.foreground, fontFamily: "Inter_600SemiBold" }]}>
+            <Text
+              style={[
+                styles.detailText,
+                { color: c.foreground, fontFamily: "Inter_600SemiBold" },
+              ]}
+            >
               {amount}
             </Text>
           </View>
@@ -131,13 +196,21 @@ export function BookingCard({
             style={[styles.actionBtn, { borderColor: c.destructive }]}
             onPress={onReject}
           >
-            <Text style={[styles.actionBtnText, { color: c.destructive }]}>Reject</Text>
+            <Text style={[styles.actionBtnText, { color: c.destructive }]}>
+              Reject
+            </Text>
           </Pressable>
           <Pressable
-            style={[styles.actionBtn, styles.actionBtnPrimary, { backgroundColor: c.primary }]}
+            style={[
+              styles.actionBtn,
+              styles.actionBtnPrimary,
+              { backgroundColor: c.primary },
+            ]}
             onPress={onConfirm}
           >
-            <Text style={[styles.actionBtnText, { color: "#FFFFFF" }]}>Confirm</Text>
+            <Text style={[styles.actionBtnText, { color: "#FFFFFF" }]}>
+              Confirm
+            </Text>
           </Pressable>
         </View>
       )}

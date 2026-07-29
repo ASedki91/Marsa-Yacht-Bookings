@@ -7,8 +7,6 @@ import {
   hostDocumentsTable,
   yachtsTable,
   bookingsTable,
-  paymentsTable,
-  refundsTable,
   reviewsTable,
   withdrawalRequestsTable,
   earningsLedgerTable,
@@ -29,7 +27,6 @@ import {
   auditLog,
 } from "../middlewares/index";
 import { notify } from "../lib/notify";
-import { getStripeClient } from "../lib/stripe";
 
 const router: IRouter = Router();
 
@@ -330,103 +327,6 @@ router.get(
   },
 );
 
-// ── Process Cancellation Request ──────────────────────────────────────────────
-const processCancellationSchema = z.object({
-  action: z.enum(["approve", "reject"]),
-  notes: z.string().max(500).optional(),
-});
-
-router.post(
-  "/admin/bookings/:id/process-cancellation",
-  validateBody(processCancellationSchema),
-  auditLog({
-    action: "admin.process_cancellation",
-    entityType: "booking",
-    getEntityId: (r) => String(r.params.id),
-  }),
-  async (req: Request, res: Response): Promise<void> => {
-    const id = String(req.params.id);
-    const { action, notes } = req.body as z.infer<typeof processCancellationSchema>;
-
-    const [booking] = await db
-      .select()
-      .from(bookingsTable)
-      .where(and(eq(bookingsTable.id, id), eq(bookingsTable.status, "cancel_requested")))
-      .limit(1);
-
-    if (!booking) { res.status(404).json({ error: "Booking not in cancel_requested state" }); return; }
-
-    const hoursOld = (Date.now() - new Date(String(booking.createdAt)).getTime()) / 3600000;
-    const feePct = hoursOld < 24 ? 0.05 : 0;
-    const totalEgp = parseFloat(String(booking.totalAmountEgp ?? "0"));
-    const cancellationFeeEgp = (totalEgp * feePct).toFixed(2);
-    const refundEgp = (totalEgp * (1 - feePct)).toFixed(2);
-
-    // Issue Stripe refund (full or partial) when approving a cancellation
-    if (action === "approve") {
-      const [payment] = await db
-        .select()
-        .from(paymentsTable)
-        .where(and(eq(paymentsTable.bookingId, id), eq(paymentsTable.status, "succeeded")))
-        .limit(1);
-
-      if (payment?.stripePaymentIntentId) {
-        try {
-          const stripeClient = await getStripeClient();
-          // For < 24h cancellations charge 5% fee → refund 95% of USD amount
-          const amountUsd = parseFloat(String(payment.amountUsd ?? "0"));
-          const refundAmountCents = Math.round(amountUsd * (1 - feePct) * 100);
-
-          const stripeRefund = await stripeClient.refunds.create({
-            payment_intent: payment.stripePaymentIntentId,
-            ...(feePct > 0 ? { amount: refundAmountCents } : {}),
-          });
-
-          await db
-            .insert(refundsTable)
-            .values({
-              id: randomUUID(),
-              paymentId: payment.id,
-              bookingId: id,
-              stripeRefundId: stripeRefund.id,
-              amountEgp: refundEgp,
-              reason: feePct > 0 ? "Cancellation with fee (< 24h)" : "Cancellation approved",
-              status: "pending",
-              initiatedBy: (req as any).localUser?.id ?? null,
-            })
-            .catch(() => {});
-        } catch (err) {
-          req.log.error({ err }, "Stripe refund failed during cancellation approval");
-          res.status(502).json({
-            error: "Refund could not be initiated with Stripe. Cancellation status unchanged — please retry.",
-          });
-          return;
-        }
-      }
-    }
-
-    const newStatus = action === "approve" ? "cancelled" : "confirmed";
-    const [updated] = await db
-      .update(bookingsTable)
-      .set({ status: newStatus })
-      .where(eq(bookingsTable.id, id))
-      .returning();
-
-    notify({
-      userId: booking.guestId,
-      type: `booking.cancellation_${action === "approve" ? "approved" : "rejected"}`,
-      title: action === "approve" ? "Cancellation approved" : "Cancellation request rejected",
-      message: action === "approve"
-        ? `Your booking has been cancelled.${feePct > 0 ? ` A ${feePct * 100}% cancellation fee (EGP ${cancellationFeeEgp}) applies — EGP ${refundEgp} will be refunded.` : " A full refund has been initiated."}`
-        : (notes ?? "Your cancellation request was reviewed — the booking remains confirmed."),
-      relatedEntityType: "booking",
-      relatedEntityId: id,
-    });
-
-    res.json({ ...updated, cancellationFeeEgp, refundEgp });
-  },
-);
-
 // ── Reviews ───────────────────────────────────────────────────────────────────
 router.get("/admin/reviews", async (_req: Request, res: Response): Promise<void> => {
   const reviews = await db
@@ -516,7 +416,7 @@ router.get("/admin/withdrawals", async (_req: Request, res: Response): Promise<v
       : Promise.resolve([]),
   ]);
 
-  const earningsByHost: Record<string, typeof earnings> = {};
+  const earningsByHost: Record<string, Array<(typeof earnings)[number]>> = {};
   for (const e of earnings) {
     if (!earningsByHost[e.hostId]) earningsByHost[e.hostId] = [];
     earningsByHost[e.hostId].push(e);

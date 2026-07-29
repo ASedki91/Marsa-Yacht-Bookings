@@ -6,6 +6,7 @@ import { randomUUID } from "crypto";
 import { z } from "zod/v4";
 import rateLimit from "express-rate-limit";
 import { validateBody, auditLog } from "../middlewares/index";
+import { recordAdminEvent } from "../lib/adminActivity";
 
 const router: IRouter = Router();
 
@@ -114,6 +115,12 @@ router.post(
       .returning();
 
     req.log.info({ userId: created.id }, "New user provisioned");
+    void recordAdminEvent({
+      sectionKey: "users",
+      entityType: "user",
+      entityId: created.id,
+      eventType: "user.created",
+    }).catch(() => {});
     res.status(201).json({ user: created, created: true });
   },
 );

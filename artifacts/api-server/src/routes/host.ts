@@ -9,16 +9,111 @@ import {
   yachtTemplatePricingTable,
   bookingTemplatesTable,
   availabilitySlotsTable,
+  bookingsTable,
   earningsLedgerTable,
   withdrawalRequestsTable,
   photographerRequestsTable,
   auditLogsTable,
+  locationsTable,
 } from "@workspace/db";
-import { and, eq, sql, desc, asc, inArray } from "drizzle-orm";
+import { and, eq, sql, desc, asc, inArray, gte, lte } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { requireAuth, requireRole, validateBody } from "../middlewares/index";
+import {
+  requireAuth,
+  requireRole,
+  validateBody,
+  validateQuery,
+} from "../middlewares/index";
+import { recordAdminEvent } from "../lib/adminActivity";
 
 const router: IRouter = Router();
+const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const timeSchema = z.string().regex(/^\d{2}:\d{2}(?::\d{2})?$/);
+const IMMUTABLE_SLOT_BOOKING_STATUSES = [
+  "pending_payment",
+  "paid_under_review",
+  "confirmed",
+  "cancel_requested",
+  "completed",
+  "closed",
+] as const;
+const TERMINAL_SLOT_BOOKING_STATUSES = new Set([
+  "rejected_refunded",
+  "cancelled",
+]);
+const priceSchema = z
+  .string()
+  .regex(/^\d+(\.\d{1,2})?$/)
+  .refine((value) => Number(value) > 0, "Price must be greater than zero");
+
+type LocationSelection = {
+  locationId: string | null;
+  customLocationName: string | null;
+  location: string;
+  city: string;
+};
+
+async function resolveYachtLocation(input: {
+  locationId?: string | null;
+  customLocationName?: string | null;
+  location?: string | null;
+}): Promise<LocationSelection | null> {
+  const activeLocations = await db
+    .select()
+    .from(locationsTable)
+    .where(eq(locationsTable.isActive, true))
+    .orderBy(desc(locationsTable.isDefault), asc(locationsTable.sortOrder));
+
+  if (input.locationId) {
+    const managed = activeLocations.find(
+      (location) => location.id === input.locationId,
+    );
+    if (!managed) return null;
+    return {
+      locationId: managed.id,
+      customLocationName: null,
+      location: managed.name,
+      city: managed.city,
+    };
+  }
+
+  const custom = input.customLocationName?.trim() || input.location?.trim();
+  if (custom) {
+    const managed = activeLocations.find(
+      (location) =>
+        location.name.toLocaleLowerCase() === custom.toLocaleLowerCase(),
+    );
+    if (managed) {
+      return {
+        locationId: managed.id,
+        customLocationName: null,
+        location: managed.name,
+        city: managed.city,
+      };
+    }
+    return {
+      locationId: null,
+      customLocationName: custom,
+      location: custom,
+      city: custom,
+    };
+  }
+
+  const defaultLocation = activeLocations.find(
+    (location) => location.isDefault,
+  );
+  if (!defaultLocation) return null;
+  return {
+    locationId: defaultLocation.id,
+    customLocationName: null,
+    location: defaultLocation.name,
+    city: defaultLocation.city,
+  };
+}
+
+function slotDateTime(date: string, startTime: string): Date {
+  return new Date(`${date}T${startTime}`);
+}
 
 // Require authentication for all /host/* paths only.
 // A path-less router.use(requireAuth) would intercept ALL requests passing
@@ -43,7 +138,9 @@ router.post(
       .limit(1);
 
     if (existing) {
-      res.status(409).json({ error: "Host application already exists", profile: existing });
+      res
+        .status(409)
+        .json({ error: "Host application already exists", profile: existing });
       return;
     }
 
@@ -69,6 +166,12 @@ router.post(
       })
       .catch(() => {});
 
+    void recordAdminEvent({
+      sectionKey: "hosts",
+      entityType: "host_profile",
+      entityId: profile.id,
+      eventType: "host.applied",
+    }).catch(() => {});
     res.status(201).json(profile);
   },
 );
@@ -86,7 +189,11 @@ router.get(
       .where(eq(hostProfilesTable.userId, user.id))
       .limit(1);
     if (!profile) {
-      res.status(404).json({ error: "No host application found. Submit one via POST /host/apply" });
+      res
+        .status(404)
+        .json({
+          error: "No host application found. Submit one via POST /host/apply",
+        });
       return;
     }
     res.json(profile);
@@ -108,7 +215,11 @@ router.patch(
       .where(eq(hostProfilesTable.userId, user.id))
       .returning();
     if (!profile) {
-      res.status(404).json({ error: "No host application found. Submit one via POST /host/apply" });
+      res
+        .status(404)
+        .json({
+          error: "No host application found. Submit one via POST /host/apply",
+        });
       return;
     }
     res.json(profile);
@@ -127,7 +238,11 @@ router.get(
       .where(eq(hostProfilesTable.userId, user.id))
       .limit(1);
     if (!profile) {
-      res.status(404).json({ error: "No host application found. Submit one via POST /host/apply" });
+      res
+        .status(404)
+        .json({
+          error: "No host application found. Submit one via POST /host/apply",
+        });
       return;
     }
     const documents = await db
@@ -139,7 +254,12 @@ router.get(
   },
 );
 const documentSchema = z.object({
-  documentType: z.enum(["national_id", "yacht_ownership", "yacht_license", "insurance"]),
+  documentType: z.enum([
+    "national_id",
+    "yacht_ownership",
+    "yacht_license",
+    "insurance",
+  ]),
   fileUrl: z.string().url(),
 });
 
@@ -154,7 +274,11 @@ router.post(
       .where(eq(hostProfilesTable.userId, user.id))
       .limit(1);
     if (!profile) {
-      res.status(404).json({ error: "No host application found. Submit one via POST /host/apply" });
+      res
+        .status(404)
+        .json({
+          error: "No host application found. Submit one via POST /host/apply",
+        });
       return;
     }
 
@@ -168,6 +292,12 @@ router.post(
         status: "pending",
       })
       .returning();
+    void recordAdminEvent({
+      sectionKey: "documents",
+      entityType: "host_document",
+      entityId: doc.id,
+      eventType: "document.submitted",
+    }).catch(() => {});
     res.status(201).json(doc);
   },
 );
@@ -194,7 +324,11 @@ router.post(
       .where(eq(hostProfilesTable.userId, user.id))
       .limit(1);
     if (!profile) {
-      res.status(404).json({ error: "No host application found. Submit one via POST /host/apply" });
+      res
+        .status(404)
+        .json({
+          error: "No host application found. Submit one via POST /host/apply",
+        });
       return;
     }
 
@@ -210,6 +344,12 @@ router.post(
         status: "pending",
       })
       .returning();
+    void recordAdminEvent({
+      sectionKey: "photographer_requests",
+      entityType: "photographer_request",
+      entityId: request.id,
+      eventType: "photographer_request.created",
+    }).catch(() => {});
     res.status(201).json(request);
   },
 );
@@ -225,7 +365,10 @@ router.get(
       .from(hostProfilesTable)
       .where(eq(hostProfilesTable.userId, user.id))
       .limit(1);
-    if (!profile) { res.status(404).json({ error: "Host profile not found" }); return; }
+    if (!profile) {
+      res.status(404).json({ error: "Host profile not found" });
+      return;
+    }
 
     const yachts = await db
       .select()
@@ -257,7 +400,7 @@ router.get(
         ])
       : [[], []];
 
-    const photosByYacht = new Map<string, (typeof photoRows)>();
+    const photosByYacht = new Map<string, typeof photoRows>();
     for (const p of photoRows) {
       const arr = photosByYacht.get(p.yachtId) ?? [];
       arr.push(p);
@@ -281,14 +424,84 @@ router.get(
           : null,
     }));
 
-    res.json({ yachts: normalized, total: normalized.length, page: 1, limit: 100 });
+    res.json({
+      yachts: normalized,
+      total: normalized.length,
+      page: 1,
+      limit: 100,
+    });
+  },
+);
+
+router.get(
+  "/host/yachts/:id",
+  requireRole("host", "admin"),
+  async (req: Request, res: Response): Promise<void> => {
+    const user = (req as any).localUser;
+    const yachtId = String(req.params.id);
+    const [profile] = await db
+      .select()
+      .from(hostProfilesTable)
+      .where(eq(hostProfilesTable.userId, user.id))
+      .limit(1);
+    if (!profile) {
+      res.status(404).json({ error: "Host profile not found" });
+      return;
+    }
+
+    const [yacht] = await db
+      .select()
+      .from(yachtsTable)
+      .where(
+        and(eq(yachtsTable.id, yachtId), eq(yachtsTable.hostId, profile.id)),
+      )
+      .limit(1);
+    if (!yacht) {
+      res.status(404).json({ error: "Yacht not found" });
+      return;
+    }
+
+    const [photos, pricing] = await Promise.all([
+      db
+        .select()
+        .from(yachtPhotosTable)
+        .where(eq(yachtPhotosTable.yachtId, yachtId))
+        .orderBy(asc(yachtPhotosTable.sortOrder)),
+      db
+        .select({
+          templateId: yachtTemplatePricingTable.templateId,
+          templateName: bookingTemplatesTable.name,
+          durationHours: bookingTemplatesTable.durationHours,
+          priceEgp: yachtTemplatePricingTable.price,
+        })
+        .from(yachtTemplatePricingTable)
+        .innerJoin(
+          bookingTemplatesTable,
+          eq(yachtTemplatePricingTable.templateId, bookingTemplatesTable.id),
+        )
+        .where(eq(yachtTemplatePricingTable.yachtId, yachtId)),
+    ]);
+    const prices = pricing.map((item) => Number(item.priceEgp));
+
+    res.json({
+      ...yacht,
+      name: yacht.title,
+      rating: yacht.avgRating != null ? Number(yacht.avgRating) : null,
+      basePriceEgp: prices.length ? Math.min(...prices).toFixed(2) : null,
+      photos,
+      pricing,
+      reviews: [],
+      host: null,
+    });
   },
 );
 
 const yachtInputSchema = z.object({
   title: z.string().min(3).max(200),
   description: z.string().max(5000).optional(),
-  location: z.string().min(2).max(200),
+  location: z.string().min(2).max(200).optional(),
+  locationId: z.string().min(1).optional(),
+  customLocationName: z.string().min(2).max(200).optional(),
   categoryId: z.string().optional(),
   capacity: z.number().int().min(1).max(200),
   lengthFt: z.number().positive().optional(),
@@ -314,6 +527,13 @@ router.post(
     }
 
     const body = req.body as z.infer<typeof yachtInputSchema>;
+    const location = await resolveYachtLocation(body);
+    if (!location) {
+      res.status(400).json({
+        error: "Choose an active location or enter a custom location",
+      });
+      return;
+    }
     const [yacht] = await db
       .insert(yachtsTable)
       .values({
@@ -321,8 +541,7 @@ router.post(
         hostId: profile.id,
         title: body.title,
         description: body.description ?? null,
-        location: body.location,
-        city: "Gouna",
+        ...location,
         categoryId: body.categoryId ?? null,
         capacity: body.capacity,
         lengthFt: body.lengthFt ? String(body.lengthFt) : null,
@@ -340,6 +559,8 @@ const yachtUpdateSchema = z.object({
   title: z.string().min(3).max(200).optional(),
   description: z.string().max(5000).optional(),
   location: z.string().min(2).max(200).optional(),
+  locationId: z.string().min(1).nullable().optional(),
+  customLocationName: z.string().min(2).max(200).nullable().optional(),
   categoryId: z.string().optional(),
   capacity: z.number().int().min(1).max(200).optional(),
   features: z.array(z.string()).optional(),
@@ -358,17 +579,25 @@ router.patch(
       .from(hostProfilesTable)
       .where(eq(hostProfilesTable.userId, user.id))
       .limit(1);
-    if (!profile) { res.status(404).json({ error: "Host profile not found" }); return; }
+    if (!profile) {
+      res.status(404).json({ error: "Host profile not found" });
+      return;
+    }
 
     const [yacht] = await db
       .select()
       .from(yachtsTable)
       .where(and(eq(yachtsTable.id, id), eq(yachtsTable.hostId, profile.id)))
       .limit(1);
-    if (!yacht) { res.status(404).json({ error: "Yacht not found" }); return; }
+    if (!yacht) {
+      res.status(404).json({ error: "Yacht not found" });
+      return;
+    }
 
     if (!["draft", "changes_requested"].includes(yacht.status)) {
-      res.status(400).json({ error: "Yacht cannot be edited in its current status" });
+      res
+        .status(400)
+        .json({ error: "Yacht cannot be edited in its current status" });
       return;
     }
 
@@ -376,7 +605,24 @@ router.patch(
     const updates: Record<string, unknown> = {};
     if (body.title !== undefined) updates.title = body.title;
     if (body.description !== undefined) updates.description = body.description;
-    if (body.location !== undefined) updates.location = body.location;
+    if (
+      body.location !== undefined ||
+      body.locationId !== undefined ||
+      body.customLocationName !== undefined
+    ) {
+      const location = await resolveYachtLocation({
+        location: body.location,
+        locationId: body.locationId,
+        customLocationName: body.customLocationName,
+      });
+      if (!location) {
+        res.status(400).json({
+          error: "Choose an active location or enter a custom location",
+        });
+        return;
+      }
+      Object.assign(updates, location);
+    }
     if (body.categoryId !== undefined) updates.categoryId = body.categoryId;
     if (body.capacity !== undefined) updates.capacity = body.capacity;
     if (body.features !== undefined) updates.features = body.features;
@@ -406,14 +652,20 @@ router.delete(
       .from(hostProfilesTable)
       .where(eq(hostProfilesTable.userId, user.id))
       .limit(1);
-    if (!profile) { res.status(404).json({ error: "Host profile not found" }); return; }
+    if (!profile) {
+      res.status(404).json({ error: "Host profile not found" });
+      return;
+    }
 
     const [yacht] = await db
       .select()
       .from(yachtsTable)
       .where(and(eq(yachtsTable.id, id), eq(yachtsTable.hostId, profile.id)))
       .limit(1);
-    if (!yacht) { res.status(404).json({ error: "Yacht not found" }); return; }
+    if (!yacht) {
+      res.status(404).json({ error: "Yacht not found" });
+      return;
+    }
 
     if (!["draft", "changes_requested"].includes(yacht.status)) {
       res.status(400).json({
@@ -455,11 +707,19 @@ router.post(
       ? await db
           .select()
           .from(yachtsTable)
-          .where(and(eq(yachtsTable.id, yachtId), eq(yachtsTable.hostId, profile.id)))
+          .where(
+            and(
+              eq(yachtsTable.id, yachtId),
+              eq(yachtsTable.hostId, profile.id),
+            ),
+          )
           .limit(1)
       : [];
 
-    if (!yacht) { res.status(404).json({ error: "Yacht not found" }); return; }
+    if (!yacht) {
+      res.status(404).json({ error: "Yacht not found" });
+      return;
+    }
 
     const body = req.body as z.infer<typeof photoSchema>;
 
@@ -468,7 +728,12 @@ router.post(
       await db
         .update(yachtPhotosTable)
         .set({ isPrimary: false })
-        .where(and(eq(yachtPhotosTable.yachtId, yachtId), eq(yachtPhotosTable.isPrimary, true)));
+        .where(
+          and(
+            eq(yachtPhotosTable.yachtId, yachtId),
+            eq(yachtPhotosTable.isPrimary, true),
+          ),
+        );
     }
 
     const [photo] = await db
@@ -504,34 +769,253 @@ router.delete(
       ? await db
           .select()
           .from(yachtsTable)
-          .where(and(eq(yachtsTable.id, yachtId), eq(yachtsTable.hostId, profile.id)))
+          .where(
+            and(
+              eq(yachtsTable.id, yachtId),
+              eq(yachtsTable.hostId, profile.id),
+            ),
+          )
           .limit(1)
       : [];
 
-    if (!yacht) { res.status(404).json({ error: "Yacht not found" }); return; }
+    if (!yacht) {
+      res.status(404).json({ error: "Yacht not found" });
+      return;
+    }
 
     const [deleted] = await db
       .delete(yachtPhotosTable)
-      .where(and(eq(yachtPhotosTable.id, photoId), eq(yachtPhotosTable.yachtId, yachtId)))
+      .where(
+        and(
+          eq(yachtPhotosTable.id, photoId),
+          eq(yachtPhotosTable.yachtId, yachtId),
+        ),
+      )
       .returning();
 
-    if (!deleted) { res.status(404).json({ error: "Photo not found" }); return; }
+    if (!deleted) {
+      res.status(404).json({ error: "Photo not found" });
+      return;
+    }
 
     res.json({ deleted: true });
   },
 );
 
-// ── Availability Slots (batch upsert) ─────────────────────────────────────────
-const availabilityBatchSchema = z.object({
-  slots: z.array(
-    z.object({
-      templateId: z.string(),
-      date: z.string(),
-      startTime: z.string(),
-      isAvailable: z.boolean(),
-    }),
-  ),
+// ── Availability Slots ────────────────────────────────────────────────────────
+const hostAvailabilityQuerySchema = z.object({
+  yachtId: z.string().min(1),
+  from: dateSchema,
+  to: dateSchema,
 });
+
+router.get(
+  "/host/yacht-availability",
+  requireRole("host", "admin"),
+  validateQuery(hostAvailabilityQuerySchema),
+  async (req: Request, res: Response): Promise<void> => {
+    const user = (req as any).localUser;
+    const { yachtId, from, to } = req.query as unknown as z.infer<
+      typeof hostAvailabilityQuerySchema
+    >;
+    const fromTime = Date.parse(`${from}T00:00:00Z`);
+    const toTime = Date.parse(`${to}T00:00:00Z`);
+    if (
+      !Number.isFinite(fromTime) ||
+      !Number.isFinite(toTime) ||
+      toTime < fromTime
+    ) {
+      res.status(400).json({ error: "Invalid availability date range" });
+      return;
+    }
+    if ((toTime - fromTime) / 86_400_000 > 62) {
+      res
+        .status(400)
+        .json({ error: "Availability ranges cannot exceed 62 days" });
+      return;
+    }
+
+    const [profile] = await db
+      .select()
+      .from(hostProfilesTable)
+      .where(eq(hostProfilesTable.userId, user.id))
+      .limit(1);
+    const [yacht] = profile
+      ? await db
+          .select({ id: yachtsTable.id })
+          .from(yachtsTable)
+          .where(
+            and(
+              eq(yachtsTable.id, yachtId),
+              eq(yachtsTable.hostId, profile.id),
+            ),
+          )
+          .limit(1)
+      : [];
+    if (!yacht) {
+      res.status(404).json({ error: "Yacht not found" });
+      return;
+    }
+
+    const slots = await db
+      .select()
+      .from(availabilitySlotsTable)
+      .where(
+        and(
+          eq(availabilitySlotsTable.yachtId, yachtId),
+          gte(availabilitySlotsTable.date, from),
+          lte(availabilitySlotsTable.date, to),
+        ),
+      )
+      .orderBy(
+        asc(availabilitySlotsTable.date),
+        asc(availabilitySlotsTable.startTime),
+      );
+    const slotIds = slots.map((slot) => slot.id);
+    const templateIds = [...new Set(slots.map((slot) => slot.templateId))];
+    const [bookings, pricing] = await Promise.all([
+      slotIds.length
+        ? db
+            .select({
+              id: bookingsTable.id,
+              slotId: bookingsTable.slotId,
+              status: bookingsTable.status,
+            })
+            .from(bookingsTable)
+            .where(inArray(bookingsTable.slotId, slotIds))
+            .orderBy(desc(bookingsTable.createdAt))
+        : [],
+      templateIds.length
+        ? db
+            .select({
+              templateId: yachtTemplatePricingTable.templateId,
+              price: yachtTemplatePricingTable.price,
+            })
+            .from(yachtTemplatePricingTable)
+            .where(
+              and(
+                eq(yachtTemplatePricingTable.yachtId, yachtId),
+                inArray(yachtTemplatePricingTable.templateId, templateIds),
+                eq(yachtTemplatePricingTable.isActive, true),
+              ),
+            )
+        : [],
+    ]);
+    const bookingBySlot = new Map<string, (typeof bookings)[number]>();
+    for (const booking of bookings) {
+      if (!booking.slotId) continue;
+      const current = bookingBySlot.get(booking.slotId);
+      const currentIsTerminal =
+        current && TERMINAL_SLOT_BOOKING_STATUSES.has(current.status);
+      const nextIsTerminal = TERMINAL_SLOT_BOOKING_STATUSES.has(booking.status);
+      if (!current || (currentIsTerminal && !nextIsTerminal)) {
+        bookingBySlot.set(booking.slotId, booking);
+      }
+    }
+    const priceByTemplate = new Map(
+      pricing.map((item) => [item.templateId, item.price]),
+    );
+    const now = new Date();
+
+    res.json({
+      slots: slots
+        .filter((slot) => {
+          const booking = bookingBySlot.get(slot.id);
+          return !(
+            booking &&
+            TERMINAL_SLOT_BOOKING_STATUSES.has(booking.status) &&
+            !slot.isAvailable
+          );
+        })
+        .map((slot) => {
+          const linkedBooking = bookingBySlot.get(slot.id);
+          const bookingId =
+            linkedBooking &&
+            !TERMINAL_SLOT_BOOKING_STATUSES.has(linkedBooking.status)
+              ? linkedBooking.id
+              : null;
+          const isPast =
+            slotDateTime(slot.date, slot.startTime).getTime() < now.getTime();
+          const isHeld =
+            !slot.isAvailable &&
+            !bookingId &&
+            Boolean(
+              slot.holdExpiresAt &&
+              slot.holdExpiresAt.getTime() > now.getTime(),
+            );
+          const displayStatus = isPast
+            ? "past"
+            : bookingId
+              ? "booked"
+              : isHeld
+                ? "held"
+                : slot.isAvailable
+                  ? "available"
+                  : "blocked";
+          return {
+            ...slot,
+            effectivePriceEgp:
+              slot.priceOverrideEgp ??
+              priceByTemplate.get(slot.templateId) ??
+              null,
+            displayStatus,
+            editable: !isPast && !bookingId && !isHeld,
+            bookingId,
+          };
+        }),
+    });
+  },
+);
+
+const availabilityMutationSchema = z.object({
+  id: z.string().min(1).optional(),
+  templateId: z.string().min(1),
+  date: dateSchema,
+  startTime: timeSchema,
+  isAvailable: z.boolean(),
+  priceOverrideEgp: priceSchema.nullable().optional(),
+});
+
+const availabilityBatchSchema = z
+  .object({
+    slots: z.array(availabilityMutationSchema.omit({ id: true })).optional(),
+    upsert: z.array(availabilityMutationSchema).optional(),
+    deleteIds: z.array(z.string().min(1)).optional(),
+  })
+  .superRefine((value, context) => {
+    const mutations: Array<z.infer<typeof availabilityMutationSchema>> = [
+      ...(value.slots ?? []),
+      ...(value.upsert ?? []),
+    ];
+    if (mutations.length === 0 && (value.deleteIds?.length ?? 0) === 0) {
+      context.addIssue({
+        code: "custom",
+        message: "Provide at least one slot to upsert or delete",
+      });
+    }
+    const keys = new Set<string>();
+    for (const slot of mutations) {
+      const key =
+        slot.id ?? `${slot.templateId}|${slot.date}|${slot.startTime}`;
+      if (keys.has(key)) {
+        context.addIssue({
+          code: "custom",
+          message: `Duplicate slot mutation: ${key}`,
+        });
+      }
+      keys.add(key);
+    }
+    for (const id of value.deleteIds ?? []) {
+      if (keys.has(id)) {
+        context.addIssue({
+          code: "custom",
+          message: `A slot cannot be updated and deleted in the same request: ${id}`,
+        });
+      }
+    }
+  });
+
+class AvailabilityConflictError extends Error {}
 
 router.post(
   "/host/yachts/:id/availability",
@@ -551,55 +1035,221 @@ router.post(
       ? await db
           .select()
           .from(yachtsTable)
-          .where(and(eq(yachtsTable.id, yachtId), eq(yachtsTable.hostId, profile.id)))
+          .where(
+            and(
+              eq(yachtsTable.id, yachtId),
+              eq(yachtsTable.hostId, profile.id),
+            ),
+          )
           .limit(1)
       : [];
 
-    if (!yacht) { res.status(404).json({ error: "Yacht not found" }); return; }
+    if (!yacht) {
+      res.status(404).json({ error: "Yacht not found" });
+      return;
+    }
 
-    const slots = req.body.slots as z.infer<typeof availabilityBatchSchema>["slots"];
-
-    // Manual upsert per slot — partial unique index cannot use onConflictDoUpdate
-    const results = await Promise.all(
-      slots.map(async (slot) => {
-        const [existing] = await db
-          .select()
-          .from(availabilitySlotsTable)
+    const body = req.body as z.infer<typeof availabilityBatchSchema>;
+    const mutations: Array<z.infer<typeof availabilityMutationSchema>> = [
+      ...(body.slots ?? []),
+      ...(body.upsert ?? []),
+    ];
+    const deleteIds = [...new Set(body.deleteIds ?? [])];
+    const templateIds = [...new Set(mutations.map((slot) => slot.templateId))];
+    const templates = templateIds.length
+      ? await db
+          .select({ id: bookingTemplatesTable.id })
+          .from(bookingTemplatesTable)
           .where(
             and(
-              eq(availabilitySlotsTable.yachtId, yachtId),
-              eq(availabilitySlotsTable.templateId, slot.templateId),
-              eq(availabilitySlotsTable.date, slot.date),
-              eq(availabilitySlotsTable.startTime, slot.startTime),
+              inArray(bookingTemplatesTable.id, templateIds),
+              eq(bookingTemplatesTable.isActive, true),
             ),
           )
-          .limit(1);
+      : [];
+    if (templates.length !== templateIds.length) {
+      res
+        .status(400)
+        .json({
+          error: "One or more booking templates are invalid or inactive",
+        });
+      return;
+    }
 
-        if (existing) {
-          const [updated] = await db
-            .update(availabilitySlotsTable)
-            .set({ isAvailable: slot.isAvailable })
-            .where(eq(availabilitySlotsTable.id, existing.id))
-            .returning();
-          return updated;
+    const referencedIds = [
+      ...deleteIds,
+      ...mutations.flatMap((slot) => (slot.id ? [slot.id] : [])),
+    ];
+    if (referencedIds.length) {
+      const ownedSlots = await db
+        .select({ id: availabilitySlotsTable.id })
+        .from(availabilitySlotsTable)
+        .where(
+          and(
+            eq(availabilitySlotsTable.yachtId, yachtId),
+            inArray(availabilitySlotsTable.id, referencedIds),
+          ),
+        );
+      if (ownedSlots.length !== new Set(referencedIds).size) {
+        res
+          .status(404)
+          .json({ error: "One or more availability slots were not found" });
+        return;
+      }
+      const [linkedBooking] = await db
+        .select({ id: bookingsTable.id })
+        .from(bookingsTable)
+        .where(
+          and(
+            inArray(bookingsTable.slotId, referencedIds),
+            inArray(bookingsTable.status, [...IMMUTABLE_SLOT_BOOKING_STATUSES]),
+          ),
+        )
+        .limit(1);
+      if (linkedBooking) {
+        res.status(409).json({
+          error: "Booked slots are immutable. Create a new slot instead.",
+        });
+        return;
+      }
+    }
+
+    try {
+      const results = await db.transaction(async (tx) => {
+        if (deleteIds.length) {
+          await tx
+            .delete(availabilitySlotsTable)
+            .where(
+              and(
+                eq(availabilitySlotsTable.yachtId, yachtId),
+                inArray(availabilitySlotsTable.id, deleteIds),
+              ),
+            );
         }
 
-        const [inserted] = await db
-          .insert(availabilitySlotsTable)
-          .values({
-            id: randomUUID(),
-            yachtId,
-            templateId: slot.templateId,
-            date: slot.date,
-            startTime: slot.startTime,
-            isAvailable: slot.isAvailable,
-          })
-          .returning();
-        return inserted;
-      }),
-    );
+        const saved: Array<typeof availabilitySlotsTable.$inferSelect> = [];
+        for (const slot of mutations) {
+          let existingId = slot.id;
+          if (!existingId) {
+            const [existing] = await tx
+              .select({ id: availabilitySlotsTable.id })
+              .from(availabilitySlotsTable)
+              .where(
+                and(
+                  eq(availabilitySlotsTable.yachtId, yachtId),
+                  eq(availabilitySlotsTable.templateId, slot.templateId),
+                  eq(availabilitySlotsTable.date, slot.date),
+                  eq(availabilitySlotsTable.startTime, slot.startTime),
+                  eq(availabilitySlotsTable.isAvailable, true),
+                ),
+              )
+              .limit(1);
+            existingId = existing?.id;
+          }
 
-    res.json({ slots: results });
+          if (existingId) {
+            const [linkedBooking] = await tx
+              .select({ id: bookingsTable.id })
+              .from(bookingsTable)
+              .where(
+                and(
+                  eq(bookingsTable.slotId, existingId),
+                  inArray(bookingsTable.status, [
+                    ...IMMUTABLE_SLOT_BOOKING_STATUSES,
+                  ]),
+                ),
+              )
+              .limit(1);
+            if (linkedBooking) {
+              throw new AvailabilityConflictError(
+                "Booked slots are immutable. Create a new slot instead.",
+              );
+            }
+            const [updated] = await tx
+              .update(availabilitySlotsTable)
+              .set({
+                templateId: slot.templateId,
+                date: slot.date,
+                startTime: slot.startTime,
+                isAvailable: slot.isAvailable,
+                priceOverrideEgp: slot.priceOverrideEgp ?? null,
+                holdExpiresAt: null,
+              })
+              .where(
+                and(
+                  eq(availabilitySlotsTable.id, existingId),
+                  eq(availabilitySlotsTable.yachtId, yachtId),
+                ),
+              )
+              .returning();
+            if (!updated)
+              throw new AvailabilityConflictError("Availability slot changed");
+            saved.push(updated);
+          } else {
+            const [inserted] = await tx
+              .insert(availabilitySlotsTable)
+              .values({
+                id: randomUUID(),
+                yachtId,
+                templateId: slot.templateId,
+                date: slot.date,
+                startTime: slot.startTime,
+                isAvailable: slot.isAvailable,
+                priceOverrideEgp: slot.priceOverrideEgp ?? null,
+              })
+              .returning();
+            saved.push(inserted);
+          }
+        }
+        return saved;
+      });
+
+      const pricing = templateIds.length
+        ? await db
+            .select({
+              templateId: yachtTemplatePricingTable.templateId,
+              price: yachtTemplatePricingTable.price,
+            })
+            .from(yachtTemplatePricingTable)
+            .where(
+              and(
+                eq(yachtTemplatePricingTable.yachtId, yachtId),
+                inArray(yachtTemplatePricingTable.templateId, templateIds),
+                eq(yachtTemplatePricingTable.isActive, true),
+              ),
+            )
+        : [];
+      const priceByTemplate = new Map(
+        pricing.map((item) => [item.templateId, item.price]),
+      );
+      const now = Date.now();
+      res.json({
+        slots: results.map((slot) => {
+          const isPast =
+            slotDateTime(slot.date, slot.startTime).getTime() < now;
+          return {
+            ...slot,
+            effectivePriceEgp:
+              slot.priceOverrideEgp ??
+              priceByTemplate.get(slot.templateId) ??
+              null,
+            displayStatus: isPast
+              ? "past"
+              : slot.isAvailable
+                ? "available"
+                : "blocked",
+            editable: !isPast,
+            bookingId: null,
+          };
+        }),
+      });
+    } catch (error) {
+      if (error instanceof AvailabilityConflictError) {
+        res.status(409).json({ error: error.message });
+        return;
+      }
+      throw error;
+    }
   },
 );
 
@@ -631,13 +1281,23 @@ router.put(
       ? await db
           .select()
           .from(yachtsTable)
-          .where(and(eq(yachtsTable.id, yachtId), eq(yachtsTable.hostId, profile.id)))
+          .where(
+            and(
+              eq(yachtsTable.id, yachtId),
+              eq(yachtsTable.hostId, profile.id),
+            ),
+          )
           .limit(1)
       : [];
 
-    if (!yacht) { res.status(404).json({ error: "Yacht not found" }); return; }
+    if (!yacht) {
+      res.status(404).json({ error: "Yacht not found" });
+      return;
+    }
 
-    const pricing = req.body.pricing as z.infer<typeof pricingBatchSchema>["pricing"];
+    const pricing = req.body.pricing as z.infer<
+      typeof pricingBatchSchema
+    >["pricing"];
 
     const upserted = await Promise.all(
       pricing.map((item) =>
@@ -652,7 +1312,10 @@ router.put(
             isActive: true,
           })
           .onConflictDoUpdate({
-            target: [yachtTemplatePricingTable.yachtId, yachtTemplatePricingTable.templateId],
+            target: [
+              yachtTemplatePricingTable.yachtId,
+              yachtTemplatePricingTable.templateId,
+            ],
             set: { price: item.priceEgp, isActive: true },
           })
           .returning(),
@@ -699,11 +1362,16 @@ router.post(
       ? await db
           .select()
           .from(yachtsTable)
-          .where(and(eq(yachtsTable.id, id), eq(yachtsTable.hostId, profile.id)))
+          .where(
+            and(eq(yachtsTable.id, id), eq(yachtsTable.hostId, profile.id)),
+          )
           .limit(1)
       : [];
 
-    if (!yacht) { res.status(404).json({ error: "Yacht not found" }); return; }
+    if (!yacht) {
+      res.status(404).json({ error: "Yacht not found" });
+      return;
+    }
 
     if (!["draft", "changes_requested"].includes(yacht.status)) {
       res.status(400).json({ error: "Yacht is already submitted or approved" });
@@ -728,6 +1396,12 @@ router.post(
       })
       .catch(() => {});
 
+    void recordAdminEvent({
+      sectionKey: "yachts",
+      entityType: "yacht",
+      entityId: id,
+      eventType: "yacht.submitted",
+    }).catch(() => {});
     res.json(updated);
   },
 );
@@ -743,7 +1417,10 @@ router.get(
       .from(hostProfilesTable)
       .where(eq(hostProfilesTable.userId, user.id))
       .limit(1);
-    if (!profile) { res.status(404).json({ error: "Host profile not found" }); return; }
+    if (!profile) {
+      res.status(404).json({ error: "Host profile not found" });
+      return;
+    }
 
     // Auto-release earnings past their eligibility date
     await db
@@ -816,7 +1493,10 @@ router.get(
       .from(hostProfilesTable)
       .where(eq(hostProfilesTable.userId, user.id))
       .limit(1);
-    if (!profile) { res.status(404).json({ error: "Host profile not found" }); return; }
+    if (!profile) {
+      res.status(404).json({ error: "Host profile not found" });
+      return;
+    }
 
     const ledger = await db
       .select()
@@ -842,7 +1522,10 @@ router.post(
       .from(hostProfilesTable)
       .where(eq(hostProfilesTable.userId, user.id))
       .limit(1);
-    if (!profile) { res.status(404).json({ error: "Host profile not found" }); return; }
+    if (!profile) {
+      res.status(404).json({ error: "Host profile not found" });
+      return;
+    }
 
     const body = req.body as z.infer<typeof withdrawalInputSchema>;
 
@@ -880,6 +1563,12 @@ router.post(
       })
       .returning();
 
+    void recordAdminEvent({
+      sectionKey: "withdrawals",
+      entityType: "withdrawal_request",
+      entityId: withdrawal.id,
+      eventType: "withdrawal.requested",
+    }).catch(() => {});
     res.status(201).json(withdrawal);
   },
 );
@@ -895,7 +1584,10 @@ router.get(
       .from(hostProfilesTable)
       .where(eq(hostProfilesTable.userId, user.id))
       .limit(1);
-    if (!profile) { res.status(404).json({ error: "Host profile not found" }); return; }
+    if (!profile) {
+      res.status(404).json({ error: "Host profile not found" });
+      return;
+    }
 
     const withdrawals = await db
       .select()
@@ -917,7 +1609,10 @@ router.post(
       .from(hostProfilesTable)
       .where(eq(hostProfilesTable.userId, user.id))
       .limit(1);
-    if (!profile) { res.status(404).json({ error: "Host profile not found" }); return; }
+    if (!profile) {
+      res.status(404).json({ error: "Host profile not found" });
+      return;
+    }
 
     const [available] = await db
       .select({
@@ -953,6 +1648,12 @@ router.post(
         payoutMethod: req.body.payoutMethod,
       })
       .returning();
+    void recordAdminEvent({
+      sectionKey: "withdrawals",
+      entityType: "withdrawal_request",
+      entityId: withdrawal.id,
+      eventType: "withdrawal.requested",
+    }).catch(() => {});
     res.status(201).json(withdrawal);
   },
 );

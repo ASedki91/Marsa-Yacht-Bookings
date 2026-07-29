@@ -25,6 +25,7 @@ const STATUS_COLOR: Record<string, { label: string; color: string; bg: string }>
   live: { label: "Live", color: "#065F46", bg: "#D1FAE5" },
   changes_requested: { label: "Changes Needed", color: "#991B1B", bg: "#FEE2E2" },
   rejected: { label: "Rejected", color: "#991B1B", bg: "#FEE2E2" },
+  suspended: { label: "Suspended", color: "#991B1B", bg: "#FEE2E2" },
 };
 
 const EDITABLE = ["draft", "changes_requested", "rejected"];
@@ -74,8 +75,10 @@ export default function MyYachtsScreen() {
   const handlePress = (item: any) => {
     if (EDITABLE.includes(item.status)) {
       router.push(`/(home)/new-yacht?editId=${item.id}`);
-    } else {
+    } else if (item.status === "live") {
       router.push(`/(home)/yacht/${item.id}`);
+    } else {
+      router.push(`/(home)/host/yacht/${item.id}/calendar` as any);
     }
   };
 
@@ -135,8 +138,20 @@ export default function MyYachtsScreen() {
                   <Text style={[styles.statusText, { color: statusCfg.color }]}>
                     {statusCfg.label}
                   </Text>
-                  {canEdit && (
-                    <View style={styles.actionBtns}>
+                  <View style={styles.actionBtns}>
+                    <Pressable
+                      style={[styles.actionBtn, { backgroundColor: "#DBEAFE" }]}
+                      onPress={() =>
+                        router.push(`/(home)/host/yacht/${item.id}/calendar` as any)
+                      }
+                    >
+                      <Ionicons name="calendar-outline" size={14} color="#1E40AF" />
+                      <Text style={[styles.actionBtnText, { color: "#1E40AF" }]}>
+                        Calendar
+                      </Text>
+                    </Pressable>
+                    {canEdit && (
+                      <>
                       <Pressable
                         style={[styles.actionBtn, { backgroundColor: colors.light.navy + "18" }]}
                         onPress={() => handleEdit(item)}
@@ -151,8 +166,9 @@ export default function MyYachtsScreen() {
                         <Ionicons name="trash-outline" size={14} color="#991B1B" />
                         <Text style={[styles.actionBtnText, { color: "#991B1B" }]}>Delete</Text>
                       </Pressable>
-                    </View>
-                  )}
+                      </>
+                    )}
+                  </View>
                 </View>
               </View>
             );

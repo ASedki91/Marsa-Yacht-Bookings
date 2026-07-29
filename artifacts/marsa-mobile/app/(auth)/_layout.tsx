@@ -7,7 +7,7 @@ export default function AuthLayout() {
   const colors = useColors();
 
   if (!isLoaded) return null;
-  if (isSignedIn) return <Redirect href="/(home)/(tabs)/explore" />;
+  if (isSignedIn) return <Redirect href={"/(home)" as any} />;
 
   return (
     <Stack

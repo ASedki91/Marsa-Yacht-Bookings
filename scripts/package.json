@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "backfill:marketplace-update": "tsx ./src/backfill-marketplace-update.ts",
     "hello": "tsx ./src/hello.ts",
     "seed": "tsx ./src/seed.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"

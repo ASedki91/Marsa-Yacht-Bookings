@@ -5,6 +5,7 @@
  * MARSA Yacht Booking API
  * OpenAPI spec version: 0.1.0
  */
+import type { AvailabilitySlotDisplayStatus } from './availabilitySlotDisplayStatus';
 
 export interface AvailabilitySlot {
   id: string;
@@ -13,4 +14,12 @@ export interface AvailabilitySlot {
   date: string;
   startTime: string;
   isAvailable: boolean;
+  /** @nullable */
+  priceOverrideEgp?: string | null;
+  /** @nullable */
+  effectivePriceEgp: string | null;
+  displayStatus: AvailabilitySlotDisplayStatus;
+  editable: boolean;
+  /** @nullable */
+  bookingId?: string | null;
 }

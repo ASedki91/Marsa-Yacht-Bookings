@@ -61,7 +61,9 @@ export default function ReviewScreen() {
           </Text>
           <Pressable
             style={[styles.doneBtn, { backgroundColor: colors.light.navy }]}
-            onPress={() => router.replace("/(home)/(tabs)/bookings")}
+            onPress={() =>
+              router.replace("/(home)/guest/(tabs)/bookings" as any)
+            }
           >
             <Text style={styles.doneBtnText}>Back to Bookings</Text>
           </Pressable>

@@ -1,17 +1,31 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
-  View, Text, StyleSheet, FlatList, TextInput, Pressable,
-  ScrollView, RefreshControl, Platform, Modal,
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TextInput,
+  Pressable,
+  ScrollView,
+  RefreshControl,
+  Platform,
+  Modal,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useListYachts, useListCategories, useListBookingTemplates } from "@workspace/api-client-react";
+import {
+  useListYachts,
+  useListCategories,
+  useListBookingTemplates,
+  useListLocations,
+} from "@workspace/api-client-react";
 import { useColors } from "@/hooks/useColors";
 import { YachtCard } from "@/components/YachtCard";
 import { EmptyState } from "@/components/EmptyState";
 import { SkeletonYachtCard } from "@/components/SkeletonCard";
 import colors from "@/constants/colors";
+import { useWishlist } from "@/hooks/useWishlist";
 
 const SORT_OPTIONS = [
   { key: "newest", label: "Newest" },
@@ -30,18 +44,34 @@ const CAPACITY_OPTIONS = [
 ];
 
 const FEATURE_OPTIONS = [
-  "Air Conditioning", "Swimming Platform", "Snorkeling Gear", "Fishing Equipment",
-  "Bluetooth Sound System", "BBQ Grill", "GPS Navigation", "WiFi",
-  "Sun Deck", "Kitchenette", "Life Jackets",
+  "Air Conditioning",
+  "Swimming Platform",
+  "Snorkeling Gear",
+  "Fishing Equipment",
+  "Bluetooth Sound System",
+  "BBQ Grill",
+  "GPS Navigation",
+  "WiFi",
+  "Sun Deck",
+  "Kitchenette",
+  "Life Jackets",
 ];
 
 function formatDateLabel(dateStr: string): string {
   const today = new Date();
   const d = new Date(dateStr + "T12:00:00");
-  const diff = Math.round((d.getTime() - new Date(today.toISOString().slice(0, 10) + "T12:00:00").getTime()) / 86400000);
+  const diff = Math.round(
+    (d.getTime() -
+      new Date(today.toISOString().slice(0, 10) + "T12:00:00").getTime()) /
+      86400000,
+  );
   if (diff === 0) return "Today";
   if (diff === 1) return "Tomorrow";
-  return d.toLocaleDateString("en-EG", { weekday: "short", month: "short", day: "numeric" });
+  return d.toLocaleDateString("en-EG", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function buildDateOptions(): { label: string; value: string }[] {
@@ -91,26 +121,46 @@ function FilterModal({
   const dateOptions = buildDateOptions();
 
   const reset = () => setDraft(DEFAULT_FILTERS);
-  const apply = () => { onApply(draft); onClose(); };
+  const apply = () => {
+    onApply(draft);
+    onClose();
+  };
 
   const toggleFeature = (f: string) => {
     setDraft((d) => ({
       ...d,
-      features: d.features.includes(f) ? d.features.filter((x) => x !== f) : [...d.features, f],
+      features: d.features.includes(f)
+        ? d.features.filter((x) => x !== f)
+        : [...d.features, f],
     }));
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
       <View style={[fStyles.container, { backgroundColor: c.background }]}>
         <View style={[fStyles.header, { borderBottomColor: c.border }]}>
-          <Pressable onPress={onClose}><Text style={[fStyles.cancel, { color: c.primary }]}>Cancel</Text></Pressable>
-          <Text style={[fStyles.title, { color: c.foreground }]}>Filter & Sort</Text>
-          <Pressable onPress={reset}><Text style={[fStyles.reset, { color: c.mutedForeground }]}>Reset</Text></Pressable>
+          <Pressable onPress={onClose}>
+            <Text style={[fStyles.cancel, { color: c.primary }]}>Cancel</Text>
+          </Pressable>
+          <Text style={[fStyles.title, { color: c.foreground }]}>
+            Filter & Sort
+          </Text>
+          <Pressable onPress={reset}>
+            <Text style={[fStyles.reset, { color: c.mutedForeground }]}>
+              Reset
+            </Text>
+          </Pressable>
         </View>
 
         <ScrollView contentContainerStyle={fStyles.content}>
-          <Text style={[fStyles.sectionTitle, { color: c.foreground }]}>Sort By</Text>
+          <Text style={[fStyles.sectionTitle, { color: c.foreground }]}>
+            Sort By
+          </Text>
           <View style={fStyles.sortOptions}>
             {SORT_OPTIONS.map((opt) => (
               <Pressable
@@ -118,23 +168,43 @@ function FilterModal({
                 style={[
                   fStyles.sortOption,
                   {
-                    backgroundColor: draft.sort === opt.key ? colors.light.navy + "15" : c.card,
-                    borderColor: draft.sort === opt.key ? colors.light.navy : c.border,
+                    backgroundColor:
+                      draft.sort === opt.key
+                        ? colors.light.navy + "15"
+                        : c.card,
+                    borderColor:
+                      draft.sort === opt.key ? colors.light.navy : c.border,
                   },
                 ]}
                 onPress={() => setDraft((d) => ({ ...d, sort: opt.key }))}
               >
                 {draft.sort === opt.key && (
-                  <Ionicons name="checkmark-circle" size={16} color={colors.light.navy} />
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={16}
+                    color={colors.light.navy}
+                  />
                 )}
-                <Text style={[fStyles.sortLabel, { color: draft.sort === opt.key ? colors.light.navy : c.foreground }]}>
+                <Text
+                  style={[
+                    fStyles.sortLabel,
+                    {
+                      color:
+                        draft.sort === opt.key
+                          ? colors.light.navy
+                          : c.foreground,
+                    },
+                  ]}
+                >
                   {opt.label}
                 </Text>
               </Pressable>
             ))}
           </View>
 
-          <Text style={[fStyles.sectionTitle, { color: c.foreground }]}>Date</Text>
+          <Text style={[fStyles.sectionTitle, { color: c.foreground }]}>
+            Date
+          </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={fStyles.chipRow}>
               <Pressable
@@ -147,7 +217,12 @@ function FilterModal({
                 ]}
                 onPress={() => setDraft((d) => ({ ...d, date: "" }))}
               >
-                <Text style={[fStyles.dateChipText, { color: !draft.date ? "#fff" : c.foreground }]}>
+                <Text
+                  style={[
+                    fStyles.dateChipText,
+                    { color: !draft.date ? "#fff" : c.foreground },
+                  ]}
+                >
                   Any Date
                 </Text>
               </Pressable>
@@ -157,13 +232,22 @@ function FilterModal({
                   style={[
                     fStyles.dateChip,
                     {
-                      backgroundColor: draft.date === opt.value ? colors.light.navy : c.card,
-                      borderColor: draft.date === opt.value ? colors.light.navy : c.border,
+                      backgroundColor:
+                        draft.date === opt.value ? colors.light.navy : c.card,
+                      borderColor:
+                        draft.date === opt.value ? colors.light.navy : c.border,
                     },
                   ]}
                   onPress={() => setDraft((d) => ({ ...d, date: opt.value }))}
                 >
-                  <Text style={[fStyles.dateChipText, { color: draft.date === opt.value ? "#fff" : c.foreground }]}>
+                  <Text
+                    style={[
+                      fStyles.dateChipText,
+                      {
+                        color: draft.date === opt.value ? "#fff" : c.foreground,
+                      },
+                    ]}
+                  >
                     {opt.label}
                   </Text>
                 </Pressable>
@@ -173,19 +257,30 @@ function FilterModal({
 
           {templates.length > 0 && (
             <>
-              <Text style={[fStyles.sectionTitle, { color: c.foreground }]}>Duration</Text>
+              <Text style={[fStyles.sectionTitle, { color: c.foreground }]}>
+                Duration
+              </Text>
               <View style={fStyles.chipRow}>
                 <Pressable
                   style={[
                     fStyles.templateChip,
                     {
-                      backgroundColor: !draft.templateId ? colors.light.navy : c.card,
-                      borderColor: !draft.templateId ? colors.light.navy : c.border,
+                      backgroundColor: !draft.templateId
+                        ? colors.light.navy
+                        : c.card,
+                      borderColor: !draft.templateId
+                        ? colors.light.navy
+                        : c.border,
                     },
                   ]}
                   onPress={() => setDraft((d) => ({ ...d, templateId: "" }))}
                 >
-                  <Text style={[fStyles.dateChipText, { color: !draft.templateId ? "#fff" : c.foreground }]}>
+                  <Text
+                    style={[
+                      fStyles.dateChipText,
+                      { color: !draft.templateId ? "#fff" : c.foreground },
+                    ]}
+                  >
                     Any
                   </Text>
                 </Pressable>
@@ -195,13 +290,29 @@ function FilterModal({
                     style={[
                       fStyles.templateChip,
                       {
-                        backgroundColor: draft.templateId === t.id ? colors.light.navy : c.card,
-                        borderColor: draft.templateId === t.id ? colors.light.navy : c.border,
+                        backgroundColor:
+                          draft.templateId === t.id
+                            ? colors.light.navy
+                            : c.card,
+                        borderColor:
+                          draft.templateId === t.id
+                            ? colors.light.navy
+                            : c.border,
                       },
                     ]}
-                    onPress={() => setDraft((d) => ({ ...d, templateId: t.id }))}
+                    onPress={() =>
+                      setDraft((d) => ({ ...d, templateId: t.id }))
+                    }
                   >
-                    <Text style={[fStyles.dateChipText, { color: draft.templateId === t.id ? "#fff" : c.foreground }]}>
+                    <Text
+                      style={[
+                        fStyles.dateChipText,
+                        {
+                          color:
+                            draft.templateId === t.id ? "#fff" : c.foreground,
+                        },
+                      ]}
+                    >
                       {t.name}
                     </Text>
                   </Pressable>
@@ -210,7 +321,9 @@ function FilterModal({
             </>
           )}
 
-          <Text style={[fStyles.sectionTitle, { color: c.foreground }]}>Minimum Capacity</Text>
+          <Text style={[fStyles.sectionTitle, { color: c.foreground }]}>
+            Minimum Capacity
+          </Text>
           <View style={fStyles.capacityRow}>
             {CAPACITY_OPTIONS.map((opt) => (
               <Pressable
@@ -218,24 +331,51 @@ function FilterModal({
                 style={[
                   fStyles.capacityChip,
                   {
-                    backgroundColor: draft.minCapacity === opt.value ? colors.light.navy : c.muted,
-                    borderColor: draft.minCapacity === opt.value ? colors.light.navy : c.border,
+                    backgroundColor:
+                      draft.minCapacity === opt.value
+                        ? colors.light.navy
+                        : c.muted,
+                    borderColor:
+                      draft.minCapacity === opt.value
+                        ? colors.light.navy
+                        : c.border,
                   },
                 ]}
-                onPress={() => setDraft((d) => ({ ...d, minCapacity: opt.value }))}
+                onPress={() =>
+                  setDraft((d) => ({ ...d, minCapacity: opt.value }))
+                }
               >
-                <Text style={[fStyles.capacityText, { color: draft.minCapacity === opt.value ? "#fff" : c.foreground }]}>
+                <Text
+                  style={[
+                    fStyles.capacityText,
+                    {
+                      color:
+                        draft.minCapacity === opt.value ? "#fff" : c.foreground,
+                    },
+                  ]}
+                >
                   {opt.label}
                 </Text>
               </Pressable>
             ))}
           </View>
 
-          <Text style={[fStyles.sectionTitle, { color: c.foreground }]}>Max Price (EGP)</Text>
+          <Text style={[fStyles.sectionTitle, { color: c.foreground }]}>
+            Max Price (EGP)
+          </Text>
           <TextInput
-            style={[fStyles.priceInput, { backgroundColor: c.input, color: c.foreground, borderColor: c.border }]}
+            style={[
+              fStyles.priceInput,
+              {
+                backgroundColor: c.input,
+                color: c.foreground,
+                borderColor: c.border,
+              },
+            ]}
             value={draft.maxPriceEgp}
-            onChangeText={(v) => setDraft((d) => ({ ...d, maxPriceEgp: v.replace(/[^0-9]/g, "") }))}
+            onChangeText={(v) =>
+              setDraft((d) => ({ ...d, maxPriceEgp: v.replace(/[^0-9]/g, "") }))
+            }
             placeholder="No limit"
             placeholderTextColor={c.mutedForeground}
             keyboardType="numeric"
@@ -244,7 +384,9 @@ function FilterModal({
             Per booking (based on the shortest available slot)
           </Text>
 
-          <Text style={[fStyles.sectionTitle, { color: c.foreground }]}>Features & Amenities</Text>
+          <Text style={[fStyles.sectionTitle, { color: c.foreground }]}>
+            Features & Amenities
+          </Text>
           <View style={fStyles.featuresGrid}>
             {FEATURE_OPTIONS.map((f) => (
               <Pressable
@@ -252,16 +394,33 @@ function FilterModal({
                 style={[
                   fStyles.featureChip,
                   {
-                    backgroundColor: draft.features.includes(f) ? colors.light.navy + "15" : c.card,
-                    borderColor: draft.features.includes(f) ? colors.light.navy : c.border,
+                    backgroundColor: draft.features.includes(f)
+                      ? colors.light.navy + "15"
+                      : c.card,
+                    borderColor: draft.features.includes(f)
+                      ? colors.light.navy
+                      : c.border,
                   },
                 ]}
                 onPress={() => toggleFeature(f)}
               >
                 {draft.features.includes(f) && (
-                  <Ionicons name="checkmark-circle" size={13} color={colors.light.navy} />
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={13}
+                    color={colors.light.navy}
+                  />
                 )}
-                <Text style={[fStyles.featureChipText, { color: draft.features.includes(f) ? colors.light.navy : c.foreground }]}>
+                <Text
+                  style={[
+                    fStyles.featureChipText,
+                    {
+                      color: draft.features.includes(f)
+                        ? colors.light.navy
+                        : c.foreground,
+                    },
+                  ]}
+                >
                   {f}
                 </Text>
               </Pressable>
@@ -270,7 +429,10 @@ function FilterModal({
         </ScrollView>
 
         <View style={[fStyles.footer, { borderTopColor: c.border }]}>
-          <Pressable style={[fStyles.applyBtn, { backgroundColor: colors.light.navy }]} onPress={apply}>
+          <Pressable
+            style={[fStyles.applyBtn, { backgroundColor: colors.light.navy }]}
+            onPress={apply}
+          >
             <Text style={fStyles.applyBtnText}>Apply Filters</Text>
           </Pressable>
         </View>
@@ -281,40 +443,97 @@ function FilterModal({
 
 const fStyles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 16, borderBottomWidth: 1 },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+  },
   title: { fontSize: 17, fontFamily: "Inter_700Bold" },
   cancel: { fontSize: 15, fontFamily: "Inter_400Regular" },
   reset: { fontSize: 15, fontFamily: "Inter_400Regular" },
   content: { padding: 20, gap: 16 },
   sectionTitle: { fontSize: 15, fontFamily: "Inter_700Bold" },
   sortOptions: { gap: 8 },
-  sortOption: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 12, borderWidth: 1 },
+  sortOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
   sortLabel: { fontSize: 14, fontFamily: "Inter_400Regular" },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  dateChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, marginRight: 2 },
+  dateChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginRight: 2,
+  },
   dateChipText: { fontSize: 13, fontFamily: "Inter_500Medium" },
-  templateChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
+  templateChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
   capacityRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  capacityChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
+  capacityChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
   capacityText: { fontSize: 13, fontFamily: "Inter_500Medium" },
-  priceInput: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontFamily: "Inter_400Regular" },
+  priceInput: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+  },
   priceNote: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: -8 },
   featuresGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  featureChip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  featureChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
   featureChipText: { fontSize: 12, fontFamily: "Inter_400Regular" },
   footer: { padding: 16, borderTopWidth: 1 },
   applyBtn: { borderRadius: 14, paddingVertical: 15, alignItems: "center" },
-  applyBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  applyBtnText: {
+    color: "#fff",
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+  },
 });
 
 function sortYachts(yachts: any[], sort: string): any[] {
   const arr = [...yachts];
   switch (sort) {
-    case "price_asc": return arr.sort((a, b) => Number(a.basePriceEgp ?? 0) - Number(b.basePriceEgp ?? 0));
-    case "price_desc": return arr.sort((a, b) => Number(b.basePriceEgp ?? 0) - Number(a.basePriceEgp ?? 0));
-    case "capacity_asc": return arr.sort((a, b) => (a.capacity ?? 0) - (b.capacity ?? 0));
-    case "capacity_desc": return arr.sort((a, b) => (b.capacity ?? 0) - (a.capacity ?? 0));
-    default: return arr;
+    case "price_asc":
+      return arr.sort(
+        (a, b) => Number(a.basePriceEgp ?? 0) - Number(b.basePriceEgp ?? 0),
+      );
+    case "price_desc":
+      return arr.sort(
+        (a, b) => Number(b.basePriceEgp ?? 0) - Number(a.basePriceEgp ?? 0),
+      );
+    case "capacity_asc":
+      return arr.sort((a, b) => (a.capacity ?? 0) - (b.capacity ?? 0));
+    case "capacity_desc":
+      return arr.sort((a, b) => (b.capacity ?? 0) - (a.capacity ?? 0));
+    default:
+      return arr;
   }
 }
 
@@ -322,47 +541,89 @@ export default function ExploreScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    locationId?: string | string[];
+    date?: string | string[];
+    intent?: string | string[];
+  }>();
+  const routeLocationId = Array.isArray(params.locationId)
+    ? params.locationId[0]
+    : params.locationId;
+  const routeDate = Array.isArray(params.date) ? params.date[0] : params.date;
   const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
+  const [selectedCategory, setSelectedCategory] = useState<
+    string | undefined
+  >();
+  const [selectedLocationId, setSelectedLocationId] = useState<
+    string | undefined
+  >(routeLocationId);
   const [refreshing, setRefreshing] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
-  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<FilterState>({
+    ...DEFAULT_FILTERS,
+    date: routeDate ?? "",
+  });
   const [layout, setLayout] = useState<"list" | "grid">("list");
+  const wishlist = useWishlist();
 
   const { data: categoriesData } = useListCategories();
   const { data: templatesData } = useListBookingTemplates();
+  const { data: locationsData } = useListLocations();
   const categories = (categoriesData as any)?.categories ?? [];
   const templates = (templatesData as any)?.templates ?? [];
+  const locations = (locationsData as any)?.locations ?? [];
+  const selectedLocation = locations.find(
+    (location: any) => location.id === selectedLocationId,
+  );
+
+  useEffect(() => {
+    setSelectedLocationId(routeLocationId);
+  }, [routeLocationId]);
+
+  useEffect(() => {
+    if (!routeDate) return;
+    setFilters((current) => ({ ...current, date: routeDate }));
+  }, [routeDate]);
 
   const { data, isLoading, error, refetch } = useListYachts({
     limit: 40,
     categoryId: selectedCategory,
     date: filters.date || undefined,
     templateId: filters.templateId || undefined,
-    features: filters.features.length > 0 ? filters.features.join(",") : undefined,
+    features:
+      filters.features.length > 0 ? filters.features.join(",") : undefined,
     capacity: filters.minCapacity > 0 ? filters.minCapacity : undefined,
     maxPrice: filters.maxPriceEgp ? Number(filters.maxPriceEgp) : undefined,
+    locationId: selectedLocationId,
+    intent: "rent",
   } as any);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refetch();
+      void wishlist.refetch();
+    }, [refetch, wishlist.refetch]),
+  );
 
   const yachts = (data as any)?.yachts ?? [];
 
-  const hasFilters = (
+  const hasFilters =
     filters.sort !== "newest" ||
     filters.minCapacity > 0 ||
     !!filters.maxPriceEgp ||
     !!filters.date ||
     !!filters.templateId ||
-    filters.features.length > 0
-  );
+    filters.features.length > 0;
 
   const filtered = (() => {
     let arr = [...yachts];
     if (search.trim()) {
       const q = search.toLowerCase();
-      arr = arr.filter((y: any) =>
-        (y.title ?? y.name ?? "").toLowerCase().includes(q) ||
-        y.description?.toLowerCase().includes(q) ||
-        y.location?.toLowerCase().includes(q)
+      arr = arr.filter(
+        (y: any) =>
+          (y.title ?? y.name ?? "").toLowerCase().includes(q) ||
+          y.description?.toLowerCase().includes(q) ||
+          y.location?.toLowerCase().includes(q),
       );
     }
     return sortYachts(arr, filters.sort);
@@ -377,13 +638,18 @@ export default function ExploreScreen() {
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   const activeFilterLabels = [
-    filters.sort !== "newest" && SORT_OPTIONS.find((s) => s.key === filters.sort)?.label,
+    filters.sort !== "newest" &&
+      SORT_OPTIONS.find((s) => s.key === filters.sort)?.label,
     filters.date && formatDateLabel(filters.date),
-    filters.templateId && templates.find((t: any) => t.id === filters.templateId)?.name,
+    filters.templateId &&
+      templates.find((t: any) => t.id === filters.templateId)?.name,
     filters.minCapacity > 0 && `${filters.minCapacity}+ guests`,
     filters.maxPriceEgp && `≤ EGP ${filters.maxPriceEgp}`,
-    filters.features.length > 0 && `${filters.features.length} feature${filters.features.length > 1 ? "s" : ""}`,
-  ].filter(Boolean).join(" · ");
+    filters.features.length > 0 &&
+      `${filters.features.length} feature${filters.features.length > 1 ? "s" : ""}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
@@ -395,20 +661,61 @@ export default function ExploreScreen() {
         onClose={() => setShowFilter(false)}
       />
 
-      <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: c.background, borderBottomColor: c.border }]}>
+      <View
+        style={[
+          styles.header,
+          {
+            paddingTop: topPad + 12,
+            backgroundColor: c.background,
+            borderBottomColor: c.border,
+          },
+        ]}
+      >
         <View style={styles.headerTop}>
           <View>
-            <Text style={[styles.greeting, { color: c.mutedForeground }]}>El Gouna, Egypt</Text>
-            <Text style={[styles.title, { color: c.foreground }]}>Find Your Yacht</Text>
+            <Pressable
+              onPress={() => router.push("/(home)/guest/(tabs)/home" as any)}
+              style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+            >
+              <Ionicons
+                name="location-outline"
+                size={13}
+                color={c.mutedForeground}
+              />
+              <Text style={[styles.greeting, { color: c.mutedForeground }]}>
+                {selectedLocation
+                  ? `${selectedLocation.name}, ${selectedLocation.country}`
+                  : "All locations"}
+              </Text>
+              <Ionicons
+                name="chevron-down"
+                size={12}
+                color={c.mutedForeground}
+              />
+            </Pressable>
+            <Text style={[styles.title, { color: c.foreground }]}>
+              Find Your Yacht
+            </Text>
           </View>
-          <View style={[styles.logoBox, { backgroundColor: colors.light.navy }]}>
+          <View
+            style={[styles.logoBox, { backgroundColor: colors.light.navy }]}
+          >
             <Ionicons name="boat" size={22} color={colors.light.gold} />
           </View>
         </View>
 
         <View style={styles.searchRow}>
-          <View style={[styles.searchBar, { backgroundColor: c.input, borderColor: c.border, flex: 1 }]}>
-            <Ionicons name="search-outline" size={18} color={c.mutedForeground} />
+          <View
+            style={[
+              styles.searchBar,
+              { backgroundColor: c.input, borderColor: c.border, flex: 1 },
+            ]}
+          >
+            <Ionicons
+              name="search-outline"
+              size={18}
+              color={c.mutedForeground}
+            />
             <TextInput
               style={[styles.searchInput, { color: c.foreground }]}
               placeholder="Search yachts..."
@@ -418,22 +725,43 @@ export default function ExploreScreen() {
             />
             {search.length > 0 && (
               <Pressable onPress={() => setSearch("")}>
-                <Ionicons name="close-circle" size={18} color={c.mutedForeground} />
+                <Ionicons
+                  name="close-circle"
+                  size={18}
+                  color={c.mutedForeground}
+                />
               </Pressable>
             )}
           </View>
           <Pressable
-            style={[styles.filterBtn, { backgroundColor: hasFilters ? colors.light.navy : c.card, borderColor: c.border }]}
+            style={[
+              styles.filterBtn,
+              {
+                backgroundColor: hasFilters ? colors.light.navy : c.card,
+                borderColor: c.border,
+              },
+            ]}
             onPress={() => setShowFilter(true)}
           >
-            <Ionicons name="options-outline" size={18} color={hasFilters ? "#fff" : c.foreground} />
+            <Ionicons
+              name="options-outline"
+              size={18}
+              color={hasFilters ? "#fff" : c.foreground}
+            />
             {hasFilters && <View style={styles.filterDot} />}
           </Pressable>
           <Pressable
-            style={[styles.filterBtn, { backgroundColor: c.card, borderColor: c.border }]}
-            onPress={() => setLayout((l) => l === "list" ? "grid" : "list")}
+            style={[
+              styles.filterBtn,
+              { backgroundColor: c.card, borderColor: c.border },
+            ]}
+            onPress={() => setLayout((l) => (l === "list" ? "grid" : "list"))}
           >
-            <Ionicons name={layout === "list" ? "grid-outline" : "list-outline"} size={18} color={c.foreground} />
+            <Ionicons
+              name={layout === "list" ? "grid-outline" : "list-outline"}
+              size={18}
+              color={c.foreground}
+            />
           </Pressable>
         </View>
 
@@ -446,22 +774,55 @@ export default function ExploreScreen() {
             <Pressable
               style={[
                 styles.categoryChip,
-                !selectedCategory ? { backgroundColor: colors.light.navy } : { backgroundColor: c.muted, borderColor: c.border, borderWidth: 1 },
+                !selectedCategory
+                  ? { backgroundColor: colors.light.navy }
+                  : {
+                      backgroundColor: c.muted,
+                      borderColor: c.border,
+                      borderWidth: 1,
+                    },
               ]}
               onPress={() => setSelectedCategory(undefined)}
             >
-              <Text style={[styles.categoryText, { color: !selectedCategory ? "#fff" : c.mutedForeground }]}>All</Text>
+              <Text
+                style={[
+                  styles.categoryText,
+                  { color: !selectedCategory ? "#fff" : c.mutedForeground },
+                ]}
+              >
+                All
+              </Text>
             </Pressable>
             {categories.map((cat: any) => (
               <Pressable
                 key={cat.id}
                 style={[
                   styles.categoryChip,
-                  selectedCategory === cat.id ? { backgroundColor: colors.light.navy } : { backgroundColor: c.muted, borderColor: c.border, borderWidth: 1 },
+                  selectedCategory === cat.id
+                    ? { backgroundColor: colors.light.navy }
+                    : {
+                        backgroundColor: c.muted,
+                        borderColor: c.border,
+                        borderWidth: 1,
+                      },
                 ]}
-                onPress={() => setSelectedCategory((prev) => (prev === cat.id ? undefined : cat.id))}
+                onPress={() =>
+                  setSelectedCategory((prev) =>
+                    prev === cat.id ? undefined : cat.id,
+                  )
+                }
               >
-                <Text style={[styles.categoryText, { color: selectedCategory === cat.id ? "#fff" : c.mutedForeground }]}>
+                <Text
+                  style={[
+                    styles.categoryText,
+                    {
+                      color:
+                        selectedCategory === cat.id
+                          ? "#fff"
+                          : c.mutedForeground,
+                    },
+                  ]}
+                >
                   {cat.name}
                 </Text>
               </Pressable>
@@ -472,10 +833,16 @@ export default function ExploreScreen() {
         {hasFilters && (
           <View style={styles.activeFilters}>
             <Ionicons name="funnel-outline" size={13} color={c.primary} />
-            <Text style={[styles.activeFiltersText, { color: c.primary }]} numberOfLines={1}>
+            <Text
+              style={[styles.activeFiltersText, { color: c.primary }]}
+              numberOfLines={1}
+            >
               {activeFilterLabels}
             </Text>
-            <Pressable onPress={() => setFilters(DEFAULT_FILTERS)} style={styles.clearFilters}>
+            <Pressable
+              onPress={() => setFilters(DEFAULT_FILTERS)}
+              style={styles.clearFilters}
+            >
               <Ionicons name="close-circle" size={14} color={c.primary} />
             </Pressable>
           </View>
@@ -484,7 +851,9 @@ export default function ExploreScreen() {
 
       {isLoading ? (
         <View style={styles.list}>
-          {[1, 2, 3].map((i) => <SkeletonYachtCard key={i} />)}
+          {[1, 2, 3].map((i) => (
+            <SkeletonYachtCard key={i} />
+          ))}
         </View>
       ) : error ? (
         <EmptyState
@@ -498,7 +867,11 @@ export default function ExploreScreen() {
         <EmptyState
           icon="boat-outline"
           title="No yachts found"
-          subtitle={search || hasFilters ? "Try different search terms or filters" : "No yachts available right now"}
+          subtitle={
+            search || hasFilters
+              ? "Try different search terms or filters"
+              : "No yachts available right now"
+          }
           actionLabel={hasFilters ? "Clear Filters" : undefined}
           onAction={hasFilters ? () => setFilters(DEFAULT_FILTERS) : undefined}
         />
@@ -514,6 +887,11 @@ export default function ExploreScreen() {
                 yacht={item}
                 onPress={() => router.push(`/(home)/yacht/${item.id}`)}
                 compact={layout === "grid"}
+                wishlisted={wishlist.ids.has(item.id)}
+                wishlistPending={wishlist.isPending(item.id)}
+                onToggleWishlist={() =>
+                  wishlist.toggle(item.id).catch(() => {})
+                }
               />
             </View>
           )}
@@ -524,11 +902,16 @@ export default function ExploreScreen() {
           showsVerticalScrollIndicator={false}
           scrollEnabled={filtered.length > 0}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={c.primary}
+            />
           }
           ListHeaderComponent={
             <Text style={[styles.resultCount, { color: c.mutedForeground }]}>
-              {filtered.length} yacht{filtered.length !== 1 ? "s" : ""} available
+              {filtered.length} yacht{filtered.length !== 1 ? "s" : ""}{" "}
+              available
             </Text>
           }
         />
@@ -539,23 +922,79 @@ export default function ExploreScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, gap: 12 },
-  headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  header: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    gap: 12,
+  },
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   greeting: { fontSize: 13, fontFamily: "Inter_400Regular" },
   title: { fontSize: 26, fontFamily: "Inter_700Bold" },
-  logoBox: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  logoBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   searchRow: { flexDirection: "row", gap: 8, alignItems: "center" },
-  searchBar: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11 },
-  searchInput: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular", paddingVertical: 0 },
-  filterBtn: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  filterDot: { position: "absolute", top: 8, right: 8, width: 7, height: 7, borderRadius: 4, backgroundColor: colors.light.gold },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    paddingVertical: 0,
+  },
+  filterBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterDot: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: colors.light.gold,
+  },
   categories: { gap: 8, paddingVertical: 2 },
-  categoryChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 100 },
+  categoryChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 100,
+  },
   categoryText: { fontSize: 13, fontFamily: "Inter_500Medium" },
-  activeFilters: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 2 },
+  activeFilters: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 2,
+  },
   activeFiltersText: { flex: 1, fontSize: 12, fontFamily: "Inter_400Regular" },
   clearFilters: { padding: 2 },
   list: { padding: 16, gap: 12 },
   gridItem: { flex: 1, margin: 4 },
-  resultCount: { fontSize: 12, fontFamily: "Inter_400Regular", marginBottom: 4 },
+  resultCount: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    marginBottom: 4,
+  },
 });

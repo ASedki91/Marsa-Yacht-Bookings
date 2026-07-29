@@ -19,14 +19,46 @@ import {
   useListAddOns,
   useGetYachtSlots,
   useCreateBooking,
+  useGetCurrentCancellationPolicy,
 } from "@workspace/api-client-react";
-import { useStripe } from "@stripe/stripe-react-native";
+import { useStripe } from "@/lib/stripe";
 import { useColors } from "@/hooks/useColors";
 import { useUser } from "@/contexts/UserContext";
+import { usePaymentConfig } from "@/contexts/PaymentConfigContext";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import colors from "@/constants/colors";
 
 const STEPS = ["Duration", "Date & Time", "Add-ons", "Details", "Payment"];
+
+function formatWindow(minutes: number) {
+  if (minutes % 1440 === 0) {
+    const days = minutes / 1440;
+    return `${days} day${days === 1 ? "" : "s"}`;
+  }
+  if (minutes % 60 === 0) {
+    const hours = minutes / 60;
+    return `${hours} hour${hours === 1 ? "" : "s"}`;
+  }
+  return `${minutes} minutes`;
+}
+
+function policyRuleLabels(rules: any[]) {
+  const ordered = [...rules].sort(
+    (left, right) =>
+      right.minimumMinutesBeforeTrip - left.minimumMinutesBeforeTrip,
+  );
+  return ordered.map((rule, index) => {
+    const threshold = rule.minimumMinutesBeforeTrip;
+    const previous = ordered[index - 1]?.minimumMinutesBeforeTrip;
+    const range =
+      index === 0
+        ? `${formatWindow(threshold)} or more before departure`
+        : threshold === 0
+          ? `Less than ${formatWindow(previous)} before departure`
+          : `${formatWindow(threshold)} to less than ${formatWindow(previous)} before departure`;
+    return { ...rule, range };
+  });
+}
 
 function StepIndicator({ current, total }: { current: number; total: number }) {
   const c = useColors();
@@ -82,6 +114,8 @@ export default function BookScreen() {
   const router = useRouter();
 
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const { config: paymentConfig, isLoading: paymentConfigLoading } =
+    usePaymentConfig();
   const { user } = useUser();
   const [step, setStep] = useState(0);
   const [payError, setPayError] = useState<string | null>(null);
@@ -101,6 +135,9 @@ export default function BookScreen() {
   const [guestEmail, setGuestEmail] = useState("");
   const [specialNote, setSpecialNote] = useState("");
   const [booking, setBooking] = useState<any>(null);
+  const [paymentResult, setPaymentResult] = useState<any>(null);
+  const [cancellationTerms, setCancellationTerms] = useState<any>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   React.useEffect(() => {
     if (user?.name) setGuestName(user.name);
@@ -111,6 +148,7 @@ export default function BookScreen() {
   const { data: templatesData, isLoading: templatesLoading } = useListBookingTemplates();
   const { data: addOnsData } = useListAddOns();
   const createBooking = useCreateBooking();
+  const cancellationPolicyQuery = useGetCurrentCancellationPolicy();
 
   const yacht = (yachtData as any) ?? null;
   const templates = (templatesData as any)?.templates ?? [];
@@ -160,6 +198,7 @@ export default function BookScreen() {
     try {
       const result = await createBooking.mutateAsync({
         data: {
+          slotId: selectedSlot.id,
           yachtId: id!,
           templateId: selectedTemplate.id,
           bookingDate: selectedDate,
@@ -170,17 +209,31 @@ export default function BookScreen() {
           guestEmail: guestEmail.trim(),
           specialRequests: specialNote.trim() || undefined,
           addOnIds: selectedAddOns.length > 0 ? selectedAddOns : undefined,
+          acceptedCancellationPolicyId: (cancellationPolicyQuery.data as any)?.id,
         },
       });
 
-      const { booking: createdBooking, clientSecret } = result as any;
+      const {
+        booking: createdBooking,
+        payment,
+        cancellationTerms: acceptedTerms,
+      } = result as any;
       setBooking(createdBooking);
+      setPaymentResult(payment);
+      setCancellationTerms(acceptedTerms);
 
-      if (clientSecret) {
+      if (
+        payment?.gateway === "stripe" &&
+        payment?.action?.type === "stripe_payment_sheet" &&
+        payment?.action?.clientSecret
+      ) {
         const { error: initError } = await initPaymentSheet({
           merchantDisplayName: "MARSA Charter",
-          paymentIntentClientSecret: clientSecret,
-          defaultBillingDetails: { name: "" },
+          paymentIntentClientSecret: payment.action.clientSecret,
+          defaultBillingDetails: {
+            name: guestName.trim(),
+            email: guestEmail.trim(),
+          },
           returnURL: "marsa://payment-complete",
         });
 
@@ -196,6 +249,11 @@ export default function BookScreen() {
           setPayError(sheetError.message ?? "Payment failed. Please try again.");
           return;
         }
+      } else if (payment?.status !== "succeeded") {
+        setPayError(
+          "The payment gateway did not complete checkout. Please try again.",
+        );
+        return;
       }
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -218,11 +276,14 @@ export default function BookScreen() {
   }, 0);
 
   const basePrice = selectedTemplate
-    ? (yacht?.pricing?.find((p: any) => p.templateId === selectedTemplate.id)?.priceEgp ??
+    ? (selectedSlot?.effectivePriceEgp ??
+       yacht?.pricing?.find((p: any) => p.templateId === selectedTemplate.id)?.priceEgp ??
        yacht?.basePriceEgp ?? 0)
     : 0;
 
   const totalPrice = parseFloat(String(basePrice)) + totalAddOnPrice;
+  const currentPolicy = cancellationPolicyQuery.data as any;
+  const currentPolicyRules = policyRuleLabels(currentPolicy?.rules ?? []);
 
   const canNext = (() => {
     switch (step) {
@@ -230,7 +291,13 @@ export default function BookScreen() {
       case 1: return !!selectedSlot;
       case 2: return true;
       case 3: return guestCount > 0 && guestName.trim().length >= 2 && guestPhone.trim().length >= 6 && guestEmail.trim().includes("@");
-      case 4: return true;
+      case 4:
+        return (
+          !paymentConfigLoading &&
+          paymentConfig.checkoutEnabled &&
+          !!cancellationPolicyQuery.data &&
+          termsAccepted
+        );
       default: return false;
     }
   })();
@@ -249,17 +316,28 @@ export default function BookScreen() {
           <View style={[styles.confirmBox, { backgroundColor: c.card, borderColor: c.border }]}>
             <Text style={[styles.confirmLabel, { color: c.mutedForeground }]}>Total Amount</Text>
             <Text style={[styles.confirmAmount, { color: c.foreground }]}>
-              EGP {totalPrice.toLocaleString("en-EG")}
+              EGP{" "}
+              {Number(booking.totalAmountEgp ?? totalPrice).toLocaleString(
+                "en-EG",
+              )}
             </Text>
             <Text style={[styles.confirmSub, { color: c.mutedForeground }]}>
-              Payment processed by Stripe — pending host confirmation
+              {paymentResult?.gateway === "test"
+                ? "Test payment approved — no card was charged"
+                : "Payment received — pending host confirmation"}
             </Text>
+            {!!cancellationTerms && (
+              <Text style={[styles.confirmSub, { color: c.mutedForeground }]}>
+                Cancellation terms: {cancellationTerms.policyName} v
+                {cancellationTerms.policyVersion}
+              </Text>
+            )}
           </View>
         )}
         <Pressable
           style={[styles.doneBtn, { backgroundColor: colors.light.navy }]}
           onPress={() => {
-            router.replace("/(home)/(tabs)/bookings");
+            router.replace("/(home)/guest/(tabs)/bookings" as any);
           }}
         >
           <Text style={styles.doneBtnText}>View My Bookings</Text>
@@ -393,24 +471,38 @@ export default function BookScreen() {
                 <Text style={[styles.slotsLabel, { color: c.foreground }]}>Available Slots</Text>
                 {slots.map((slot: any) => {
                   const startTime = slot.startTime?.slice(0, 5) ?? "";
-                  const endTime = slot.endTime?.slice(0, 5) ?? "";
                   return (
                     <Pressable
-                      key={slot.startTime}
+                      key={slot.id}
                       style={[
                         styles.slotCard,
                         {
                           backgroundColor: c.card,
-                          borderColor: selectedSlot?.startTime === slot.startTime ? colors.light.navy : c.border,
-                          borderWidth: selectedSlot?.startTime === slot.startTime ? 2 : 1,
+                          borderColor: selectedSlot?.id === slot.id ? colors.light.navy : c.border,
+                          borderWidth: selectedSlot?.id === slot.id ? 2 : 1,
                         },
                       ]}
                       onPress={() => setSelectedSlot(slot)}
                     >
-                      <Text style={[styles.slotTime, { color: c.foreground }]}>
-                        {startTime} — {endTime}
-                      </Text>
-                      {selectedSlot?.startTime === slot.startTime && (
+                      <View>
+                        <Text style={[styles.slotTime, { color: c.foreground }]}>
+                          {startTime}
+                        </Text>
+                        {!!slot.effectivePriceEgp && (
+                          <Text
+                            style={[
+                              styles.slotPrice,
+                              { color: c.mutedForeground },
+                            ]}
+                          >
+                            EGP{" "}
+                            {Number(slot.effectivePriceEgp).toLocaleString(
+                              "en-EG",
+                            )}
+                          </Text>
+                        )}
+                      </View>
+                      {selectedSlot?.id === slot.id && (
                         <Ionicons name="checkmark-circle" size={20} color={colors.light.navy} />
                       )}
                     </Pressable>
@@ -630,10 +722,112 @@ export default function BookScreen() {
               </View>
             </View>
 
-            <View style={[styles.stripeNote, { backgroundColor: "#EFF6FF", borderColor: "#BFDBFE" }]}>
-              <Ionicons name="lock-closed-outline" size={16} color={colors.light.ocean} />
-              <Text style={[styles.stripeText, { color: colors.light.ocean }]}>
-                Secured by Stripe. Your payment details are encrypted and safe.
+            <View
+              style={[
+                styles.policyCard,
+                { backgroundColor: c.card, borderColor: c.border },
+              ]}
+            >
+              <View style={styles.policyHeader}>
+                <View style={[styles.policyIcon, { backgroundColor: c.primary + "14" }]}>
+                  <Ionicons name="shield-checkmark-outline" size={20} color={c.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.policyTitle, { color: c.foreground }]}>
+                    Cancellation terms
+                  </Text>
+                  <Text style={[styles.policySubtitle, { color: c.mutedForeground }]}>
+                    {currentPolicy
+                      ? `${currentPolicy.name} · version ${currentPolicy.version}`
+                      : "No active policy is available"}
+                  </Text>
+                </View>
+              </View>
+
+              {cancellationPolicyQuery.isLoading ? (
+                <ActivityIndicator color={c.primary} />
+              ) : currentPolicyRules.length > 0 ? (
+                <View style={styles.policyRules}>
+                  {currentPolicyRules.map((rule) => (
+                    <View key={rule.id} style={styles.policyRule}>
+                      <View style={[styles.policyBullet, { backgroundColor: c.primary }]} />
+                      <Text style={[styles.policyRange, { color: c.mutedForeground }]}>
+                        {rule.range}
+                      </Text>
+                      <Text style={[styles.policyFee, { color: c.foreground }]}>
+                        {Number(rule.feePercentage).toLocaleString("en-EG", {
+                          maximumFractionDigits: 2,
+                        })}
+                        % fee
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={[styles.policyError, { color: c.destructive }]}>
+                  Booking is temporarily unavailable until MARSA activates a
+                  cancellation policy.
+                </Text>
+              )}
+
+              <Pressable
+                disabled={!currentPolicy}
+                onPress={() => setTermsAccepted((accepted) => !accepted)}
+                style={styles.acceptanceRow}
+              >
+                <Ionicons
+                  name={termsAccepted ? "checkbox" : "square-outline"}
+                  size={23}
+                  color={termsAccepted ? c.primary : c.mutedForeground}
+                />
+                <Text style={[styles.acceptanceText, { color: c.foreground }]}>
+                  I have reviewed and accept these cancellation terms.
+                </Text>
+              </Pressable>
+            </View>
+
+            <View
+              style={[
+                styles.stripeNote,
+                {
+                  backgroundColor:
+                    paymentConfig.gateway === "disabled" ? "#FEF2F2" : "#EFF6FF",
+                  borderColor:
+                    paymentConfig.gateway === "disabled" ? "#FECACA" : "#BFDBFE",
+                },
+              ]}
+            >
+              <Ionicons
+                name={
+                  paymentConfig.gateway === "test"
+                    ? "flask-outline"
+                    : paymentConfig.gateway === "stripe"
+                      ? "lock-closed-outline"
+                      : "pause-circle-outline"
+                }
+                size={17}
+                color={
+                  paymentConfig.gateway === "disabled"
+                    ? "#DC2626"
+                    : colors.light.ocean
+                }
+              />
+              <Text
+                style={[
+                  styles.stripeText,
+                  {
+                    color:
+                      paymentConfig.gateway === "disabled"
+                        ? "#B91C1C"
+                        : colors.light.ocean,
+                  },
+                ]}
+              >
+                {paymentConfig.gateway === "test"
+                  ? "Test checkout is active. No card details are needed and no money will be charged."
+                  : paymentConfig.gateway === "stripe"
+                    ? "Secure card checkout is enabled for this booking."
+                    : "Checkout is temporarily disabled. You can review the booking, but cannot submit payment yet."}
               </Text>
             </View>
           </View>
@@ -677,7 +871,13 @@ export default function BookScreen() {
           ) : (
             <>
               <Text style={styles.nextBtnText}>
-                {step === 4 ? "Confirm & Pay" : "Continue"}
+                {step === 4
+                  ? paymentConfig.gateway === "test"
+                    ? "Complete Test Booking"
+                    : paymentConfig.gateway === "disabled"
+                      ? "Checkout Unavailable"
+                      : "Confirm & Pay"
+                  : "Continue"}
               </Text>
               <Ionicons name="arrow-forward" size={16} color="#fff" />
             </>
@@ -737,6 +937,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   slotTime: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  slotPrice: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
   counterBox: { borderRadius: 14, borderWidth: 1, padding: 16, gap: 12 },
   counterLabel: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
   counter: { flexDirection: "row", alignItems: "center", gap: 20 },
@@ -771,6 +972,45 @@ const styles = StyleSheet.create({
   totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 10, borderTopWidth: 1 },
   totalLabel: { fontSize: 16, fontFamily: "Inter_700Bold" },
   totalAmount: { fontSize: 20, fontFamily: "Inter_700Bold" },
+  policyCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 15,
+    gap: 14,
+  },
+  policyHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
+  policyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  policyTitle: { fontSize: 15, fontFamily: "Inter_700Bold" },
+  policySubtitle: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
+  policyRules: { gap: 9 },
+  policyRule: { flexDirection: "row", alignItems: "center", gap: 7 },
+  policyBullet: { width: 6, height: 6, borderRadius: 3 },
+  policyRange: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 16,
+  },
+  policyFee: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  policyError: { fontSize: 12, fontFamily: "Inter_500Medium", lineHeight: 17 },
+  acceptanceRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+    paddingTop: 2,
+  },
+  acceptanceText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    lineHeight: 18,
+  },
   stripeNote: {
     flexDirection: "row",
     alignItems: "flex-start",
