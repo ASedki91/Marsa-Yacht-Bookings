@@ -43,7 +43,7 @@ export default function SignInScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const handleEmailSignIn = async () => {
-    if (!isLoaded) return;
+    if (!isLoaded || !signIn) return;
     setError(null);
     setLoading(true);
     try {
@@ -223,9 +223,9 @@ export default function SignInScreen() {
         </Link>
 
         <Pressable
-          style={[styles.primaryBtn, { backgroundColor: c.primary, opacity: (!email || !password || loading || !isLoaded) ? 0.6 : 1 }]}
+          style={[styles.primaryBtn, { backgroundColor: c.primary, opacity: (!email || !password || loading || !isLoaded || !signIn) ? 0.6 : 1 }]}
           onPress={handleEmailSignIn}
-          disabled={!email || !password || loading || !isLoaded}
+          disabled={!email || !password || loading || !isLoaded || !signIn}
         >
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Sign in</Text>}
         </Pressable>
