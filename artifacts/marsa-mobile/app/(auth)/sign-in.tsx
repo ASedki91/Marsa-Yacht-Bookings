@@ -29,7 +29,7 @@ export default function SignInScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const { signIn } = useSignIn();
+  const { signIn, errors: signInErrors, fetchStatus } = useSignIn();
   const { isLoaded } = useAuth();
   const { startSSOFlow } = useSSO();
 
@@ -42,12 +42,19 @@ export default function SignInScreen() {
   const [pendingVerification, setPendingVerification] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Show field-level Clerk errors in the banner when present
+  const clerkError =
+    (signInErrors as any)?.fields?.identifier?.message ??
+    (signInErrors as any)?.fields?.password?.message ??
+    null;
+
   const handleEmailSignIn = async () => {
     if (!isLoaded || !signIn) return;
     setError(null);
     setLoading(true);
     try {
-      const { error: pwError } = await signIn.password({ identifier: email, password });
+      // NOTE: Clerk Future API requires `emailAddress`, not `identifier`
+      const { error: pwError } = await signIn.password({ emailAddress: email, password });
       if (pwError) {
         setError((pwError as any)?.errors?.[0]?.longMessage ?? (pwError as any)?.message ?? "Sign in failed. Please try again.");
         return;
@@ -56,6 +63,15 @@ export default function SignInScreen() {
         await signIn.finalize();
         router.replace("/(home)" as any);
       } else if (signIn.status === "needs_second_factor") {
+        setPendingVerification(true);
+      } else if (signIn.status === "needs_client_trust") {
+        // Clerk needs additional trust verification — send email code
+        const emailFactor = (signIn as any).supportedSecondFactors?.find(
+          (f: any) => f.strategy === "email_code",
+        );
+        if (emailFactor) {
+          await (signIn as any).mfa.sendEmailCode();
+        }
         setPendingVerification(true);
       } else {
         setError("Sign in could not be completed. Please try again.");
@@ -68,11 +84,11 @@ export default function SignInScreen() {
   };
 
   const handleVerify = async () => {
-    if (!isLoaded) return;
+    if (!isLoaded || !signIn) return;
     setError(null);
     setLoading(true);
     try {
-      const { error: mfaError } = await signIn.mfa.verifyPhoneCode({ code });
+      const { error: mfaError } = await signIn.mfa.verifyEmailCode({ code });
       if (mfaError) {
         setError((mfaError as any)?.errors?.[0]?.longMessage ?? "Invalid code.");
         return;
@@ -179,10 +195,10 @@ export default function SignInScreen() {
           <View style={[styles.dividerLine, { backgroundColor: c.border }]} />
         </View>
 
-        {error ? (
+        {(error || clerkError) ? (
           <View style={[styles.errorBox, { backgroundColor: "#fef2f2", borderColor: "#fecaca" }]}>
             <Ionicons name="alert-circle-outline" size={16} color="#ef4444" />
-            <Text style={styles.errorText}>{error}</Text>
+            <Text style={styles.errorText}>{error ?? clerkError}</Text>
           </View>
         ) : null}
 

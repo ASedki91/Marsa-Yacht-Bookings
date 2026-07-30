@@ -18,7 +18,9 @@ const { isLoaded } = useAuth();   // Future hooks have NO isLoaded/setActive —
 Future API has no `isLoaded`/`setActive`. Every method returns `{ error: ClerkError | null }` (do NOT rely on try/catch alone — check `error`). After an awaited call, read `signIn.status` / `signUp.status` synchronously (canonical pattern). User-facing error text: `err?.errors?.[0]?.longMessage ?? err?.message ?? fallback`.
 
 ### Sign-in (email/password)
-`signIn.password({ identifier, password })` → if `signIn.status === "complete"` → `signIn.finalize()` (sets active session; `navigate` is optional). `needs_second_factor` → MFA via `signIn.mfa.verifyPhoneCode({ code })` (MFA/phone unsupported on Replit-managed Clerk, so effectively dead).
+`signIn.password({ emailAddress, password })` — MUST use `emailAddress`, NOT `identifier` (passing `identifier` silently omits the email; Clerk returns "identifier is invalid"). After call, read `signIn.status`: `"complete"` → `signIn.finalize()` (sets active session; `navigate` callback is optional for native). `"needs_second_factor"` → MFA phone (dead on Replit-managed Clerk). `"needs_client_trust"` → send email code via `signIn.mfa.sendEmailCode()` then verify with `signIn.mfa.verifyEmailCode({ code })`.
+
+`useSignIn()` also returns `{ errors, fetchStatus }` — `errors.fields.identifier.message` / `errors.fields.password.message` give field-level error text; `fetchStatus === 'fetching'` tracks in-flight state.
 
 ### Sign-up (email/password)
 `signUp.password({ emailAddress, password, unsafeMetadata? })` → `signUp.verifications.sendEmailCode()` → `signUp.verifications.verifyEmailCode({ code })` → if `complete` → `signUp.finalize()`.
