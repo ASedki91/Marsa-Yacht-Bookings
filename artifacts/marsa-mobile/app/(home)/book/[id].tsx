@@ -146,7 +146,8 @@ export default function BookScreen() {
   React.useEffect(() => {
     if (user?.name) setGuestName(user.name);
     if (user?.email) setGuestEmail(user.email);
-  }, [user?.name, user?.email]);
+    if (user?.phone) setGuestPhone(user.phone);
+  }, [user?.name, user?.email, user?.phone]);
 
   const { data: yachtData, isLoading: yachtLoading } = useGetYacht(id!);
   const { data: templatesData, isLoading: templatesLoading } = useListBookingTemplates();

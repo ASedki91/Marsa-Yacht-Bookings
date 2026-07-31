@@ -8,6 +8,8 @@ interface UserProfile {
   clerkId: string;
   email: string;
   name?: string;
+  phone?: string;
+  nationality?: string;
   role: string;
   avatarUrl?: string;
 }
@@ -40,6 +42,8 @@ async function fetchMe(token: string | null): Promise<UserProfile> {
     clerkId: raw.clerkId,
     email: raw.email,
     name: raw.fullName ?? raw.name ?? undefined,
+    phone: raw.phone ?? undefined,
+    nationality: raw.nationality ?? undefined,
     role: raw.role ?? "guest",
     avatarUrl: raw.avatarUrl ?? undefined,
   };
