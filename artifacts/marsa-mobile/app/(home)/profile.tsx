@@ -9,7 +9,9 @@ import {
   TextInput,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Image,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { useClerk, useAuth } from "@clerk/expo";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -106,17 +108,105 @@ export default function ProfileScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // Avatar upload state
+  const [localAvatarUri, setLocalAvatarUri] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
   const handleStartEditing = () => {
     setEditName(user?.name ?? "");
     setEditPhone(user?.phone ?? "");
     setEditNationality(user?.nationality ?? "");
+    setLocalAvatarUri(null);
     setSaveError(null);
     setIsEditing(true);
   };
 
   const handleCancelEditing = () => {
+    setLocalAvatarUri(null);
     setIsEditing(false);
     setSaveError(null);
+  };
+
+  const handlePickAvatar = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setSaveError("Photo library access is required to change your avatar.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets.length > 0) {
+        setLocalAvatarUri(result.assets[0].uri);
+        setSaveError(null);
+      }
+    } catch {
+      setSaveError("Could not open photo library. Please try again.");
+    }
+  };
+
+  /** Upload localAvatarUri via two-step GCS flow and return the public URL. */
+  const uploadAvatarAndGetUrl = async (localUri: string, token: string | null): Promise<string> => {
+    setIsUploadingAvatar(true);
+    try {
+      // Determine content type from URI extension
+      const ext = localUri.split(".").pop()?.toLowerCase() ?? "jpg";
+      const contentTypeMap: Record<string, string> = {
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        png: "image/png",
+        webp: "image/webp",
+        heic: "image/heic",
+      };
+      const contentType = contentTypeMap[ext] ?? "image/jpeg";
+      const fileName = `avatar.${ext}`;
+
+      // Fetch the image as a blob for size + upload
+      const imageResponse = await fetch(localUri);
+      const blob = await imageResponse.blob();
+
+      // Step 1: Request a presigned upload URL
+      const urlRes = await fetch(`${API_BASE_URL}/api/storage/uploads/request-url`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ name: fileName, size: blob.size, contentType }),
+      });
+      if (!urlRes.ok) throw new Error("Failed to request upload URL.");
+      const { uploadURL, objectPath } = await urlRes.json();
+
+      // Step 2: Upload binary directly to GCS
+      const uploadRes = await fetch(uploadURL, {
+        method: "PUT",
+        headers: { "Content-Type": contentType },
+        body: blob,
+      });
+      if (!uploadRes.ok) throw new Error("Failed to upload image.");
+
+      // Step 3: Finalize — set public ACL so the image can be served without auth
+      const finalizeRes = await fetch(`${API_BASE_URL}/api/storage/uploads/finalize`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ objectPath, visibility: "public" }),
+      });
+      if (!finalizeRes.ok) throw new Error("Failed to finalize upload.");
+
+      // Build the public URL (strip leading /objects/ prefix for the endpoint path)
+      const finalizedPath = (await finalizeRes.json()).objectPath as string;
+      const objectId = finalizedPath.replace(/^\/objects\//, "");
+      return `${API_BASE_URL}/api/storage/public-uploads/${objectId}`;
+    } finally {
+      setIsUploadingAvatar(false);
+    }
   };
 
   const handleSaveProfile = async () => {
@@ -128,6 +218,11 @@ export default function ProfileScreen() {
       if (editName.trim()) body.fullName = editName.trim();
       if (editPhone.trim()) body.phone = editPhone.trim();
       if (editNationality.trim()) body.nationality = editNationality.trim();
+
+      // Upload avatar if a new one was picked
+      if (localAvatarUri) {
+        body.avatarUrl = await uploadAvatarAndGetUrl(localAvatarUri, token);
+      }
 
       const res = await fetch(`${API_BASE_URL}/api/users/me`, {
         method: "PATCH",
@@ -144,6 +239,7 @@ export default function ProfileScreen() {
       }
 
       refetch();
+      setLocalAvatarUri(null);
       setIsEditing(false);
     } catch (err: any) {
       setSaveError(err?.message ?? "Could not save profile. Please try again.");
@@ -221,10 +317,31 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
 
-          {/* Avatar (non-editable) */}
-          <View style={[styles.avatar, { backgroundColor: colors.light.navy }]}>
-            <Text style={styles.avatarText}>{initials}</Text>
-          </View>
+          {/* Avatar — tappable to change photo */}
+          <Pressable
+            onPress={handlePickAvatar}
+            disabled={isUploadingAvatar || isSaving}
+            style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+          >
+            <View style={styles.avatarWrapper}>
+              {localAvatarUri ? (
+                <Image source={{ uri: localAvatarUri }} style={styles.avatarImage} />
+              ) : user?.avatarUrl ? (
+                <Image source={{ uri: user.avatarUrl }} style={styles.avatarImage} />
+              ) : (
+                <View style={[styles.avatar, { backgroundColor: colors.light.navy }]}>
+                  <Text style={styles.avatarText}>{initials}</Text>
+                </View>
+              )}
+              <View style={styles.avatarEditBadge}>
+                {isUploadingAvatar ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="camera" size={14} color="#fff" />
+                )}
+              </View>
+            </View>
+          </Pressable>
 
           {/* Error */}
           {saveError ? (
@@ -291,9 +408,13 @@ export default function ProfileScreen() {
       style={{ backgroundColor: c.background }}
       contentContainerStyle={[styles.content, { paddingBottom: bottomPad + 32 }]}
     >
-      <View style={[styles.avatar, { backgroundColor: colors.light.navy }]}>
-        <Text style={styles.avatarText}>{initials}</Text>
-      </View>
+      {user?.avatarUrl ? (
+        <Image source={{ uri: user.avatarUrl }} style={styles.avatarImage} />
+      ) : (
+        <View style={[styles.avatar, { backgroundColor: colors.light.navy }]}>
+          <Text style={styles.avatarText}>{initials}</Text>
+        </View>
+      )}
 
       <Text style={[styles.name, { color: c.foreground }]}>
         {user?.name ?? "Guest User"}
@@ -437,8 +558,17 @@ const styles = StyleSheet.create({
   content: { alignItems: "center", paddingHorizontal: 16, paddingTop: 24, gap: 4 },
 
   // View mode
-  avatar: { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center", marginBottom: 8 },
+  avatarWrapper: { position: "relative", marginBottom: 8 },
+  avatar: { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center" },
+  avatarImage: { width: 80, height: 80, borderRadius: 40 },
   avatarText: { color: "#fff", fontSize: 28, fontFamily: "Inter_700Bold" },
+  avatarEditBadge: {
+    position: "absolute", bottom: 0, right: 0,
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: "#1e40af",
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 2, borderColor: "#fff",
+  },
   name: { fontSize: 20, fontFamily: "Inter_700Bold", textAlign: "center" },
   email: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center" },
   phone: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 2 },
