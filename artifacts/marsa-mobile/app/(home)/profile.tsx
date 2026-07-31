@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -12,8 +12,12 @@ import { useClerk } from "@clerk/expo";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { ConfirmActionModal } from "@/components/ConfirmActionModal";
+import { usePushNotifications } from "@/contexts/PushNotificationsContext";
 import { useColors } from "@/hooks/useColors";
 import { useUser } from "@/contexts/UserContext";
+import { getClerkErrorMessage } from "@/lib/clerkAuth";
+import { devBypass } from "@/lib/devBypass";
 import colors from "@/constants/colors";
 
 interface SettingRowProps {
@@ -57,19 +61,43 @@ export default function ProfileScreen() {
   const { signOut } = useClerk();
   const router = useRouter();
   const { user, isHost, isAdmin } = useUser();
+  const pushNotifications = usePushNotifications();
+  const [showSignOut, setShowSignOut] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
 
   const handleSignOut = () => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign Out",
-        style: "destructive",
-        onPress: async () => {
-          await signOut();
-          router.replace("/(auth)/sign-in");
-        },
-      },
-    ]);
+    setSignOutError(null);
+    setShowSignOut(true);
+  };
+
+  const confirmSignOut = async () => {
+    setIsSigningOut(true);
+    setSignOutError(null);
+    try {
+      try {
+        await pushNotifications.deactivate();
+      } catch (notificationError) {
+        console.warn(
+          "Push token cleanup failed during sign-out.",
+          notificationError,
+        );
+      }
+
+      await signOut();
+      devBypass.disable();
+      setShowSignOut(false);
+      router.replace("/(auth)/sign-in");
+    } catch (clerkError: unknown) {
+      setSignOutError(
+        getClerkErrorMessage(
+          clerkError,
+          "Sign out could not be completed. Check your connection and try again.",
+        ),
+      );
+    } finally {
+      setIsSigningOut(false);
+    }
   };
 
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
@@ -207,6 +235,20 @@ export default function ProfileScreen() {
       </View>
 
       <Text style={[styles.version, { color: c.mutedForeground }]}>MARSA v1.0.0</Text>
+      <ConfirmActionModal
+        visible={showSignOut}
+        title="Sign out of MARSA?"
+        message="You can sign back in at any time with your email, email code, or Google account."
+        confirmLabel="Sign out"
+        destructive
+        loading={isSigningOut}
+        error={signOutError}
+        onCancel={() => {
+          setSignOutError(null);
+          setShowSignOut(false);
+        }}
+        onConfirm={confirmSignOut}
+      />
     </ScrollView>
   );
 }

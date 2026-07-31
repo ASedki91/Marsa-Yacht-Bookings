@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Alert,
   Platform,
@@ -14,10 +14,13 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import colors from "@/constants/colors";
+import { ConfirmActionModal } from "@/components/ConfirmActionModal";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { usePushNotifications } from "@/contexts/PushNotificationsContext";
 import { useUser } from "@/contexts/UserContext";
 import { useColors } from "@/hooks/useColors";
+import { getClerkErrorMessage } from "@/lib/clerkAuth";
+import { devBypass } from "@/lib/devBypass";
 
 type ProfileMode = "guest" | "host";
 
@@ -94,6 +97,9 @@ export function ModeProfileScreen({ mode }: { mode: ProfileMode }) {
   const { setMode } = useAppMode();
   const pushNotifications = usePushNotifications();
   const topPad = Platform.OS === "web" ? 24 : insets.top;
+  const [showSignOut, setShowSignOut] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
 
   const displayName =
     user?.name?.trim() ||
@@ -122,18 +128,37 @@ export function ModeProfileScreen({ mode }: { mode: ProfileMode }) {
   };
 
   const signOutUser = () => {
-    Alert.alert("Sign out", "Do you want to sign out of MARSA?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign out",
-        style: "destructive",
-        onPress: async () => {
-          await pushNotifications.deactivate();
-          await signOut();
-          router.replace("/(auth)/sign-in");
-        },
-      },
-    ]);
+    setSignOutError(null);
+    setShowSignOut(true);
+  };
+
+  const confirmSignOut = async () => {
+    setIsSigningOut(true);
+    setSignOutError(null);
+    try {
+      try {
+        await pushNotifications.deactivate();
+      } catch (notificationError) {
+        console.warn(
+          "Push token cleanup failed during sign-out.",
+          notificationError,
+        );
+      }
+
+      await signOut();
+      devBypass.disable();
+      setShowSignOut(false);
+      router.replace("/(auth)/sign-in");
+    } catch (clerkError: unknown) {
+      setSignOutError(
+        getClerkErrorMessage(
+          clerkError,
+          "Sign out could not be completed. Check your connection and try again.",
+        ),
+      );
+    } finally {
+      setIsSigningOut(false);
+    }
   };
 
   const managePushNotifications = () => {
@@ -349,6 +374,20 @@ export function ModeProfileScreen({ mode }: { mode: ProfileMode }) {
           MARSA v1.0.0
         </Text>
       </ScrollView>
+      <ConfirmActionModal
+        visible={showSignOut}
+        title="Sign out of MARSA?"
+        message="You can sign back in at any time with your email, email code, or Google account."
+        confirmLabel="Sign out"
+        destructive
+        loading={isSigningOut}
+        error={signOutError}
+        onCancel={() => {
+          setSignOutError(null);
+          setShowSignOut(false);
+        }}
+        onConfirm={confirmSignOut}
+      />
     </View>
   );
 }

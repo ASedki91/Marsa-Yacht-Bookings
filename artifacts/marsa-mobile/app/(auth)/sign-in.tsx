@@ -12,8 +12,20 @@ import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import colors from "@/constants/colors";
 import { devBypass } from "@/lib/devBypass";
+import {
+  getClerkErrorMessage,
+  isValidEmailAddress,
+  normalizeEmailAddress,
+} from "@/lib/clerkAuth";
 
 WebBrowser.maybeCompleteAuthSession();
+
+type VerificationStrategy =
+  | "email_code"
+  | "mfa_email"
+  | "mfa_phone"
+  | "mfa_totp"
+  | "mfa_backup_code";
 
 function useWarmUpBrowser() {
   useEffect(() => {
@@ -29,7 +41,7 @@ export default function SignInScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const { signIn, errors: signInErrors, fetchStatus } = useSignIn();
+  const { signIn, fetchStatus } = useSignIn();
   const { isLoaded } = useAuth();
   const { startSSOFlow } = useSSO();
 
@@ -39,69 +51,321 @@ export default function SignInScreen() {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [ssoLoading, setSsoLoading] = useState(false);
-  const [pendingVerification, setPendingVerification] = useState(false);
+  const [verificationStrategy, setVerificationStrategy] =
+    useState<VerificationStrategy | null>(null);
+  const [verificationDestination, setVerificationDestination] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const isBusy = loading || fetchStatus === "fetching";
 
-  // Show field-level Clerk errors in the banner when present
-  const clerkError =
-    (signInErrors as any)?.fields?.identifier?.message ??
-    (signInErrors as any)?.fields?.password?.message ??
-    null;
+  const finalizeSignIn = async () => {
+    const { error: finalizeError } = await signIn.finalize();
+    if (finalizeError) {
+      setError(
+        getClerkErrorMessage(
+          finalizeError,
+          "Your session could not be started. Please try again.",
+        ),
+      );
+      return false;
+    }
+
+    router.replace("/(home)" as any);
+    return true;
+  };
+
+  const prepareSecondFactor = async () => {
+    const emailFactor = signIn.supportedSecondFactors.find(
+      (factor) => factor.strategy === "email_code",
+    );
+    if (emailFactor) {
+      const { error: sendError } = await signIn.mfa.sendEmailCode();
+      if (sendError) {
+        setError(
+          getClerkErrorMessage(
+            sendError,
+            "Could not send the verification code.",
+          ),
+        );
+        return;
+      }
+      setCode("");
+      setVerificationDestination(emailFactor.safeIdentifier);
+      setVerificationStrategy("mfa_email");
+      return;
+    }
+
+    const phoneFactor = signIn.supportedSecondFactors.find(
+      (factor) => factor.strategy === "phone_code",
+    );
+    if (phoneFactor) {
+      const { error: sendError } = await signIn.mfa.sendPhoneCode();
+      if (sendError) {
+        setError(
+          getClerkErrorMessage(
+            sendError,
+            "Could not send the verification code.",
+          ),
+        );
+        return;
+      }
+      setCode("");
+      setVerificationDestination(phoneFactor.safeIdentifier);
+      setVerificationStrategy("mfa_phone");
+      return;
+    }
+
+    if (
+      signIn.supportedSecondFactors.some(
+        (factor) => factor.strategy === "totp",
+      )
+    ) {
+      setCode("");
+      setVerificationDestination("");
+      setVerificationStrategy("mfa_totp");
+      return;
+    }
+
+    if (
+      signIn.supportedSecondFactors.some(
+        (factor) => factor.strategy === "backup_code",
+      )
+    ) {
+      setCode("");
+      setVerificationDestination("");
+      setVerificationStrategy("mfa_backup_code");
+      return;
+    }
+
+    setError(
+      "This account requires a verification method that is not available in the app. Please contact support.",
+    );
+  };
+
+  const handleSignInStatus = async () => {
+    switch (signIn.status) {
+      case "complete":
+        await finalizeSignIn();
+        break;
+      case "needs_second_factor":
+      case "needs_client_trust":
+        await prepareSecondFactor();
+        break;
+      case "needs_new_password":
+        setError(
+          'This account needs a new password. Use "Forgot password?" to continue.',
+        );
+        break;
+      case "needs_first_factor":
+        setError(
+          "Password sign-in is not available for this account. Try an email sign-in code instead.",
+        );
+        break;
+      default:
+        setError(
+          "Your sign-in needs an additional step that is not available. Please start again.",
+        );
+    }
+  };
 
   const handleEmailSignIn = async () => {
     if (!isLoaded || !signIn) return;
+
+    const normalizedEmail = normalizeEmailAddress(email);
+    if (!isValidEmailAddress(normalizedEmail)) {
+      setError("Enter a valid email address.");
+      return;
+    }
+
+    setEmail(normalizedEmail);
     setError(null);
     setLoading(true);
     try {
-      // NOTE: Clerk Future API requires `emailAddress`, not `identifier`
-      const { error: pwError } = await signIn.password({ emailAddress: email, password });
-      if (pwError) {
-        setError((pwError as any)?.errors?.[0]?.longMessage ?? (pwError as any)?.message ?? "Sign in failed. Please try again.");
+      const { error: identifierError } = await signIn.create({
+        identifier: normalizedEmail,
+      });
+      if (identifierError) {
+        setError(
+          getClerkErrorMessage(
+            identifierError,
+            "We could not find an account with that email address.",
+          ),
+        );
         return;
       }
-      if (signIn.status === "complete") {
-        await signIn.finalize();
-        router.replace("/(home)" as any);
-      } else if (signIn.status === "needs_second_factor") {
-        setPendingVerification(true);
-      } else if (signIn.status === "needs_client_trust") {
-        // Clerk needs additional trust verification — send email code
-        const emailFactor = (signIn as any).supportedSecondFactors?.find(
-          (f: any) => f.strategy === "email_code",
+
+      const supportsPassword = signIn.supportedFirstFactors.some(
+        (factor) => factor.strategy === "password",
+      );
+      if (!supportsPassword) {
+        setError(
+          "This account does not currently support password sign-in. Use an email sign-in code or reset the password.",
         );
-        if (emailFactor) {
-          await (signIn as any).mfa.sendEmailCode();
-        }
-        setPendingVerification(true);
-      } else {
-        setError("Sign in could not be completed. Please try again.");
+        return;
       }
-    } catch (err: any) {
-      setError(err?.errors?.[0]?.longMessage ?? err?.message ?? "Sign in failed. Please try again.");
+
+      const { error: pwError } = await signIn.password({ password });
+      if (pwError) {
+        setError(
+          getClerkErrorMessage(
+            pwError,
+            "The email address or password is incorrect.",
+          ),
+        );
+        return;
+      }
+
+      await handleSignInStatus();
+    } catch (signInError: unknown) {
+      setError(
+        getClerkErrorMessage(
+          signInError,
+          "Sign in failed. Please try again.",
+        ),
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEmailCodeSignIn = async () => {
+    if (!isLoaded || !signIn) return;
+
+    const normalizedEmail = normalizeEmailAddress(email);
+    if (!isValidEmailAddress(normalizedEmail)) {
+      setError("Enter a valid email address.");
+      return;
+    }
+
+    setEmail(normalizedEmail);
+    setError(null);
+    setLoading(true);
+    try {
+      const { error: identifierError } = await signIn.create({
+        identifier: normalizedEmail,
+      });
+      if (identifierError) {
+        setError(
+          getClerkErrorMessage(
+            identifierError,
+            "We could not start email sign-in for that address.",
+          ),
+        );
+        return;
+      }
+
+      const emailFactor = signIn.supportedFirstFactors.find(
+        (factor) => factor.strategy === "email_code",
+      );
+      if (!emailFactor) {
+        setError("Email code sign-in is not enabled for this account.");
+        return;
+      }
+
+      const { error: sendError } = await signIn.emailCode.sendCode();
+      if (sendError) {
+        setError(
+          getClerkErrorMessage(
+            sendError,
+            "Could not send the sign-in code.",
+          ),
+        );
+        return;
+      }
+
+      setCode("");
+      setVerificationDestination(emailFactor.safeIdentifier);
+      setVerificationStrategy("email_code");
+    } catch (emailCodeError: unknown) {
+      setError(
+        getClerkErrorMessage(
+          emailCodeError,
+          "Could not send the sign-in code.",
+        ),
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const handleVerify = async () => {
-    if (!isLoaded || !signIn) return;
+    if (!isLoaded || !signIn || !verificationStrategy) return;
     setError(null);
     setLoading(true);
     try {
-      const { error: mfaError } = await signIn.mfa.verifyEmailCode({ code });
-      if (mfaError) {
-        setError((mfaError as any)?.errors?.[0]?.longMessage ?? "Invalid code.");
+      const result =
+        verificationStrategy === "email_code"
+          ? await signIn.emailCode.verifyCode({ code })
+          : verificationStrategy === "mfa_email"
+            ? await signIn.mfa.verifyEmailCode({ code })
+            : verificationStrategy === "mfa_phone"
+              ? await signIn.mfa.verifyPhoneCode({ code })
+              : verificationStrategy === "mfa_totp"
+                ? await signIn.mfa.verifyTOTP({ code })
+                : await signIn.mfa.verifyBackupCode({ code });
+
+      if (result.error) {
+        setError(
+          getClerkErrorMessage(
+            result.error,
+            "That verification code is not valid.",
+          ),
+        );
         return;
       }
-      if (signIn.status === "complete") {
-        await signIn.finalize();
-        router.replace("/(home)" as any);
-      }
-    } catch (err: any) {
-      setError(err?.errors?.[0]?.longMessage ?? "Invalid code.");
+
+      await handleSignInStatus();
+    } catch (verificationError: unknown) {
+      setError(
+        getClerkErrorMessage(
+          verificationError,
+          "That verification code is not valid.",
+        ),
+      );
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleResendCode = async () => {
+    if (!verificationStrategy) return;
+    setError(null);
+    setLoading(true);
+    try {
+      const result =
+        verificationStrategy === "email_code"
+          ? await signIn.emailCode.sendCode()
+          : verificationStrategy === "mfa_email"
+            ? await signIn.mfa.sendEmailCode()
+            : verificationStrategy === "mfa_phone"
+              ? await signIn.mfa.sendPhoneCode()
+              : null;
+
+      if (result?.error) {
+        setError(
+          getClerkErrorMessage(
+            result.error,
+            "Could not send a new verification code.",
+          ),
+        );
+      }
+    } catch (resendError: unknown) {
+      setError(
+        getClerkErrorMessage(
+          resendError,
+          "Could not send a new verification code.",
+        ),
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStartOver = async () => {
+    await signIn.reset();
+    setCode("");
+    setError(null);
+    setVerificationDestination("");
+    setVerificationStrategy(null);
   };
 
   const handleGoogle = useCallback(async () => {
@@ -116,39 +380,90 @@ export default function SignInScreen() {
         await ssoSetActive({ session: createdSessionId });
         router.replace("/(home)" as any);
       }
-    } catch (err: any) {
-      setError(err?.errors?.[0]?.longMessage ?? "Could not sign in with Google.");
+    } catch (googleError: unknown) {
+      setError(
+        getClerkErrorMessage(
+          googleError,
+          "Could not sign in with Google.",
+        ),
+      );
     } finally {
       setSsoLoading(false);
     }
   }, [startSSOFlow, router]);
 
-  if (pendingVerification) {
+  if (verificationStrategy) {
     const topPad2 = Platform.OS === "web" ? 67 : insets.top;
+    const isBackupCode = verificationStrategy === "mfa_backup_code";
+    const verificationCopy =
+      verificationStrategy === "mfa_totp"
+        ? "Enter the code from your authenticator app."
+        : isBackupCode
+          ? "Enter one of your saved backup codes."
+          : `Enter the code sent to ${verificationDestination || "your account"}.`;
+    const canResend = [
+      "email_code",
+      "mfa_email",
+      "mfa_phone",
+    ].includes(verificationStrategy);
+
     return (
       <View style={[styles.container, { backgroundColor: c.background, paddingTop: topPad2 + 60, paddingHorizontal: 24 }]}>
         <View style={[styles.logoBox, { backgroundColor: colors.light.navy }]}>
           <Ionicons name="shield-checkmark-outline" size={28} color={colors.light.gold} />
         </View>
-        <Text style={[styles.title, { color: c.foreground }]}>2FA Verification</Text>
-        <Text style={[styles.subtitle, { color: c.mutedForeground }]}>Enter the code sent to your phone</Text>
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        <Text style={[styles.title, { color: c.foreground }]}>Verify your sign-in</Text>
+        <Text style={[styles.subtitle, styles.verificationCopy, { color: c.mutedForeground }]}>
+          {verificationCopy}
+        </Text>
+        {error ? (
+          <View
+            style={[
+              styles.errorBox,
+              { backgroundColor: "#fef2f2", borderColor: "#fecaca" },
+            ]}
+          >
+            <Ionicons name="alert-circle-outline" size={16} color="#ef4444" />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
         <TextInput
           style={[styles.input, { backgroundColor: c.input, color: c.foreground, borderColor: error ? "#ef4444" : c.border, width: "100%" }]}
           value={code}
           onChangeText={(v) => { setCode(v); setError(null); }}
-          placeholder="6-digit code"
+          placeholder={isBackupCode ? "Backup code" : "6-digit code"}
           placeholderTextColor={c.mutedForeground}
-          keyboardType="numeric"
-          maxLength={6}
+          keyboardType={isBackupCode ? "default" : "numeric"}
+          maxLength={isBackupCode ? undefined : 6}
+          autoCapitalize="none"
+          autoComplete="one-time-code"
           autoFocus
         />
         <Pressable
-          style={[styles.primaryBtn, { backgroundColor: c.primary, opacity: (!code || loading) ? 0.6 : 1, width: "100%" }]}
+          accessibilityRole="button"
+          style={[styles.primaryBtn, { backgroundColor: c.primary, opacity: (!code || isBusy) ? 0.6 : 1, width: "100%" }]}
           onPress={handleVerify}
-          disabled={!code || loading}
+          disabled={!code || isBusy}
         >
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Verify</Text>}
+          {isBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Verify</Text>}
+        </Pressable>
+        {canResend && (
+          <Pressable
+            accessibilityRole="button"
+            disabled={isBusy}
+            onPress={handleResendCode}
+            style={styles.textButton}
+          >
+            <Text style={[styles.linkText, { color: c.primary }]}>Send a new code</Text>
+          </Pressable>
+        )}
+        <Pressable
+          accessibilityRole="button"
+          disabled={isBusy}
+          onPress={handleStartOver}
+          style={styles.textButton}
+        >
+          <Text style={[styles.linkText, { color: c.mutedForeground }]}>Start over</Text>
         </Pressable>
       </View>
     );
@@ -175,9 +490,10 @@ export default function SignInScreen() {
         <Text style={[styles.subtitle, { color: c.mutedForeground }]}>Sign in to your account</Text>
 
         <Pressable
-          style={[styles.socialBtn, { backgroundColor: c.card, borderColor: c.border, opacity: ssoLoading ? 0.7 : 1 }]}
+          accessibilityRole="button"
+          style={[styles.socialBtn, { backgroundColor: c.card, borderColor: c.border, opacity: (ssoLoading || isBusy) ? 0.7 : 1 }]}
           onPress={handleGoogle}
-          disabled={ssoLoading || loading}
+          disabled={ssoLoading || isBusy}
         >
           {ssoLoading ? (
             <ActivityIndicator color={c.foreground} size="small" />
@@ -195,10 +511,10 @@ export default function SignInScreen() {
           <View style={[styles.dividerLine, { backgroundColor: c.border }]} />
         </View>
 
-        {(error || clerkError) ? (
+        {error ? (
           <View style={[styles.errorBox, { backgroundColor: "#fef2f2", borderColor: "#fecaca" }]}>
             <Ionicons name="alert-circle-outline" size={16} color="#ef4444" />
-            <Text style={styles.errorText}>{error ?? clerkError}</Text>
+            <Text style={styles.errorText}>{error}</Text>
           </View>
         ) : null}
 
@@ -211,6 +527,7 @@ export default function SignInScreen() {
             placeholder="your@email.com"
             placeholderTextColor={c.mutedForeground}
             autoCapitalize="none"
+            autoCorrect={false}
             keyboardType="email-address"
             autoComplete="email"
           />
@@ -226,7 +543,7 @@ export default function SignInScreen() {
               placeholder="Your password"
               placeholderTextColor={c.mutedForeground}
               secureTextEntry={!showPassword}
-              autoComplete="password"
+              autoComplete="current-password"
             />
             <Pressable style={styles.eyeBtn} onPress={() => setShowPassword((v) => !v)}>
               <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color={c.mutedForeground} />
@@ -239,11 +556,31 @@ export default function SignInScreen() {
         </Link>
 
         <Pressable
-          style={[styles.primaryBtn, { backgroundColor: c.primary, opacity: (!email || !password || loading || !isLoaded || !signIn) ? 0.6 : 1 }]}
+          accessibilityRole="button"
+          style={[styles.primaryBtn, { backgroundColor: c.primary, opacity: (!email || !password || isBusy || !isLoaded || !signIn) ? 0.6 : 1 }]}
           onPress={handleEmailSignIn}
-          disabled={!email || !password || loading || !isLoaded || !signIn}
+          disabled={!email || !password || isBusy || !isLoaded || !signIn}
         >
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Sign in</Text>}
+          {isBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Sign in</Text>}
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          style={[
+            styles.emailCodeBtn,
+            {
+              borderColor: c.border,
+              backgroundColor: c.card,
+              opacity: (!email || isBusy || !isLoaded || !signIn) ? 0.6 : 1,
+            },
+          ]}
+          onPress={handleEmailCodeSignIn}
+          disabled={!email || isBusy || !isLoaded || !signIn}
+        >
+          <Ionicons name="mail-outline" size={18} color={c.primary} />
+          <Text style={[styles.emailCodeBtnText, { color: c.foreground }]}>
+            Sign in with an email code
+          </Text>
         </Pressable>
 
         <View style={styles.footer}>
@@ -279,6 +616,7 @@ const styles = StyleSheet.create({
   tagline: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center" },
   title: { fontSize: 22, fontFamily: "Inter_700Bold" },
   subtitle: { fontSize: 14, fontFamily: "Inter_400Regular" },
+  verificationCopy: { textAlign: "center", lineHeight: 20 },
   socialBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, padding: 14, borderRadius: 12, borderWidth: 1 },
   socialBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   divider: { flexDirection: "row", alignItems: "center", gap: 10 },
@@ -290,10 +628,13 @@ const styles = StyleSheet.create({
   eyeBtn: { position: "absolute", right: 14, top: 0, bottom: 0, justifyContent: "center" },
   primaryBtn: { borderRadius: 12, paddingVertical: 15, alignItems: "center", marginTop: 4 },
   primaryBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  emailCodeBtn: { minHeight: 50, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14 },
+  emailCodeBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  textButton: { paddingHorizontal: 12, paddingVertical: 6 },
   footer: { flexDirection: "row", justifyContent: "center", flexWrap: "wrap" },
   footerText: { fontSize: 14, fontFamily: "Inter_400Regular" },
   linkText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  errorBox: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 10, borderWidth: 1 },
+  errorBox: { width: "100%", flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 10, borderWidth: 1 },
   errorText: { color: "#ef4444", fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
   devBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, marginTop: 4, opacity: 0.6 },
   devBtnText: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#6b7280" },

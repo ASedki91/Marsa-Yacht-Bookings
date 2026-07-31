@@ -11,6 +11,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import colors from "@/constants/colors";
+import {
+  getClerkErrorMessage,
+  isValidEmailAddress,
+  normalizeEmailAddress,
+} from "@/lib/clerkAuth";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -35,26 +40,49 @@ export default function SignUpScreen() {
 
   const handleSignUp = async () => {
     if (!isLoaded) return;
+
+    const normalizedEmail = normalizeEmailAddress(email);
+    if (!isValidEmailAddress(normalizedEmail)) {
+      setError("Enter a valid email address.");
+      return;
+    }
+
+    setEmail(normalizedEmail);
     setError(null);
     setLoading(true);
     try {
       const { error: pwError } = await signUp.password({
-        emailAddress: email,
+        emailAddress: normalizedEmail,
         password,
         ...(name.trim() ? { unsafeMetadata: { fullName: name.trim() } } : {}),
       });
       if (pwError) {
-        setError((pwError as any)?.errors?.[0]?.longMessage ?? (pwError as any)?.message ?? "Sign up failed. Please try again.");
+        setError(
+          getClerkErrorMessage(
+            pwError,
+            "Sign up failed. Please try again.",
+          ),
+        );
         return;
       }
       const { error: codeError } = await signUp.verifications.sendEmailCode();
       if (codeError) {
-        setError((codeError as any)?.errors?.[0]?.longMessage ?? "Could not send verification code.");
+        setError(
+          getClerkErrorMessage(
+            codeError,
+            "Could not send verification code.",
+          ),
+        );
         return;
       }
       setPendingVerification(true);
-    } catch (err: any) {
-      setError(err?.errors?.[0]?.longMessage ?? err?.message ?? "Sign up failed. Please try again.");
+    } catch (signUpError: unknown) {
+      setError(
+        getClerkErrorMessage(
+          signUpError,
+          "Sign up failed. Please try again.",
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -67,15 +95,34 @@ export default function SignUpScreen() {
     try {
       const { error: verifyError } = await signUp.verifications.verifyEmailCode({ code });
       if (verifyError) {
-        setError((verifyError as any)?.errors?.[0]?.longMessage ?? "Invalid code. Please try again.");
+        setError(
+          getClerkErrorMessage(
+            verifyError,
+            "Invalid code. Please try again.",
+          ),
+        );
         return;
       }
       if (signUp.status === "complete") {
-        await signUp.finalize();
+        const { error: finalizeError } = await signUp.finalize();
+        if (finalizeError) {
+          setError(
+            getClerkErrorMessage(
+              finalizeError,
+              "Your account was created, but the session could not be started.",
+            ),
+          );
+          return;
+        }
         router.replace("/(home)" as any);
       }
-    } catch (err: any) {
-      setError(err?.errors?.[0]?.longMessage ?? "Invalid code. Please try again.");
+    } catch (verificationError: unknown) {
+      setError(
+        getClerkErrorMessage(
+          verificationError,
+          "Invalid code. Please try again.",
+        ),
+      );
     } finally {
       setLoading(false);
     }

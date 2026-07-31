@@ -9,6 +9,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import colors from "@/constants/colors";
+import {
+  getClerkErrorMessage,
+  isValidEmailAddress,
+  normalizeEmailAddress,
+} from "@/lib/clerkAuth";
 
 type Stage = "email" | "code";
 
@@ -29,21 +34,49 @@ export default function ForgotPasswordScreen() {
 
   const sendCode = async () => {
     if (!isLoaded || !email) return;
+
+    const normalizedEmail = normalizeEmailAddress(email);
+    if (!isValidEmailAddress(normalizedEmail)) {
+      Alert.alert("Invalid email", "Enter a valid email address.");
+      return;
+    }
+
+    setEmail(normalizedEmail);
     setLoading(true);
     try {
-      const { error: createError } = await signIn.create({ identifier: email });
+      const { error: createError } = await signIn.create({
+        identifier: normalizedEmail,
+      });
       if (createError) {
-        Alert.alert("Error", (createError as any)?.errors?.[0]?.longMessage ?? "Could not send reset email.");
+        Alert.alert(
+          "Error",
+          getClerkErrorMessage(
+            createError,
+            "Could not send reset email.",
+          ),
+        );
         return;
       }
       const { error: sendError } = await signIn.resetPasswordEmailCode.sendCode();
       if (sendError) {
-        Alert.alert("Error", (sendError as any)?.errors?.[0]?.longMessage ?? "Could not send reset email.");
+        Alert.alert(
+          "Error",
+          getClerkErrorMessage(
+            sendError,
+            "Could not send reset email.",
+          ),
+        );
         return;
       }
       setStage("code");
-    } catch (err: any) {
-      Alert.alert("Error", err?.errors?.[0]?.longMessage ?? "Could not send reset email.");
+    } catch (resetError: unknown) {
+      Alert.alert(
+        "Error",
+        getClerkErrorMessage(
+          resetError,
+          "Could not send reset email.",
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -55,20 +88,48 @@ export default function ForgotPasswordScreen() {
     try {
       const { error: verifyError } = await signIn.resetPasswordEmailCode.verifyCode({ code });
       if (verifyError) {
-        Alert.alert("Error", (verifyError as any)?.errors?.[0]?.longMessage ?? "Invalid code or password.");
+        Alert.alert(
+          "Error",
+          getClerkErrorMessage(
+            verifyError,
+            "Invalid code or password.",
+          ),
+        );
         return;
       }
       const { error: submitError } = await signIn.resetPasswordEmailCode.submitPassword({ password: newPassword });
       if (submitError) {
-        Alert.alert("Error", (submitError as any)?.errors?.[0]?.longMessage ?? "Invalid code or password.");
+        Alert.alert(
+          "Error",
+          getClerkErrorMessage(
+            submitError,
+            "Invalid code or password.",
+          ),
+        );
         return;
       }
       if (signIn.status === "complete") {
-        await signIn.finalize();
+        const { error: finalizeError } = await signIn.finalize();
+        if (finalizeError) {
+          Alert.alert(
+            "Error",
+            getClerkErrorMessage(
+              finalizeError,
+              "Your password was changed, but the session could not be started.",
+            ),
+          );
+          return;
+        }
         router.replace("/(home)" as any);
       }
-    } catch (err: any) {
-      Alert.alert("Error", err?.errors?.[0]?.longMessage ?? "Invalid code or password.");
+    } catch (resetError: unknown) {
+      Alert.alert(
+        "Error",
+        getClerkErrorMessage(
+          resetError,
+          "Invalid code or password.",
+        ),
+      );
     } finally {
       setLoading(false);
     }

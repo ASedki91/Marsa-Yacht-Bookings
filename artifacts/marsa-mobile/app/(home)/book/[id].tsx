@@ -114,8 +114,12 @@ export default function BookScreen() {
   const router = useRouter();
 
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
-  const { config: paymentConfig, isLoading: paymentConfigLoading } =
-    usePaymentConfig();
+  const {
+    config: paymentConfig,
+    isLoading: paymentConfigLoading,
+    error: paymentConfigError,
+    refresh: refreshPaymentConfig,
+  } = usePaymentConfig();
   const { user } = useUser();
   const [step, setStep] = useState(0);
   const [payError, setPayError] = useState<string | null>(null);
@@ -323,7 +327,7 @@ export default function BookScreen() {
             </Text>
             <Text style={[styles.confirmSub, { color: c.mutedForeground }]}>
               {paymentResult?.gateway === "test"
-                ? "Test payment approved — no card was charged"
+                ? "Virtual test payment completed — no card was charged"
                 : "Payment received — pending host confirmation"}
             </Text>
             {!!cancellationTerms && (
@@ -791,15 +795,23 @@ export default function BookScreen() {
                 styles.stripeNote,
                 {
                   backgroundColor:
-                    paymentConfig.gateway === "disabled" ? "#FEF2F2" : "#EFF6FF",
+                    !paymentConfigLoading &&
+                    paymentConfig.gateway === "disabled"
+                      ? "#FEF2F2"
+                      : "#EFF6FF",
                   borderColor:
-                    paymentConfig.gateway === "disabled" ? "#FECACA" : "#BFDBFE",
+                    !paymentConfigLoading &&
+                    paymentConfig.gateway === "disabled"
+                      ? "#FECACA"
+                      : "#BFDBFE",
                 },
               ]}
             >
               <Ionicons
                 name={
-                  paymentConfig.gateway === "test"
+                  paymentConfigLoading
+                    ? "hourglass-outline"
+                    : paymentConfig.gateway === "test"
                     ? "flask-outline"
                     : paymentConfig.gateway === "stripe"
                       ? "lock-closed-outline"
@@ -807,28 +819,47 @@ export default function BookScreen() {
                 }
                 size={17}
                 color={
+                  !paymentConfigLoading &&
                   paymentConfig.gateway === "disabled"
                     ? "#DC2626"
                     : colors.light.ocean
                 }
               />
-              <Text
-                style={[
-                  styles.stripeText,
-                  {
-                    color:
-                      paymentConfig.gateway === "disabled"
-                        ? "#B91C1C"
-                        : colors.light.ocean,
-                  },
-                ]}
-              >
-                {paymentConfig.gateway === "test"
-                  ? "Test checkout is active. No card details are needed and no money will be charged."
-                  : paymentConfig.gateway === "stripe"
-                    ? "Secure card checkout is enabled for this booking."
-                    : "Checkout is temporarily disabled. You can review the booking, but cannot submit payment yet."}
-              </Text>
+              <View style={styles.paymentNoticeContent}>
+                <Text
+                  style={[
+                    styles.stripeText,
+                    {
+                      color:
+                        !paymentConfigLoading &&
+                        paymentConfig.gateway === "disabled"
+                          ? "#B91C1C"
+                          : colors.light.ocean,
+                    },
+                  ]}
+                >
+                  {paymentConfigLoading
+                    ? "Checking payment availability..."
+                    : paymentConfig.gateway === "test"
+                      ? "Virtual payment is ready. Completing it will record a successful test transaction and create the booking. No card or real money is used."
+                      : paymentConfig.gateway === "stripe"
+                        ? "Secure card checkout is enabled for this booking."
+                        : "Checkout configuration is unavailable. Reload it to enable test payment in the development environment."}
+                </Text>
+                {!paymentConfigLoading &&
+                  paymentConfig.gateway === "disabled" &&
+                  paymentConfigError && (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Retry loading payment configuration"
+                      onPress={() => void refreshPaymentConfig()}
+                      style={styles.paymentRetryButton}
+                    >
+                      <Ionicons name="refresh" size={14} color="#B91C1C" />
+                      <Text style={styles.paymentRetryText}>Retry</Text>
+                    </Pressable>
+                  )}
+              </View>
             </View>
           </View>
         )}
@@ -872,9 +903,11 @@ export default function BookScreen() {
             <>
               <Text style={styles.nextBtnText}>
                 {step === 4
-                  ? paymentConfig.gateway === "test"
-                    ? "Complete Test Booking"
-                    : paymentConfig.gateway === "disabled"
+                  ? paymentConfigLoading
+                    ? "Checking Checkout..."
+                    : paymentConfig.gateway === "test"
+                      ? "Complete Virtual Payment"
+                      : paymentConfig.gateway === "disabled"
                       ? "Checkout Unavailable"
                       : "Confirm & Pay"
                   : "Continue"}
@@ -1020,6 +1053,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   stripeText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  paymentNoticeContent: { flex: 1, gap: 10 },
+  paymentRetryButton: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: "#FCA5A5",
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  paymentRetryText: {
+    color: "#B91C1C",
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+  },
   footer: {
     position: "absolute",
     bottom: 0,

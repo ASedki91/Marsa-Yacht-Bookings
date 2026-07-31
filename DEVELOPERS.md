@@ -48,6 +48,30 @@ are documented in
 The future sale-listing module is not implemented yet; only neutral discovery
 seams and a disabled **Buy — Soon** choice are present.
 
+### Current stabilization checkpoint (2026-07-31)
+
+- Mobile authentication now uses `@clerk/expo` v3.7.8 as an application
+  dependency. Password sign-in first identifies the account with
+  `signIn.create({ identifier })`, confirms that the account supports a
+  password factor, submits `signIn.password({ password })`, handles any
+  required second factor, and calls `signIn.finalize()` only when Clerk reports
+  `complete`. This fixes the invalid-identifier/incomplete-session behavior
+  caused by sending the email directly to the password factor.
+- Email addresses are normalized and validated consistently across sign-in,
+  sign-up, and password reset. Sign-in also supports an email-code fallback and
+  Clerk second factors (email code, phone code, TOTP, and backup code), with
+  reusable Clerk error extraction and visible retryable errors.
+- Guest and host profile surfaces use the shared `ConfirmActionModal` for sign
+  out. Push-token deactivation is best-effort, Clerk sign-out remains the
+  authoritative operation, the local development bypass is cleared, and users
+  are routed back to sign-in only after sign-out succeeds.
+- Development checkout is active when `PAYMENT_GATEWAY=test` and
+  `ENABLE_TEST_PAYMENT_GATEWAY=true`. The mobile action completes a virtual
+  payment, the API persists a unique `test_pay_*` transaction as `succeeded`,
+  and the booking advances to `paid_under_review` without collecting card
+  details or moving real money. Production and published Replit deployments
+  still fail closed.
+
 ---
 
 ## 2. Repository Structure
@@ -81,7 +105,7 @@ Each `artifacts/*` package is a standalone deployable application. They share li
 | Runtime | Node.js 24, TypeScript 5.9 |
 | Package manager | pnpm workspaces |
 | API server | Express 5, `@clerk/express` |
-| Auth | Clerk (Google OAuth + Email/Password via Future/signal API) |
+| Auth | Clerk (Google OAuth + email/password/email-code via Expo Future/signal API) |
 | Database | PostgreSQL + Drizzle ORM |
 | Validation | Zod v4, `drizzle-zod` |
 | API contract | OpenAPI 3.1 → Orval codegen → React Query hooks + Zod schemas |
@@ -466,7 +490,7 @@ app/
 │
 ├── (auth)/
 │   ├── _layout.tsx              → Auth stack layout
-│   ├── sign-in.tsx              → Email/password sign-in + Google SSO
+│   ├── sign-in.tsx              → Password/email-code sign-in, MFA + Google SSO
 │   ├── sign-up.tsx              → Email/password sign-up + email verification
 │   └── forgot-password.tsx      → Password reset (send code → verify → new password)
 │
@@ -502,7 +526,7 @@ the authorization capability.
 
 | Package | Purpose |
 |---------|---------|
-| `@clerk/expo` v3.3 | Auth (Future/signal API — see gotchas) |
+| `@clerk/expo` v3.7.8 | Auth (Future/signal API — see gotchas) |
 | `expo-secure-store` | Clerk token cache |
 | `@tanstack/react-query` | Server state |
 | `@workspace/api-client-react` | Generated API hooks |
@@ -518,10 +542,30 @@ Clerk Expo v3 uses the **Future/signal API**, not the legacy resource API. The `
 
 ```typescript
 const { signIn } = useSignIn();
-const { error } = await signIn.password({ identifier: email, password });
-// Read status from the signal: signIn.status
-if (signIn.status === "complete") { /* setActive and navigate */ }
+const { error: identifierError } = await signIn.create({
+  identifier: normalizedEmail,
+});
+
+if (!identifierError) {
+  const supportsPassword = signIn.supportedFirstFactors.some(
+    (factor) => factor.strategy === "password",
+  );
+  if (supportsPassword) {
+    const { error: passwordError } = await signIn.password({ password });
+    if (!passwordError && signIn.status === "complete") {
+      await signIn.finalize();
+      router.replace("/(home)");
+    }
+  }
+}
 ```
+
+Do not pass the email directly to `signIn.password()`. Establish the sign-in
+attempt with `signIn.create({ identifier })`, inspect the supported factors,
+then invoke the chosen factor. For passwordless email sign-in, use
+`signIn.emailCode.sendCode()` / `verifyCode()` on that same attempt. Handle
+`needs_second_factor` and `needs_client_trust` before finalizing the session.
+Shared normalization and Clerk error parsing live in `lib/clerkAuth.ts`.
 
 See `.agents/memory/clerk-expo-v3-api.md` for the full canonical pattern.
 
@@ -533,7 +577,11 @@ See `.agents/memory/clerk-expo-v3-api.md` for the full canonical pattern.
 
 The selected provider and optional Stripe publishable key are fetched at
 runtime from `/api/payments/config`. Test mode never mounts Stripe or collects
-fake card details.
+fake card details. On the payment step, **Complete Virtual Payment** calls the
+ordinary booking endpoint; only the server may return a successful test
+transaction. The client requires the returned payment status to be
+`succeeded`, shows the virtual-payment confirmation, and exposes a retry action
+when runtime payment configuration could not be loaded.
 
 ---
 
@@ -588,7 +636,22 @@ fake card details.
 MARSA uses **Clerk** for authentication (not Replit Auth or JWT). Three layers:
 
 ### 1. Clerk (identity provider)
-Users sign up with email/password or Google OAuth. Clerk issues JWTs.
+Users sign up with email/password or Google OAuth. Existing users can sign in
+with password, email code, or Google OAuth. Clerk issues JWTs.
+
+### Mobile Clerk session lifecycle
+
+1. Normalize and validate the email before sending it to Clerk.
+2. Start a Clerk sign-in attempt with `signIn.create({ identifier })`.
+3. Inspect `supportedFirstFactors`, then run the selected password or email-code
+   factor. If Clerk reports `needs_second_factor` or `needs_client_trust`,
+   prepare and verify the supported MFA factor.
+4. Call `signIn.finalize()` only after `signIn.status === "complete"`, then let
+   the authenticated app call `POST /api/auth/sync`.
+5. On sign-out, show the cross-platform confirmation modal, attempt push-token
+   deactivation without allowing cleanup failure to trap the session, await
+   Clerk `signOut()`, clear the local development bypass, and replace the route
+   with `/(auth)/sign-in`.
 
 ### 2. `POST /api/auth/sync`
 Called by clients after sign-in. Creates (or updates) the local `users` DB record from Clerk data. Must be called before any other authenticated request — otherwise `requireAuth` returns 401 "User not found."
@@ -628,8 +691,9 @@ Roles are stored in the local `users` table and set by admins via `PATCH /api/ad
 3. The API atomically claims the slot, snapshots slot/add-on prices and
    cancellation terms, and creates booking/payment rows.
 4. The development test adapter returns a successful EGP test payment without
-   a card or external call. It is disabled whenever `NODE_ENV=production` or
-   `REPLIT_DEPLOYMENT=1`.
+   a card or external call. It generates a unique virtual provider ID, persists
+   the payment with `isTest=true`, and records `succeededAt`. It is disabled
+   whenever `NODE_ENV=production` or `REPLIT_DEPLOYMENT=1`.
 5. The preserved Stripe adapter alone fetches EGP/USD, creates a PaymentIntent,
    and returns a payment-sheet action.
 6. Successful payment moves the booking to `paid_under_review`; host
@@ -660,6 +724,8 @@ when no provider refund is required).
 
 - `PAYMENT_GATEWAY=test` also requires
   `ENABLE_TEST_PAYMENT_GATEWAY=true`.
+- Add both values to the local `.env` or Replit Development Secrets and restart
+  the API before testing. The mobile app does not select or override them.
 - Published Replit or production environments fail closed to `disabled`.
 - Stripe dependencies, schema fields, webhooks, and native plugin remain in
   place but new checkout does not use them unless `PAYMENT_GATEWAY=stripe`.
@@ -749,7 +815,12 @@ const booking = useGetBooking(id, { query: { enabled: !!id } });
 
 ## 16. Known Gotchas & Pitfalls
 
-1. **Clerk Expo Future API** — Import `useSignIn`, `useSignUp` from `@clerk/expo` (main export). The `/legacy` path silently no-ops on Replit-managed Clerk. Always read `signIn.status` from the signal after `await signIn.password(...)`.
+1. **Clerk Expo Future API** — Import `useSignIn`, `useSignUp` from
+   `@clerk/expo` (main export). The `/legacy` path silently no-ops on
+   Replit-managed Clerk. For password sign-in, call
+   `signIn.create({ identifier })`, verify the password factor is supported,
+   then call `signIn.password({ password })`. Read status from the signal and
+   call `signIn.finalize()` only after it becomes `complete`.
 
 2. **Express 5 syntax** — Wildcard routes: `/{*splat}`. Optional params: `{/:id}`. Async handlers must be typed `Promise<void>`.
 
@@ -757,7 +828,9 @@ const booking = useGetBooking(id, { query: { enabled: !!id } });
 
 4. **Router guard scoping** — Always scope `router.use(requireAuth)` to a path prefix like `router.use("/host", requireAuth)`. A path-less guard intercepts everything including public routes mounted later.
 
-5. **Alert.alert in Replit canvas** — `Alert.alert()` is silently suppressed inside Replit's canvas iframe. Always use inline error state, never native alert dialogs.
+5. **Alert.alert in Replit canvas** — `Alert.alert()` can be suppressed inside
+   Replit's canvas iframe. Actions that must work on web should use visible
+   inline error state or a cross-platform modal such as `ConfirmActionModal`.
 
 6. **MARSA API response shapes** — Yacht list/detail responses return nested or string fields. Mobile screens must map them explicitly; never assume flat camelCase from the generated types.
 
@@ -787,10 +860,10 @@ const booking = useGetBooking(id, { query: { enabled: !!id } });
 
 | Feature | Notes |
 |---------|-------|
-| User authentication (email/password + Google) | Clerk Expo Future API; sign-in, sign-up, forgot-password |
+| User authentication (password/email-code + Google) | Clerk Expo v3.7 Future API; identify-then-factor sign-in, MFA handling, sign-up, password reset, normalized email/error handling, and reliable cross-platform sign-out |
 | Yacht browsing & search | Filter by category, capacity, date |
 | Yacht detail page | Photos, templates, availability, reviews |
-| Provider-neutral booking flow | Development test gateway; Stripe preserved but disabled by configuration |
+| Provider-neutral booking flow | Development test gateway completes and persists virtual successful payments; Stripe is preserved but disabled by configuration |
 | Booking confirmation / rejection by host | With refund on rejection |
 | Guest booking history | With booking detail and receipt |
 | Host yacht management | Create/edit listings plus explicit per-yacht slot calendar and slot price overrides |
