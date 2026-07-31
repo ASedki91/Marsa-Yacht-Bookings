@@ -2,7 +2,6 @@ import { BlurView } from "expo-blur";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { Tabs, useRouter } from "expo-router";
 import { Platform, Pressable, StyleSheet, View, useColorScheme } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 
@@ -12,7 +11,6 @@ export default function GuestTabsLayout() {
   const isDark = useColorScheme() === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
-  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
@@ -25,42 +23,25 @@ export default function GuestTabsLayout() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
         tabBarLabelStyle: { fontFamily: "Inter_500Medium", fontSize: 10 },
-        tabBarStyle: isIOS ? {
+        tabBarStyle: {
           position: "absolute",
-          backgroundColor: "transparent",
-          borderTopWidth: 0,
-          elevation: 0,
-          marginHorizontal: 16,
-          borderRadius: 26,
-          overflow: "hidden",
-          bottom: insets.bottom > 0 ? insets.bottom - 4 : 12,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.14,
-          shadowRadius: 24,
-        } : isWeb ? {
-          position: "absolute",
-          backgroundColor: colors.background,
+          backgroundColor: isIOS ? "transparent" : colors.background,
           borderTopColor: colors.border,
-          borderTopWidth: 1,
+          borderTopWidth: isWeb ? 1 : 0,
           elevation: 0,
-          height: 76,
-        } : {
-          position: "absolute",
-          backgroundColor: colors.background,
-          borderTopWidth: 0,
-          elevation: 8,
+          ...(isWeb ? { height: 76 } : {}),
         },
-        tabBarItemStyle: isIOS ? { paddingVertical: 4 } : undefined,
         tabBarBackground: () =>
           isIOS ? (
             <BlurView
-              intensity={90}
+              intensity={100}
               tint={isDark ? "dark" : "light"}
-              style={[StyleSheet.absoluteFill, { borderRadius: 26 }]}
+              style={StyleSheet.absoluteFill}
             />
           ) : isWeb ? (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]} />
+            <View
+              style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]}
+            />
           ) : null,
         headerRight: () => (
           <Pressable
