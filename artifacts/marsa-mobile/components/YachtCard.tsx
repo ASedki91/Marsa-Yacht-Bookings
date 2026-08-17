@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
   badgeText: {
     color: "#FFFFFF",
     fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "HankenGrotesk_600SemiBold",
   },
   content: {
     padding: 14,
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "HankenGrotesk_600SemiBold",
   },
   meta: {
     flexDirection: "row",
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 13,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
   },
   priceRow: {
     flexDirection: "row",
@@ -256,10 +256,10 @@ const styles = StyleSheet.create({
   },
   price: {
     fontSize: 16,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "HankenGrotesk_700Bold",
   },
   perNight: {
     fontSize: 12,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
   },
 });

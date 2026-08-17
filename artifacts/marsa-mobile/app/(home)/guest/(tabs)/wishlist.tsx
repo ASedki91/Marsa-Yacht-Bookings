@@ -114,12 +114,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   kicker: {
-    fontFamily: "Inter_700Bold",
+    fontFamily: "HankenGrotesk_700Bold",
     fontSize: 11,
     letterSpacing: 1.2,
     marginBottom: 4,
   },
-  title: { fontFamily: "Inter_700Bold", fontSize: 26 },
-  subtitle: { fontFamily: "Inter_400Regular", fontSize: 13, marginTop: 4 },
+  title: { fontFamily: "Marcellus_400Regular", fontSize: 26 },
+  subtitle: { fontFamily: "HankenGrotesk_400Regular", fontSize: 13, marginTop: 4 },
   list: { padding: 16 },
 });

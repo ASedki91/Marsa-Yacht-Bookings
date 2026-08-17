@@ -84,9 +84,9 @@ const sStyles = StyleSheet.create({
     alignItems: "flex-start",
     minHeight: 100,
   },
-  value: { fontSize: 22, fontFamily: "Inter_700Bold" },
-  label: { fontSize: 12, fontFamily: "Inter_400Regular" },
-  sub: { fontSize: 11, fontFamily: "Inter_500Medium", marginTop: 2 },
+  value: { fontSize: 22, fontFamily: "HankenGrotesk_700Bold" },
+  label: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular" },
+  sub: { fontSize: 11, fontFamily: "HankenGrotesk_500Medium", marginTop: 2 },
 });
 
 function BookingRow({
@@ -98,10 +98,10 @@ function BookingRow({
 }) {
   const c = useColors();
   const statusColors: Record<string, string> = {
-    pending_payment: "#F59E0B",
-    paid_under_review: "#3B82F6",
+    pending_payment: "#C2924F",
+    paid_under_review: "#254E7B",
     confirmed: "#22C55E",
-    completed: "#3B82F6",
+    completed: "#254E7B",
     cancel_requested: "#F97316",
     cancelled: "#EF4444",
     rejected_refunded: "#6B7280",
@@ -166,11 +166,11 @@ const bStyles = StyleSheet.create({
     borderWidth: 1,
   },
   dot: { width: 10, height: 10, borderRadius: 5 },
-  guest: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  yacht: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 1 },
+  guest: { fontSize: 14, fontFamily: "HankenGrotesk_600SemiBold" },
+  yacht: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular", marginTop: 1 },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  badgeText: { fontSize: 11, fontFamily: "Inter_500Medium" },
-  amount: { fontSize: 13, fontFamily: "Inter_700Bold" },
+  badgeText: { fontSize: 11, fontFamily: "HankenGrotesk_500Medium" },
+  amount: { fontSize: 13, fontFamily: "HankenGrotesk_700Bold" },
 });
 
 export default function DashboardScreen() {
@@ -283,7 +283,7 @@ export default function DashboardScreen() {
             <View
               style={[
                 styles.alertBanner,
-                { backgroundColor: "#FEF3C7", borderColor: "#F59E0B" },
+                { backgroundColor: "#F2E5CF", borderColor: "#C2924F" },
               ]}
             >
               <Ionicons name="alert-circle" size={18} color="#D97706" />
@@ -412,8 +412,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  greeting: { fontSize: 13, fontFamily: "Inter_400Regular" },
-  name: { fontSize: 24, fontFamily: "Inter_700Bold" },
+  greeting: { fontSize: 13, fontFamily: "HankenGrotesk_400Regular" },
+  name: { fontSize: 24, fontFamily: "HankenGrotesk_700Bold" },
   addBtn: {
     width: 44,
     height: 44,
@@ -439,18 +439,18 @@ const styles = StyleSheet.create({
   alertText: {
     flex: 1,
     fontSize: 13,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
     lineHeight: 18,
   },
-  alertLink: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  alertLink: { fontSize: 13, fontFamily: "HankenGrotesk_600SemiBold" },
   section: { gap: 12 },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  sectionTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },
-  seeAll: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  sectionTitle: { fontSize: 17, fontFamily: "Marcellus_400Regular" },
+  seeAll: { fontSize: 13, fontFamily: "HankenGrotesk_500Medium" },
   bookingList: { gap: 8 },
   emptyCard: {
     padding: 24,
@@ -459,10 +459,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  emptyText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  emptyText: { fontSize: 15, fontFamily: "HankenGrotesk_600SemiBold" },
   emptySub: {
     fontSize: 13,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
     textAlign: "center",
     lineHeight: 18,
   },
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
   },
   actionLabel: {
     fontSize: 13,
-    fontFamily: "Inter_500Medium",
+    fontFamily: "HankenGrotesk_500Medium",
     textAlign: "center",
   },
   feeNote: {
@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
   feeText: {
     flex: 1,
     fontSize: 12,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
     lineHeight: 17,
   },
 });

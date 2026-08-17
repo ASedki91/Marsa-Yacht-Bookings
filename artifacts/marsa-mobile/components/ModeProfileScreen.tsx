@@ -363,6 +363,16 @@ export function ModeProfileScreen({ mode }: { mode: ProfileMode }) {
             }
           />
           <ProfileRow
+            icon="shield-checkmark-outline"
+            label="Privacy Policy"
+            onPress={() => router.push("/legal/privacy" as any)}
+          />
+          <ProfileRow
+            icon="document-text-outline"
+            label="Terms of Use"
+            onPress={() => router.push("/legal/terms" as any)}
+          />
+          <ProfileRow
             icon="log-out-outline"
             label="Sign out"
             danger
@@ -413,14 +423,14 @@ const styles = StyleSheet.create({
   },
   initials: {
     color: colors.light.navy,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "HankenGrotesk_700Bold",
     fontSize: 23,
   },
   identityCopy: { flex: 1 },
-  name: { color: "#FFFFFF", fontFamily: "Inter_700Bold", fontSize: 20 },
+  name: { color: "#FFFFFF", fontFamily: "HankenGrotesk_700Bold", fontSize: 20 },
   email: {
     color: "rgba(255,255,255,0.72)",
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
     fontSize: 13,
     marginTop: 2,
   },
@@ -436,7 +446,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   modeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.light.gold },
-  modeLabel: { color: "#FFFFFF", fontFamily: "Inter_600SemiBold", fontSize: 11 },
+  modeLabel: { color: "#FFFFFF", fontFamily: "HankenGrotesk_600SemiBold", fontSize: 11 },
   switchCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -454,15 +464,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   switchCopy: { flex: 1 },
-  switchTitle: { fontFamily: "Inter_700Bold", fontSize: 15 },
+  switchTitle: { fontFamily: "HankenGrotesk_700Bold", fontSize: 15 },
   switchSubtitle: {
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
     fontSize: 12,
     lineHeight: 17,
     marginTop: 3,
   },
   sectionLabel: {
-    fontFamily: "Inter_700Bold",
+    fontFamily: "SpaceMono_700Bold",
     fontSize: 11,
     letterSpacing: 1.1,
     marginBottom: 8,
@@ -485,11 +495,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  rowLabel: { flex: 1, fontFamily: "Inter_600SemiBold", fontSize: 14 },
-  rowDetail: { maxWidth: 95, fontFamily: "Inter_400Regular", fontSize: 12 },
+  rowLabel: { flex: 1, fontFamily: "HankenGrotesk_600SemiBold", fontSize: 14 },
+  rowDetail: { maxWidth: 95, fontFamily: "HankenGrotesk_400Regular", fontSize: 12 },
   version: {
     textAlign: "center",
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
     fontSize: 12,
     marginTop: 4,
   },

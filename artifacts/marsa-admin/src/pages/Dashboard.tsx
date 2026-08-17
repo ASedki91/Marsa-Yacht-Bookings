@@ -11,8 +11,8 @@ import {
 
 const BOOKING_STATUS_COLORS: Record<string, string> = {
   pending_payment: "#6B7280",
-  pending_host: "#F59E0B",
-  confirmed: "#3B82F6",
+  pending_host: "#C2924F",
+  confirmed: "#254E7B",
   completed: "#10B981",
   cancelled: "#6B7280",
   refunded: "#F97316",
@@ -53,7 +53,7 @@ function StatCard({
   return href ? <Link href={href}><a>{inner}</a></Link> : inner;
 }
 
-const CHART_COLORS = ["#3B82F6", "#F59E0B", "#10B981", "#F97316", "#EF4444", "#8B5CF6", "#6B7280"];
+const CHART_COLORS = ["#254E7B", "#C2924F", "#10B981", "#F97316", "#EF4444", "#8B5CF6", "#6B7280"];
 
 export default function Dashboard() {
   const { data: stats, isLoading } = useGetAdminStats({
@@ -194,7 +194,7 @@ export default function Dashboard() {
                   labelStyle={{ color: "hsl(var(--foreground))", fontSize: 12 }}
                   itemStyle={{ color: "hsl(var(--foreground))", fontSize: 12 }}
                 />
-                <Bar dataKey="value" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="value" fill="#254E7B" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>

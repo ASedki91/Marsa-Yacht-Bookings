@@ -4,14 +4,14 @@
     "slug": "marsa-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/marsa-mark.png",
     "scheme": "marsa",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/icon.png",
+      "image": "./assets/images/marsa-mark.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1B2A4A"
+      "backgroundColor": "#243F5D"
     },
     "ios": {
       "supportsTablet": false,
@@ -21,7 +21,7 @@
       "package": "app.marsa.mobile"
     },
     "web": {
-      "favicon": "./assets/images/icon.png"
+      "favicon": "./assets/images/marsa-mark.png"
     },
     "plugins": [
       [

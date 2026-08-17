@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     gap: 12,
     borderBottomWidth: 1,
   },
-  title: { fontSize: 24, fontFamily: "Inter_700Bold" },
+  title: { fontSize: 24, fontFamily: "Marcellus_400Regular" },
   segmented: {
     flexDirection: "row",
     borderRadius: 12,
@@ -231,6 +231,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
   },
-  segTabText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  segTabText: { fontSize: 13, fontFamily: "HankenGrotesk_600SemiBold" },
   list: { padding: 16 },
 });

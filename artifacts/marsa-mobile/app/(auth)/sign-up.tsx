@@ -10,6 +10,7 @@ import { Link, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
+import { MarsaLogo } from "@/components/MarsaLogo";
 import colors from "@/constants/colors";
 import {
   getClerkErrorMessage,
@@ -196,8 +197,8 @@ export default function SignUpScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.headerRow}>
-          <View style={[styles.logoBox, { backgroundColor: colors.light.navy }]}>
-            <Ionicons name="boat" size={26} color={colors.light.gold} />
+          <View style={styles.logoBox}>
+            <MarsaLogo size={60} />
           </View>
           <Text style={[styles.brand, { color: c.foreground }]}>MARSA</Text>
         </View>
@@ -283,6 +284,18 @@ export default function SignUpScreen() {
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Create Account</Text>}
         </Pressable>
 
+        <Text style={[styles.legalConsent, { color: c.mutedForeground }]}>
+          By creating an account, you agree to our{" "}
+          <Link href={"/legal/terms" as any}>
+            <Text style={[styles.legalLink, { color: c.primary }]}>Terms of Use</Text>
+          </Link>{" "}
+          and acknowledge our{" "}
+          <Link href={"/legal/privacy" as any}>
+            <Text style={[styles.legalLink, { color: c.primary }]}>Privacy Policy</Text>
+          </Link>
+          .
+        </Text>
+
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: c.mutedForeground }]}>Already have an account? </Text>
           <Link href="/(auth)/sign-in">
@@ -299,23 +312,25 @@ const styles = StyleSheet.create({
   verifyContainer: { flex: 1, alignItems: "center", paddingHorizontal: 24, gap: 16 },
   headerRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 8 },
   logoBox: { width: 60, height: 60, borderRadius: 18, alignItems: "center", justifyContent: "center" },
-  brand: { fontSize: 24, fontFamily: "Inter_700Bold", letterSpacing: 3 },
-  title: { fontSize: 22, fontFamily: "Inter_700Bold" },
-  subtitle: { fontSize: 14, fontFamily: "Inter_400Regular" },
+  brand: { fontSize: 24, fontFamily: "Marcellus_400Regular", letterSpacing: 6.2 },
+  title: { fontSize: 22, fontFamily: "Marcellus_400Regular" },
+  subtitle: { fontSize: 14, fontFamily: "HankenGrotesk_400Regular" },
   socialBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, padding: 14, borderRadius: 12, borderWidth: 1 },
-  socialBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  socialBtnText: { fontSize: 15, fontFamily: "HankenGrotesk_600SemiBold" },
   divider: { flexDirection: "row", alignItems: "center", gap: 10 },
   dividerLine: { flex: 1, height: 1 },
-  dividerText: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  dividerText: { fontSize: 13, fontFamily: "HankenGrotesk_400Regular" },
   field: { gap: 6 },
-  label: { fontSize: 14, fontFamily: "Inter_500Medium" },
-  input: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: "Inter_400Regular" },
+  label: { fontSize: 14, fontFamily: "HankenGrotesk_500Medium" },
+  input: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: "HankenGrotesk_400Regular" },
   eyeBtn: { position: "absolute", right: 14, top: 0, bottom: 0, justifyContent: "center" },
   primaryBtn: { borderRadius: 12, paddingVertical: 15, alignItems: "center", marginTop: 4 },
-  primaryBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  primaryBtnText: { color: "#fff", fontSize: 15, fontFamily: "HankenGrotesk_600SemiBold" },
+  legalConsent: { fontSize: 12, lineHeight: 18, textAlign: "center", fontFamily: "HankenGrotesk_400Regular" },
+  legalLink: { fontFamily: "HankenGrotesk_600SemiBold" },
   footer: { flexDirection: "row", justifyContent: "center", flexWrap: "wrap" },
-  footerText: { fontSize: 14, fontFamily: "Inter_400Regular" },
-  linkText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  footerText: { fontSize: 14, fontFamily: "HankenGrotesk_400Regular" },
+  linkText: { fontSize: 14, fontFamily: "HankenGrotesk_600SemiBold" },
   errorBox: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 10, borderWidth: 1 },
-  errorText: { color: "#ef4444", fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
+  errorText: { color: "#ef4444", fontSize: 13, fontFamily: "HankenGrotesk_400Regular", flex: 1 },
 });

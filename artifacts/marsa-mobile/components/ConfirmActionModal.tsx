@@ -175,12 +175,12 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   title: {
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Marcellus_400Regular",
     fontSize: 20,
     textAlign: "center",
   },
   message: {
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
     fontSize: 14,
     lineHeight: 20,
     textAlign: "center",
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     flex: 1,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
     fontSize: 12,
     lineHeight: 17,
   },
@@ -221,12 +221,12 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   cancelText: {
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "HankenGrotesk_600SemiBold",
     fontSize: 14,
   },
   confirmText: {
     color: "#FFFFFF",
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "HankenGrotesk_600SemiBold",
     fontSize: 14,
   },
 });

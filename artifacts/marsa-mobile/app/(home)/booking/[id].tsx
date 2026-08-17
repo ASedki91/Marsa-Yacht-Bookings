@@ -17,11 +17,11 @@ import { EmptyState } from "@/components/EmptyState";
 import colors from "@/constants/colors";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: string }> = {
-  pending_payment:   { label: "Pending Payment",  color: "#92400E", bg: "#FEF3C7", icon: "card-outline" },
+  pending_payment:   { label: "Pending Payment",  color: "#92400E", bg: "#F2E5CF", icon: "card-outline" },
   paid_under_review: { label: "Under Review",     color: "#1E40AF", bg: "#DBEAFE", icon: "search-outline" },
   confirmed:         { label: "Confirmed",         color: "#065F46", bg: "#D1FAE5", icon: "checkmark-circle-outline" },
   completed:         { label: "Completed",         color: "#1E40AF", bg: "#DBEAFE", icon: "trophy-outline" },
-  cancel_requested:  { label: "Cancel Requested", color: "#92400E", bg: "#FEF3C7", icon: "alert-outline" },
+  cancel_requested:  { label: "Cancel Requested", color: "#92400E", bg: "#F2E5CF", icon: "alert-outline" },
   cancelled:         { label: "Cancelled",         color: "#991B1B", bg: "#FEE2E2", icon: "close-circle-outline" },
   rejected_refunded: { label: "Rejected",          color: "#6B7280", bg: "#F1F5F9", icon: "ban-outline" },
 };
@@ -100,19 +100,19 @@ function Timeline({ status }: { status: string }) {
 
 const tlStyles = StyleSheet.create({
   container: { gap: 0 },
-  heading: { fontSize: 16, fontFamily: "Inter_700Bold", marginBottom: 16 },
+  heading: { fontSize: 16, fontFamily: "Marcellus_400Regular", marginBottom: 16 },
   stepRow: { flexDirection: "row", gap: 12 },
   leftCol: { alignItems: "center", width: 24 },
   dot: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   line: { width: 2, flex: 1, minHeight: 32, marginVertical: 4 },
   textCol: { paddingBottom: 24, flex: 1 },
-  stepLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  stepSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  stepLabel: { fontSize: 14, fontFamily: "HankenGrotesk_600SemiBold" },
+  stepSub: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular", marginTop: 2 },
   cancelledBox: {
     flexDirection: "row", alignItems: "center", gap: 10,
     padding: 14, borderRadius: 12, borderWidth: 1,
   },
-  cancelledText: { fontSize: 14, fontFamily: "Inter_500Medium", flex: 1 },
+  cancelledText: { fontSize: 14, fontFamily: "HankenGrotesk_500Medium", flex: 1 },
 });
 
 function DetailRow({ label, value, icon }: { label: string; value: string; icon?: any }) {
@@ -131,8 +131,8 @@ function DetailRow({ label, value, icon }: { label: string; value: string; icon?
 const dtStyles = StyleSheet.create({
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1 },
   rowLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
-  label: { fontSize: 13, fontFamily: "Inter_400Regular" },
-  value: { fontSize: 14, fontFamily: "Inter_600SemiBold", maxWidth: "60%", textAlign: "right" },
+  label: { fontSize: 13, fontFamily: "HankenGrotesk_400Regular" },
+  value: { fontSize: 14, fontFamily: "HankenGrotesk_600SemiBold", maxWidth: "60%", textAlign: "right" },
 });
 
 export default function BookingDetailScreen() {
@@ -307,7 +307,7 @@ export default function BookingDetailScreen() {
           </View>
 
           {/* Payment status badge */}
-          <View style={[styles.paymentBadge, { backgroundColor: booking.paymentStatus === "succeeded" || booking.paymentStatus === "paid" ? "#D1FAE5" : "#FEF3C7" }]}>
+          <View style={[styles.paymentBadge, { backgroundColor: booking.paymentStatus === "succeeded" || booking.paymentStatus === "paid" ? "#D1FAE5" : "#F2E5CF" }]}>
             <Ionicons
               name={booking.paymentStatus === "succeeded" || booking.paymentStatus === "paid" ? "checkmark-circle-outline" : "card-outline"}
               size={16}
@@ -478,7 +478,7 @@ export default function BookingDetailScreen() {
                   </View>
                   {!cancellationQuote.manualReviewRequired &&
                     cancellationQuote.feePercentage !== null && (
-                      <View style={[styles.feePill, { backgroundColor: "#FEF3C7" }]}>
+                      <View style={[styles.feePill, { backgroundColor: "#F2E5CF" }]}>
                         <Text style={styles.feePillText}>
                           {Number(cancellationQuote.feePercentage).toLocaleString("en-EG", {
                             maximumFractionDigits: 2,
@@ -620,38 +620,38 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", gap: 12,
   },
   backBtn: { padding: 4 },
-  headerTitle: { flex: 1, fontSize: 17, fontFamily: "Inter_700Bold" },
+  headerTitle: { flex: 1, fontSize: 17, fontFamily: "Marcellus_400Regular" },
   statusBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-  statusLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  statusLabel: { fontSize: 12, fontFamily: "HankenGrotesk_600SemiBold" },
   content: { padding: 16, gap: 16 },
   card: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 4 },
-  yachtName: { fontSize: 18, fontFamily: "Inter_700Bold" },
-  bookingId: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
-  sectionTitle: { fontSize: 15, fontFamily: "Inter_700Bold", marginBottom: 8 },
+  yachtName: { fontSize: 18, fontFamily: "HankenGrotesk_700Bold" },
+  bookingId: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular", marginTop: 2 },
+  sectionTitle: { fontSize: 15, fontFamily: "Marcellus_400Regular", marginBottom: 8 },
   totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingVertical: 8 },
-  totalLabel: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
-  totalEgp: { fontSize: 22, fontFamily: "Inter_700Bold" },
-  totalUsd: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  totalLabel: { fontSize: 16, fontFamily: "HankenGrotesk_600SemiBold" },
+  totalEgp: { fontSize: 22, fontFamily: "HankenGrotesk_700Bold" },
+  totalUsd: { fontSize: 13, fontFamily: "HankenGrotesk_400Regular" },
   paymentBadge: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, borderRadius: 10, marginTop: 8 },
-  paymentText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  paymentText: { fontSize: 13, fontFamily: "HankenGrotesk_500Medium" },
   footer: {
     position: "absolute", bottom: 0, left: 0, right: 0,
     padding: 16, paddingTop: 12, gap: 10, borderTopWidth: 1,
   },
   reviewBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 12, paddingVertical: 14 },
-  reviewBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  reviewBtnText: { color: "#fff", fontSize: 15, fontFamily: "HankenGrotesk_600SemiBold" },
   cancelBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 12, paddingVertical: 14, borderWidth: 1.5 },
-  cancelBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  cancelBtnText: { fontSize: 15, fontFamily: "HankenGrotesk_600SemiBold" },
   receiptDivider: { height: 1, marginVertical: 8 },
   stripeRef: {
     flexDirection: "row", alignItems: "center", gap: 6,
     paddingHorizontal: 10, paddingVertical: 7,
     borderRadius: 8, borderWidth: 1, marginTop: 8,
   },
-  stripeRefLabel: { fontSize: 11, fontFamily: "Inter_500Medium" },
-  stripeRefValue: { fontSize: 11, fontFamily: "Inter_400Regular", flex: 1 },
+  stripeRefLabel: { fontSize: 11, fontFamily: "HankenGrotesk_500Medium" },
+  stripeRefValue: { fontSize: 11, fontFamily: "HankenGrotesk_400Regular", flex: 1 },
   termsHeader: { flexDirection: "row", alignItems: "center", gap: 9, marginBottom: 9 },
-  termsVersion: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
+  termsVersion: { fontSize: 11, fontFamily: "HankenGrotesk_400Regular", marginTop: 2 },
   termsRule: {
     flexDirection: "row",
     alignItems: "center",
@@ -659,8 +659,8 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 7,
   },
-  termsWindow: { flex: 1, fontSize: 12, fontFamily: "Inter_400Regular" },
-  termsFee: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  termsWindow: { flex: 1, fontSize: 12, fontFamily: "HankenGrotesk_400Regular" },
+  termsFee: { fontSize: 12, fontFamily: "HankenGrotesk_700Bold" },
   modalBackdrop: {
     flex: 1,
     justifyContent: "flex-end",
@@ -688,15 +688,15 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 12,
   },
-  cancelSheetTitle: { fontSize: 21, fontFamily: "Inter_700Bold" },
+  cancelSheetTitle: { fontSize: 21, fontFamily: "HankenGrotesk_700Bold" },
   cancelSheetSubtitle: {
     fontSize: 12,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
     lineHeight: 17,
     marginTop: 3,
   },
   quoteLoading: { alignItems: "center", gap: 10, paddingVertical: 30 },
-  quoteLoadingText: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  quoteLoadingText: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular" },
   quoteError: {
     borderWidth: 1,
     borderRadius: 14,
@@ -705,14 +705,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
-  quoteErrorTitle: { color: "#991B1B", fontSize: 13, fontFamily: "Inter_700Bold" },
+  quoteErrorTitle: { color: "#991B1B", fontSize: 13, fontFamily: "HankenGrotesk_700Bold" },
   quoteErrorCopy: {
     color: "#B91C1C",
     fontSize: 11,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
     marginTop: 2,
   },
-  quoteRetry: { color: "#B91C1C", fontSize: 12, fontFamily: "Inter_700Bold" },
+  quoteRetry: { color: "#B91C1C", fontSize: 12, fontFamily: "HankenGrotesk_700Bold" },
   quoteWindow: {
     minHeight: 65,
     borderWidth: 1,
@@ -722,10 +722,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
-  quoteWindowLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
-  quoteWindowValue: { fontSize: 16, fontFamily: "Inter_700Bold", marginTop: 2 },
+  quoteWindowLabel: { fontSize: 10, fontFamily: "HankenGrotesk_600SemiBold" },
+  quoteWindowValue: { fontSize: 16, fontFamily: "HankenGrotesk_700Bold", marginTop: 2 },
   feePill: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 6 },
-  feePillText: { color: "#92400E", fontSize: 11, fontFamily: "Inter_700Bold" },
+  feePillText: { color: "#92400E", fontSize: 11, fontFamily: "HankenGrotesk_700Bold" },
   manualReview: {
     borderWidth: 1,
     borderRadius: 14,
@@ -738,7 +738,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: "#9A3412",
     fontSize: 12,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
     lineHeight: 18,
   },
   quoteAmounts: { borderWidth: 1, borderRadius: 15, padding: 14, gap: 10 },
@@ -747,8 +747,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  quoteAmountLabel: { fontSize: 12, fontFamily: "Inter_400Regular" },
-  quoteAmountValue: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  quoteAmountLabel: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular" },
+  quoteAmountValue: { fontSize: 13, fontFamily: "HankenGrotesk_600SemiBold" },
   quoteRefundRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -756,9 +756,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     paddingTop: 11,
   },
-  quoteRefundLabel: { fontSize: 14, fontFamily: "Inter_700Bold" },
-  quoteRefundValue: { color: "#047857", fontSize: 18, fontFamily: "Inter_700Bold" },
-  cancelReasonLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold", marginBottom: 7 },
+  quoteRefundLabel: { fontSize: 14, fontFamily: "HankenGrotesk_700Bold" },
+  quoteRefundValue: { color: "#047857", fontSize: 18, fontFamily: "HankenGrotesk_700Bold" },
+  cancelReasonLabel: { fontSize: 13, fontFamily: "HankenGrotesk_600SemiBold", marginBottom: 7 },
   cancelReasonInput: {
     minHeight: 74,
     borderWidth: 1,
@@ -766,7 +766,7 @@ const styles = StyleSheet.create({
     padding: 12,
     textAlignVertical: "top",
     fontSize: 13,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
   },
   cancelAcceptance: {
     flexDirection: "row",
@@ -776,7 +776,7 @@ const styles = StyleSheet.create({
   cancelAcceptanceText: {
     flex: 1,
     fontSize: 12,
-    fontFamily: "Inter_500Medium",
+    fontFamily: "HankenGrotesk_500Medium",
     lineHeight: 18,
   },
   submitCancel: {
@@ -787,5 +787,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 7,
   },
-  submitCancelText: { color: "#FFFFFF", fontSize: 14, fontFamily: "Inter_700Bold" },
+  submitCancelText: { color: "#FFFFFF", fontSize: 14, fontFamily: "HankenGrotesk_700Bold" },
 });

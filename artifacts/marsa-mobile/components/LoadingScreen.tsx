@@ -27,7 +27,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
     marginTop: 8,
   },
 });

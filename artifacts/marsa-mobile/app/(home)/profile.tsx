@@ -310,7 +310,7 @@ export default function ProfileScreen() {
               {isSaving ? (
                 <ActivityIndicator size="small" color={c.primary} />
               ) : (
-                <Text style={[styles.editHeaderBtnText, { color: c.primary, fontFamily: "Inter_600SemiBold" }]}>
+                <Text style={[styles.editHeaderBtnText, { color: c.primary, fontFamily: "HankenGrotesk_600SemiBold" }]}>
                   Save
                 </Text>
               )}
@@ -465,7 +465,7 @@ export default function ProfileScreen() {
           <SettingRow
             icon="notifications-outline"
             label="Notifications"
-            iconColor="#F59E0B"
+            iconColor="#C2924F"
             onPress={() => router.push("/(home)/notifications")}
           />
           {!isHost && (
@@ -515,10 +515,17 @@ export default function ProfileScreen() {
           />
           <View style={[styles.separator, { backgroundColor: c.border }]} />
           <SettingRow
-            icon="document-text-outline"
-            label="Terms & Privacy"
+            icon="shield-checkmark-outline"
+            label="Privacy Policy"
             iconColor={c.mutedForeground}
-            onPress={() => {}}
+            onPress={() => router.push("/legal/privacy" as any)}
+          />
+          <View style={[styles.separator, { backgroundColor: c.border }]} />
+          <SettingRow
+            icon="document-text-outline"
+            label="Terms of Use"
+            iconColor={c.mutedForeground}
+            onPress={() => router.push("/legal/terms" as any)}
           />
         </View>
       </View>
@@ -561,7 +568,7 @@ const styles = StyleSheet.create({
   avatarWrapper: { position: "relative", marginBottom: 8 },
   avatar: { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center" },
   avatarImage: { width: 80, height: 80, borderRadius: 40 },
-  avatarText: { color: "#fff", fontSize: 28, fontFamily: "Inter_700Bold" },
+  avatarText: { color: "#fff", fontSize: 28, fontFamily: "HankenGrotesk_700Bold" },
   avatarEditBadge: {
     position: "absolute", bottom: 0, right: 0,
     width: 26, height: 26, borderRadius: 13,
@@ -569,35 +576,35 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
     borderWidth: 2, borderColor: "#fff",
   },
-  name: { fontSize: 20, fontFamily: "Inter_700Bold", textAlign: "center" },
-  email: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center" },
-  phone: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 2 },
+  name: { fontSize: 20, fontFamily: "HankenGrotesk_700Bold", textAlign: "center" },
+  email: { fontSize: 14, fontFamily: "HankenGrotesk_400Regular", textAlign: "center" },
+  phone: { fontSize: 13, fontFamily: "HankenGrotesk_400Regular", textAlign: "center", marginTop: 2 },
   roleBadgeRow: { flexDirection: "row", justifyContent: "center", marginTop: 6, marginBottom: 12 },
   roleBadge: { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 100 },
-  roleBadgeText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  roleBadgeText: { fontSize: 13, fontFamily: "HankenGrotesk_600SemiBold" },
   section: { width: "100%", gap: 8 },
-  sectionTitle: { fontSize: 12, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.5, paddingLeft: 4 },
+  sectionTitle: { fontSize: 12, fontFamily: "HankenGrotesk_600SemiBold", textTransform: "uppercase", letterSpacing: 0.5, paddingLeft: 4 },
   card: { borderRadius: 14, borderWidth: 1, overflow: "hidden" },
   settingRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 14, gap: 12 },
   settingIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  settingLabel: { flex: 1, fontSize: 15, fontFamily: "Inter_500Medium" },
+  settingLabel: { flex: 1, fontSize: 15, fontFamily: "HankenGrotesk_500Medium" },
   settingRight: { flexDirection: "row", alignItems: "center", gap: 4 },
-  settingValue: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  settingValue: { fontSize: 13, fontFamily: "HankenGrotesk_400Regular" },
   separator: { height: 1, marginLeft: 62 },
-  version: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 20 },
+  version: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular", marginTop: 20 },
 
   // Edit mode
   editHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%", paddingVertical: 4, marginBottom: 16 },
   editHeaderBtn: { minWidth: 60, alignItems: "center", paddingVertical: 6 },
-  editHeaderBtnText: { fontSize: 16, fontFamily: "Inter_400Regular" },
-  editTitle: { fontSize: 17, fontFamily: "Inter_600SemiBold" },
+  editHeaderBtnText: { fontSize: 16, fontFamily: "HankenGrotesk_400Regular" },
+  editTitle: { fontSize: 17, fontFamily: "HankenGrotesk_600SemiBold" },
   editCard: { width: "100%", borderRadius: 14, borderWidth: 1, overflow: "hidden", marginTop: 8 },
   editField: { paddingHorizontal: 16, paddingVertical: 12, gap: 4 },
-  editLabel: { fontSize: 12, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.4 },
-  editInput: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, fontFamily: "Inter_400Regular" },
-  editReadOnly: { fontSize: 15, fontFamily: "Inter_400Regular", paddingVertical: 4 },
+  editLabel: { fontSize: 12, fontFamily: "HankenGrotesk_500Medium", textTransform: "uppercase", letterSpacing: 0.4 },
+  editInput: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, fontFamily: "HankenGrotesk_400Regular" },
+  editReadOnly: { fontSize: 15, fontFamily: "HankenGrotesk_400Regular", paddingVertical: 4 },
   fieldSeparator: { height: 1, marginHorizontal: 16 },
-  editHint: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 8, paddingHorizontal: 16 },
+  editHint: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular", textAlign: "center", marginTop: 8, paddingHorizontal: 16 },
   errorBox: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 10, borderWidth: 1, width: "100%", marginBottom: 4 },
-  errorText: { color: "#ef4444", fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
+  errorText: { color: "#ef4444", fontSize: 13, fontFamily: "HankenGrotesk_400Regular", flex: 1 },
 });

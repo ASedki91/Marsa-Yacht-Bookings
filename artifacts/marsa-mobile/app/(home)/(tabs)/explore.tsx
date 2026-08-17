@@ -24,8 +24,14 @@ import { useColors } from "@/hooks/useColors";
 import { YachtCard } from "@/components/YachtCard";
 import { EmptyState } from "@/components/EmptyState";
 import { SkeletonYachtCard } from "@/components/SkeletonCard";
+import {
+  addDaysToDateKey,
+  DateMatrixPicker,
+  toLocalDateKey,
+} from "@/components/DateMatrixPicker";
 import colors from "@/constants/colors";
 import { useWishlist } from "@/hooks/useWishlist";
+import { MarsaLogo } from "@/components/MarsaLogo";
 
 const SORT_OPTIONS = [
   { key: "newest", label: "Newest" },
@@ -74,17 +80,6 @@ function formatDateLabel(dateStr: string): string {
   });
 }
 
-function buildDateOptions(): { label: string; value: string }[] {
-  const opts: { label: string; value: string }[] = [];
-  for (let i = 0; i < 8; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    const value = d.toISOString().slice(0, 10);
-    opts.push({ label: formatDateLabel(value), value });
-  }
-  return opts;
-}
-
 interface FilterState {
   sort: string;
   minCapacity: number;
@@ -118,7 +113,8 @@ function FilterModal({
 }) {
   const c = useColors();
   const [draft, setDraft] = useState<FilterState>(filters);
-  const dateOptions = buildDateOptions();
+  const todayDate = toLocalDateKey(new Date());
+  const maximumFilterDate = addDaysToDateKey(todayDate, 7);
 
   const reset = () => setDraft(DEFAULT_FILTERS);
   const apply = () => {
@@ -205,55 +201,29 @@ function FilterModal({
           <Text style={[fStyles.sectionTitle, { color: c.foreground }]}>
             Date
           </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={fStyles.chipRow}>
-              <Pressable
-                style={[
-                  fStyles.dateChip,
-                  {
-                    backgroundColor: !draft.date ? colors.light.navy : c.card,
-                    borderColor: !draft.date ? colors.light.navy : c.border,
-                  },
-                ]}
-                onPress={() => setDraft((d) => ({ ...d, date: "" }))}
-              >
-                <Text
-                  style={[
-                    fStyles.dateChipText,
-                    { color: !draft.date ? "#fff" : c.foreground },
-                  ]}
-                >
-                  Any Date
-                </Text>
-              </Pressable>
-              {dateOptions.map((opt) => (
-                <Pressable
-                  key={opt.value}
-                  style={[
-                    fStyles.dateChip,
-                    {
-                      backgroundColor:
-                        draft.date === opt.value ? colors.light.navy : c.card,
-                      borderColor:
-                        draft.date === opt.value ? colors.light.navy : c.border,
-                    },
-                  ]}
-                  onPress={() => setDraft((d) => ({ ...d, date: opt.value }))}
-                >
-                  <Text
-                    style={[
-                      fStyles.dateChipText,
-                      {
-                        color: draft.date === opt.value ? "#fff" : c.foreground,
-                      },
-                    ]}
-                  >
-                    {opt.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </ScrollView>
+          <Pressable
+            style={[
+              fStyles.anyDate,
+              {
+                backgroundColor: !draft.date ? c.primary + "12" : c.card,
+                borderColor: !draft.date ? c.primary : c.border,
+              },
+            ]}
+            onPress={() => setDraft((d) => ({ ...d, date: "" }))}
+          >
+            <Ionicons name="calendar-clear-outline" size={18} color={c.primary} />
+            <Text style={[fStyles.anyDateText, { color: c.foreground }]}>Any date</Text>
+            {!draft.date && (
+              <Ionicons name="checkmark-circle" size={20} color={c.primary} />
+            )}
+          </Pressable>
+          <DateMatrixPicker
+            value={draft.date}
+            minimumDate={todayDate}
+            maximumDate={maximumFilterDate}
+            accessibilityLabel="Filter yachts by date"
+            onChange={(date) => setDraft((current) => ({ ...current, date }))}
+          />
 
           {templates.length > 0 && (
             <>
@@ -450,11 +420,11 @@ const fStyles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
   },
-  title: { fontSize: 17, fontFamily: "Inter_700Bold" },
-  cancel: { fontSize: 15, fontFamily: "Inter_400Regular" },
-  reset: { fontSize: 15, fontFamily: "Inter_400Regular" },
+  title: { fontSize: 17, fontFamily: "Marcellus_400Regular" },
+  cancel: { fontSize: 15, fontFamily: "HankenGrotesk_400Regular" },
+  reset: { fontSize: 15, fontFamily: "HankenGrotesk_400Regular" },
   content: { padding: 20, gap: 16 },
-  sectionTitle: { fontSize: 15, fontFamily: "Inter_700Bold" },
+  sectionTitle: { fontSize: 15, fontFamily: "Marcellus_400Regular" },
   sortOptions: { gap: 8 },
   sortOption: {
     flexDirection: "row",
@@ -464,16 +434,19 @@ const fStyles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
   },
-  sortLabel: { fontSize: 14, fontFamily: "Inter_400Regular" },
+  sortLabel: { fontSize: 14, fontFamily: "HankenGrotesk_400Regular" },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  dateChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+  anyDate: {
+    minHeight: 48,
+    borderRadius: 12,
     borderWidth: 1,
-    marginRight: 2,
+    paddingHorizontal: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
   },
-  dateChipText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  anyDateText: { flex: 1, fontSize: 13, fontFamily: "HankenGrotesk_600SemiBold" },
+  dateChipText: { fontSize: 13, fontFamily: "HankenGrotesk_500Medium" },
   templateChip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -487,16 +460,16 @@ const fStyles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
   },
-  capacityText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  capacityText: { fontSize: 13, fontFamily: "HankenGrotesk_500Medium" },
   priceInput: {
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
   },
-  priceNote: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: -8 },
+  priceNote: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular", marginTop: -8 },
   featuresGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   featureChip: {
     flexDirection: "row",
@@ -507,13 +480,13 @@ const fStyles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
   },
-  featureChipText: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  featureChipText: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular" },
   footer: { padding: 16, borderTopWidth: 1 },
   applyBtn: { borderRadius: 14, paddingVertical: 15, alignItems: "center" },
   applyBtnText: {
     color: "#fff",
     fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "HankenGrotesk_600SemiBold",
   },
 });
 
@@ -697,10 +670,8 @@ export default function ExploreScreen() {
               Find Your Yacht
             </Text>
           </View>
-          <View
-            style={[styles.logoBox, { backgroundColor: colors.light.navy }]}
-          >
-            <Ionicons name="boat" size={22} color={colors.light.gold} />
+          <View style={styles.logoBox}>
+            <MarsaLogo size={44} />
           </View>
         </View>
 
@@ -933,8 +904,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  greeting: { fontSize: 13, fontFamily: "Inter_400Regular" },
-  title: { fontSize: 26, fontFamily: "Inter_700Bold" },
+  greeting: { fontSize: 13, fontFamily: "HankenGrotesk_400Regular" },
+  title: { fontSize: 26, fontFamily: "Marcellus_400Regular" },
   logoBox: {
     width: 44,
     height: 44,
@@ -955,7 +926,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 14,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
     paddingVertical: 0,
   },
   filterBtn: {
@@ -981,20 +952,20 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: 100,
   },
-  categoryText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  categoryText: { fontSize: 13, fontFamily: "HankenGrotesk_500Medium" },
   activeFilters: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     paddingHorizontal: 2,
   },
-  activeFiltersText: { flex: 1, fontSize: 12, fontFamily: "Inter_400Regular" },
+  activeFiltersText: { flex: 1, fontSize: 12, fontFamily: "HankenGrotesk_400Regular" },
   clearFilters: { padding: 2 },
   list: { padding: 16, gap: 12 },
   gridItem: { flex: 1, margin: 4 },
   resultCount: {
     fontSize: 12,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
     marginBottom: 4,
   },
 });

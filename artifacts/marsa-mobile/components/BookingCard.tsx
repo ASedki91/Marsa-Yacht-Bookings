@@ -16,7 +16,7 @@ const STATUS_CONFIG: Record<
   pending_payment: {
     label: "Pending Payment",
     color: "#92400E",
-    bg: "#FEF3C7",
+    bg: "#F2E5CF",
     icon: "card-outline",
   },
   paid_under_review: {
@@ -40,7 +40,7 @@ const STATUS_CONFIG: Record<
   cancel_requested: {
     label: "Cancel Requested",
     color: "#92400E",
-    bg: "#FEF3C7",
+    bg: "#F2E5CF",
     icon: "alert-outline",
   },
   cancelled: {
@@ -171,7 +171,7 @@ export function BookingCard({
             <Text
               style={[
                 styles.detailText,
-                { color: c.foreground, fontFamily: "Inter_600SemiBold" },
+                { color: c.foreground, fontFamily: "HankenGrotesk_600SemiBold" },
               ]}
             >
               {amount}
@@ -237,11 +237,11 @@ const styles = StyleSheet.create({
   },
   yachtName: {
     fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "HankenGrotesk_600SemiBold",
   },
   template: {
     fontSize: 13,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
     marginTop: 2,
   },
   statusBadge: {
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "HankenGrotesk_600SemiBold",
   },
   details: {
     flexDirection: "row",
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
   },
   detailText: {
     fontSize: 13,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
   },
   actions: {
     flexDirection: "row",
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
   },
   actionBtnText: {
     fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "HankenGrotesk_600SemiBold",
   },
   reviewBtn: {
     flexDirection: "row",
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
   },
   reviewBtnText: {
     fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "HankenGrotesk_600SemiBold",
     color: "#fff",
   },
 });

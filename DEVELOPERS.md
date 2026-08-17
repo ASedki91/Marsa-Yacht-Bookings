@@ -72,6 +72,35 @@ seams and a disabled **Buy — Soon** choice are present.
   details or moving real money. Production and published Replit deployments
   still fail closed.
 
+### UI identity, calendar, and legal checkpoint (2026-08-17)
+
+- Guest date selection is standardized on
+  `artifacts/marsa-mobile/components/DateMatrixPicker.tsx`. Booking keeps its
+  existing 21-day window, Home search keeps its 30-day window, and Explore
+  keeps its 8-day window; only the presentation changed from horizontal date
+  cards/chips to an accessible month matrix. The component uses local
+  `YYYY-MM-DD` helpers to avoid UTC day rollover. The host per-yacht calendar
+  was already a matrix and remains functionally unchanged.
+- Privacy Policy and Terms of Use copy is stored in
+  `artifacts/marsa-mobile/constants/legal.ts` and rendered by the public
+  `/legal/privacy` and `/legal/terms` routes. These routes are available before
+  sign-up and from guest, host, compatibility, and full-profile surfaces. Keep
+  the runtime copy synchronized with approved legal text; do not substitute
+  the booking-specific cancellation terms with these general documents.
+- Mobile and admin now share the MARSA identity from
+  `https://marsa-identity-standalone.vercel.app/`: Navy `#243F5D`, Deep Blue
+  `#254E7B`, Dune Gold `#C2924F`, Warm Sand `#ECDCC0`, Paper `#F4EDDF`, and
+  Card `#FBF7EF`. Hanken Grotesk is the UI/body face, Marcellus is the
+  wordmark/display face, Space Mono is used for labels/details, and Tajawal is
+  loaded for Arabic text.
+- The canonical yacht/sun/sea mark is preserved as SVG in each client and as a
+  1024px PNG for Expo native icon/splash usage. `app.json`, authentication,
+  Explore, Clerk Admin sign-in, the admin sidebar, and browser favicons all use
+  the new mark. Admin font files are packaged with `@fontsource`; Replit does
+  not need Google Fonts network access at runtime.
+- This checkpoint is UI/content-only. It adds no API endpoint, migration,
+  database table, environment variable, or payment behavior change.
+
 ---
 
 ## 2. Repository Structure
@@ -517,6 +546,9 @@ app/
         └── yacht/[id]/calendar.tsx → Explicit date/time slots and per-slot price
 ```
 
+The root `legal/[document].tsx` route renders the public `/legal/privacy` and
+`/legal/terms` readers outside the authenticated route group.
+
 The legacy `(home)/(tabs)` files are compatibility implementations reused by
 the separated route trees; they are no longer presented as one mixed tab bar.
 Mode is client state persisted per Clerk user, while the server role remains
@@ -530,6 +562,10 @@ the authorization capability.
 | `expo-secure-store` | Clerk token cache |
 | `@tanstack/react-query` | Server state |
 | `@workspace/api-client-react` | Generated API hooks |
+| `@expo-google-fonts/hanken-grotesk` | Mobile UI/body typography |
+| `@expo-google-fonts/marcellus` | Mobile wordmark/display typography |
+| `@expo-google-fonts/space-mono` | Mobile label/detail typography |
+| `@expo-google-fonts/tajawal` | Mobile Arabic typography |
 | `@stripe/stripe-react-native` | Preserved optional Stripe payment sheet (platform-specific web stub) |
 | `expo-notifications` | Device permission, Expo token registration, and push deep links |
 | `expo-image-picker` | Yacht photo upload |
@@ -889,6 +925,9 @@ const booking = useGetBooking(id, { query: { enabled: !!id } });
 | Host name + bank details on withdrawal (admin) | Shown on admin withdrawal card |
 | Guest/host mode split | Separate five-tab interfaces with per-user remembered mode |
 | Guest discovery home | Location/date search, disabled Buy — Soon seam, featured/most-booked rails |
+| Matrix date selection | Shared accessible month grid in booking, Home search, and Explore filters; host calendar retained |
+| Privacy Policy and Terms of Use | Public in-app readers plus pre-sign-up and profile navigation |
+| MARSA identity system | Canonical logo, palette, and Marcellus/Hanken Grotesk/Space Mono/Tajawal typography across mobile and admin |
 | Wishlist | Live-only saved yachts across Home, Explore, detail, and Wishlist |
 | Managed locations | Admin activation/default/order plus host custom “Other” location |
 | Cancellation policies | Dynamic immutable tiers, checkout snapshot, quote, durable admin processing |
@@ -928,4 +967,4 @@ const booking = useGetBooking(id, { query: { enabled: !!id } });
 
 ---
 
-*Last updated: July 2026. See `replit.md` for quick-reference stack info and `replit.md > Gotchas` for Express/Drizzle-specific pitfalls.*
+*Last updated: August 2026. See `replit.md` for quick-reference stack info and `replit.md > Gotchas` for Express/Drizzle-specific pitfalls.*

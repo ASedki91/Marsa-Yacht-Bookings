@@ -20,7 +20,7 @@ import { YachtCard } from "@/components/YachtCard";
 import colors from "@/constants/colors";
 
 const STATUS_COLOR: Record<string, { label: string; color: string; bg: string }> = {
-  draft: { label: "Draft", color: "#92400E", bg: "#FEF3C7" },
+  draft: { label: "Draft", color: "#92400E", bg: "#F2E5CF" },
   pending_review: { label: "Under Review", color: "#1E40AF", bg: "#DBEAFE" },
   live: { label: "Live", color: "#065F46", bg: "#D1FAE5" },
   changes_requested: { label: "Changes Needed", color: "#991B1B", bg: "#FEE2E2" },
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     borderBottomWidth: 1,
   },
-  title: { fontSize: 24, fontFamily: "Inter_700Bold" },
+  title: { fontSize: 24, fontFamily: "Marcellus_400Regular" },
   addBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 10,
   },
-  addBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  addBtnText: { color: "#fff", fontSize: 14, fontFamily: "HankenGrotesk_600SemiBold" },
   list: { padding: 16 },
   statusRow: {
     marginTop: -12,
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  statusText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  statusText: { fontSize: 13, fontFamily: "HankenGrotesk_600SemiBold" },
   actionBtns: { flexDirection: "row", gap: 8 },
   actionBtn: {
     flexDirection: "row",
@@ -234,5 +234,5 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 8,
   },
-  actionBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  actionBtnText: { fontSize: 12, fontFamily: "HankenGrotesk_600SemiBold" },
 });

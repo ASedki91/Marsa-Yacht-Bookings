@@ -119,11 +119,15 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       >
         {/* Logo */}
         <div className="flex items-center gap-2 px-4 py-4 border-b border-sidebar-border">
-          <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center shrink-0">
-            <Ship className="w-4 h-4 text-primary-foreground" />
+          <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 overflow-hidden">
+            <img
+              src={`${import.meta.env.BASE_URL}marsa-mark.svg`}
+              alt=""
+              className="w-7 h-7 object-contain"
+            />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-bold text-sidebar-foreground leading-none">
+            <p className="text-sm font-display tracking-[0.26em] text-sidebar-foreground leading-none">
               MARSA
             </p>
             <p className="text-[10px] text-sidebar-foreground/50 tracking-widest uppercase leading-none mt-0.5">

@@ -18,17 +18,15 @@ import {
   useListLocations,
 } from "@workspace/api-client-react";
 
+import {
+  addDaysToDateKey,
+  DateMatrixPicker,
+  toLocalDateKey,
+} from "@/components/DateMatrixPicker";
 import { YachtCard } from "@/components/YachtCard";
 import colors from "@/constants/colors";
 import { useColors } from "@/hooks/useColors";
 import { useWishlist } from "@/hooks/useWishlist";
-
-function localIsoDate(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
 
 function formatSelectedDate(value: string) {
   if (!value) return "Any date";
@@ -51,6 +49,11 @@ export default function GuestHomeScreen() {
   const [locationPickerOpen, setLocationPickerOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const todayDate = useMemo(() => toLocalDateKey(new Date()), []);
+  const maximumSearchDate = useMemo(
+    () => addDaysToDateKey(todayDate, 29),
+    [todayDate],
+  );
 
   const homeData: any = discovery.data;
   const locations: any[] = (locationQuery.data as any)?.locations ?? [];
@@ -66,19 +69,6 @@ export default function GuestHomeScreen() {
       locations[0]?.id;
     if (preferredId) setLocationId(preferredId);
   }, [homeData?.defaultLocationId, locationId, locations]);
-
-  const dateOptions = useMemo(() => {
-    return Array.from({ length: 30 }, (_, index) => {
-      const value = new Date();
-      value.setDate(value.getDate() + index);
-      return {
-        value: localIsoDate(value),
-        weekday: value.toLocaleDateString("en-US", { weekday: "short" }),
-        day: String(value.getDate()),
-        month: value.toLocaleDateString("en-US", { month: "short" }),
-      };
-    });
-  }, []);
 
   const refresh = async () => {
     setRefreshing(true);
@@ -401,49 +391,16 @@ export default function GuestHomeScreen() {
               <Text style={[styles.locationName, { color: palette.foreground }]}>Any date</Text>
               {!date && <Ionicons name="checkmark-circle" size={21} color={palette.primary} />}
             </Pressable>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.dateOptions}>
-                {dateOptions.map((option) => {
-                  const selected = option.value === date;
-                  return (
-                    <Pressable
-                      key={option.value}
-                      onPress={() => {
-                        setDate(option.value);
-                        setDatePickerOpen(false);
-                      }}
-                      style={[
-                        styles.dateOption,
-                        {
-                          backgroundColor: selected ? colors.light.navy : palette.card,
-                          borderColor: selected ? colors.light.navy : palette.border,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.dateWeekday,
-                          { color: selected ? "rgba(255,255,255,0.72)" : palette.mutedForeground },
-                        ]}
-                      >
-                        {option.weekday}
-                      </Text>
-                      <Text style={[styles.dateDay, { color: selected ? "#FFFFFF" : palette.foreground }]}>
-                        {option.day}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.dateMonth,
-                          { color: selected ? "rgba(255,255,255,0.72)" : palette.mutedForeground },
-                        ]}
-                      >
-                        {option.month}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </ScrollView>
+            <DateMatrixPicker
+              value={date}
+              minimumDate={todayDate}
+              maximumDate={maximumSearchDate}
+              accessibilityLabel="Choose a trip date"
+              onChange={(selectedDate) => {
+                setDate(selectedDate);
+                setDatePickerOpen(false);
+              }}
+            />
           </Pressable>
         </Pressable>
       </Modal>
@@ -461,12 +418,12 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   kicker: {
-    fontFamily: "Inter_700Bold",
+    fontFamily: "SpaceMono_700Bold",
     fontSize: 11,
     letterSpacing: 1.25,
     marginBottom: 4,
   },
-  heading: { fontFamily: "Inter_700Bold", fontSize: 27 },
+  heading: { fontFamily: "Marcellus_400Regular", fontSize: 27 },
   notification: {
     width: 45,
     height: 45,
@@ -502,12 +459,12 @@ const styles = StyleSheet.create({
   },
   fieldCopy: { flex: 1 },
   fieldLabel: {
-    fontFamily: "Inter_700Bold",
+    fontFamily: "SpaceMono_700Bold",
     fontSize: 10,
     letterSpacing: 1.1,
     marginBottom: 3,
   },
-  fieldValue: { fontFamily: "Inter_600SemiBold", fontSize: 15 },
+  fieldValue: { fontFamily: "HankenGrotesk_600SemiBold", fontSize: 15 },
   intentBlock: { gap: 8, paddingTop: 14 },
   intentSelector: { flexDirection: "row", padding: 4, borderRadius: 13 },
   intentActive: {
@@ -519,7 +476,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
   },
-  intentActiveText: { color: "#FFFFFF", fontFamily: "Inter_700Bold", fontSize: 14 },
+  intentActiveText: { color: "#FFFFFF", fontFamily: "HankenGrotesk_700Bold", fontSize: 14 },
   intentSoon: {
     flex: 1,
     minHeight: 40,
@@ -528,9 +485,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 5,
   },
-  intentSoonText: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
+  intentSoonText: { fontFamily: "HankenGrotesk_600SemiBold", fontSize: 14 },
   soonPill: { borderRadius: 99, paddingHorizontal: 6, paddingVertical: 3 },
-  soonPillText: { color: "#9A6700", fontFamily: "Inter_700Bold", fontSize: 8 },
+  soonPillText: { color: "#9A6700", fontFamily: "SpaceMono_700Bold", fontSize: 8 },
   searchButton: {
     minHeight: 51,
     borderRadius: 15,
@@ -540,10 +497,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
   },
-  searchButtonText: { color: "#FFFFFF", fontFamily: "Inter_700Bold", fontSize: 15 },
+  searchButtonText: { color: "#FFFFFF", fontFamily: "HankenGrotesk_700Bold", fontSize: 15 },
   discoveryHeader: { paddingHorizontal: 18, marginTop: 32, marginBottom: 18 },
-  sectionTitle: { fontFamily: "Inter_700Bold", fontSize: 21 },
-  sectionSubtitle: { fontFamily: "Inter_400Regular", fontSize: 13, marginTop: 4 },
+  sectionTitle: { fontFamily: "Marcellus_400Regular", fontSize: 21 },
+  sectionSubtitle: { fontFamily: "HankenGrotesk_400Regular", fontSize: 13, marginTop: 4 },
   rail: { marginBottom: 28 },
   railHeader: {
     paddingHorizontal: 18,
@@ -552,9 +509,9 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     justifyContent: "space-between",
   },
-  railTitle: { fontFamily: "Inter_700Bold", fontSize: 19 },
-  railSubtitle: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 },
-  seeAll: { fontFamily: "Inter_700Bold", fontSize: 13 },
+  railTitle: { fontFamily: "Marcellus_400Regular", fontSize: 19 },
+  railSubtitle: { fontFamily: "HankenGrotesk_400Regular", fontSize: 12, marginTop: 2 },
+  seeAll: { fontFamily: "HankenGrotesk_700Bold", fontSize: 13 },
   railContent: { paddingLeft: 18, paddingRight: 6 },
   messageCard: {
     marginHorizontal: 18,
@@ -564,14 +521,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 7,
   },
-  messageTitle: { fontFamily: "Inter_700Bold", fontSize: 15, textAlign: "center" },
+  messageTitle: { fontFamily: "HankenGrotesk_700Bold", fontSize: 15, textAlign: "center" },
   messageCopy: {
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
     fontSize: 12,
     textAlign: "center",
     lineHeight: 18,
   },
-  retry: { fontFamily: "Inter_700Bold", fontSize: 13, marginTop: 3 },
+  retry: { fontFamily: "HankenGrotesk_700Bold", fontSize: 13, marginTop: 3 },
   modalBackdrop: {
     flex: 1,
     justifyContent: "flex-end",
@@ -593,7 +550,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginBottom: 18,
   },
-  modalTitle: { fontFamily: "Inter_700Bold", fontSize: 21, marginBottom: 16 },
+  modalTitle: { fontFamily: "Marcellus_400Regular", fontSize: 21, marginBottom: 16 },
   locationOption: {
     flexDirection: "row",
     alignItems: "center",
@@ -610,9 +567,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  locationName: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
-  locationMeta: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 },
-  defaultLabel: { fontFamily: "Inter_700Bold", fontSize: 9 },
+  locationName: { fontFamily: "HankenGrotesk_600SemiBold", fontSize: 14 },
+  locationMeta: { fontFamily: "HankenGrotesk_400Regular", fontSize: 12, marginTop: 2 },
+  defaultLabel: { fontFamily: "SpaceMono_700Bold", fontSize: 9 },
   anyDate: {
     minHeight: 52,
     borderRadius: 14,
@@ -623,16 +580,4 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 14,
   },
-  dateOptions: { flexDirection: "row", gap: 9, paddingRight: 18 },
-  dateOption: {
-    width: 72,
-    minHeight: 92,
-    borderRadius: 15,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dateWeekday: { fontFamily: "Inter_600SemiBold", fontSize: 11 },
-  dateDay: { fontFamily: "Inter_700Bold", fontSize: 25, marginVertical: 2 },
-  dateMonth: { fontFamily: "Inter_500Medium", fontSize: 11 },
 });

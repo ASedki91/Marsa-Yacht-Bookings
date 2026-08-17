@@ -223,12 +223,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   eyebrow: {
-    fontFamily: "Inter_700Bold",
+    fontFamily: "HankenGrotesk_700Bold",
     fontSize: 11,
     letterSpacing: 1.2,
     marginBottom: 3,
   },
-  title: { fontFamily: "Inter_700Bold", fontSize: 25 },
+  title: { fontFamily: "Marcellus_400Regular", fontSize: 25 },
   segmented: { flexDirection: "row", borderRadius: 12, padding: 3 },
   segment: {
     flex: 1,
@@ -236,6 +236,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 8,
   },
-  segmentText: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  segmentText: { fontFamily: "HankenGrotesk_600SemiBold", fontSize: 13 },
   list: { padding: 16 },
 });

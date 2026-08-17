@@ -26,6 +26,11 @@ import { useColors } from "@/hooks/useColors";
 import { useUser } from "@/contexts/UserContext";
 import { usePaymentConfig } from "@/contexts/PaymentConfigContext";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import {
+  addDaysToDateKey,
+  DateMatrixPicker,
+  toLocalDateKey,
+} from "@/components/DateMatrixPicker";
 import colors from "@/constants/colors";
 
 const STEPS = ["Duration", "Date & Time", "Add-ons", "Details", "Payment"];
@@ -103,7 +108,7 @@ const stepStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  num: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  num: { fontSize: 11, fontFamily: "HankenGrotesk_600SemiBold" },
   line: { height: 2, width: 24, marginHorizontal: 2 },
 });
 
@@ -121,17 +126,16 @@ export default function BookScreen() {
     refresh: refreshPaymentConfig,
   } = usePaymentConfig();
   const { user } = useUser();
+  const todayDate = React.useMemo(() => toLocalDateKey(new Date()), []);
+  const maximumBookingDate = React.useMemo(
+    () => addDaysToDateKey(todayDate, 20),
+    [todayDate],
+  );
   const [step, setStep] = useState(0);
   const [payError, setPayError] = useState<string | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  });
+  const [selectedDate, setSelectedDate] = useState(todayDate);
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
   const [guestCount, setGuestCount] = useState(2);
   const [guestName, setGuestName] = useState("");
@@ -159,28 +163,8 @@ export default function BookScreen() {
   const templates = (templatesData as any)?.templates ?? [];
   const allAddOns = (addOnsData as any)?.addOns ?? [];
 
-  const fromDate = selectedDate || new Date().toISOString().split("T")[0];
+  const fromDate = selectedDate || todayDate;
   const toDate = fromDate;
-
-  const dateOptions = React.useMemo(() => {
-    const opts: { value: string; dow: string; day: string; mon: string }[] = [];
-    const base = new Date();
-    base.setHours(0, 0, 0, 0);
-    for (let i = 0; i < 21; i++) {
-      const d = new Date(base);
-      d.setDate(base.getDate() + i);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      opts.push({
-        value: `${year}-${month}-${day}`,
-        dow: d.toLocaleDateString("en-US", { weekday: "short" }),
-        day: String(d.getDate()),
-        mon: d.toLocaleDateString("en-US", { month: "short" }),
-      });
-    }
-    return opts;
-  }, []);
 
   const { data: slotsData, isLoading: slotsLoading } = useGetYachtSlots(
     id!,
@@ -411,56 +395,16 @@ export default function BookScreen() {
         {step === 1 && (
           <View style={styles.stepContent}>
             <Text style={[styles.stepLabel, { color: c.foreground }]}>Select Date</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.dateRow}
-            >
-              {dateOptions.map((d) => {
-                const isSelected = selectedDate === d.value;
-                return (
-                  <Pressable
-                    key={d.value}
-                    style={[
-                      styles.dateChip,
-                      {
-                        backgroundColor: isSelected ? colors.light.navy : c.card,
-                        borderColor: isSelected ? colors.light.navy : c.border,
-                      },
-                    ]}
-                    onPress={() => {
-                      setSelectedDate(d.value);
-                      setSelectedSlot(null);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.dateChipDow,
-                        { color: isSelected ? "rgba(255,255,255,0.7)" : c.mutedForeground },
-                      ]}
-                    >
-                      {d.dow}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.dateChipDay,
-                        { color: isSelected ? "#fff" : c.foreground },
-                      ]}
-                    >
-                      {d.day}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.dateChipMon,
-                        { color: isSelected ? "rgba(255,255,255,0.7)" : c.mutedForeground },
-                      ]}
-                    >
-                      {d.mon}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+            <DateMatrixPicker
+              value={selectedDate}
+              minimumDate={todayDate}
+              maximumDate={maximumBookingDate}
+              accessibilityLabel="Choose a booking date"
+              onChange={(date) => {
+                setSelectedDate(date);
+                setSelectedSlot(null);
+              }}
+            />
 
             {slotsLoading ? (
               <ActivityIndicator color={c.primary} style={{ marginTop: 16 }} />
@@ -931,11 +875,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  headerTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },
-  yachtName: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  headerTitle: { fontSize: 17, fontFamily: "Marcellus_400Regular" },
+  yachtName: { fontSize: 13, fontFamily: "HankenGrotesk_400Regular" },
   content: { padding: 16 },
   stepContent: { gap: 14 },
-  stepLabel: { fontSize: 18, fontFamily: "Inter_700Bold", marginBottom: 4 },
+  stepLabel: { fontSize: 18, fontFamily: "HankenGrotesk_700Bold", marginBottom: 4 },
   optionCard: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -944,25 +888,13 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     gap: 12,
   },
-  optionTitle: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
-  optionSub: { fontSize: 13, fontFamily: "Inter_400Regular", marginTop: 2 },
+  optionTitle: { fontSize: 16, fontFamily: "HankenGrotesk_600SemiBold" },
+  optionSub: { fontSize: 13, fontFamily: "HankenGrotesk_400Regular", marginTop: 2 },
   addOnRight: { alignItems: "flex-end", gap: 6 },
-  addOnPrice: { fontSize: 14, fontFamily: "Inter_700Bold" },
-  dateRow: { gap: 10, paddingVertical: 2, paddingRight: 8 },
-  dateChip: {
-    width: 64,
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingVertical: 12,
-    alignItems: "center",
-    gap: 2,
-  },
-  dateChipDow: { fontSize: 12, fontFamily: "Inter_500Medium" },
-  dateChipDay: { fontSize: 20, fontFamily: "Inter_700Bold" },
-  dateChipMon: { fontSize: 11, fontFamily: "Inter_400Regular" },
-  slotsLabel: { fontSize: 15, fontFamily: "Inter_700Bold", marginTop: 8 },
+  addOnPrice: { fontSize: 14, fontFamily: "HankenGrotesk_700Bold" },
+  slotsLabel: { fontSize: 15, fontFamily: "HankenGrotesk_700Bold", marginTop: 8 },
   noSlots: { alignItems: "center", padding: 24, borderRadius: 14, borderWidth: 1, gap: 10 },
-  noSlotsText: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center" },
+  noSlotsText: { fontSize: 14, fontFamily: "HankenGrotesk_400Regular", textAlign: "center" },
   slotCard: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -970,23 +902,23 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 12,
   },
-  slotTime: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
-  slotPrice: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
+  slotTime: { fontSize: 15, fontFamily: "HankenGrotesk_600SemiBold" },
+  slotPrice: { fontSize: 11, fontFamily: "HankenGrotesk_400Regular", marginTop: 2 },
   counterBox: { borderRadius: 14, borderWidth: 1, padding: 16, gap: 12 },
-  counterLabel: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
+  counterLabel: { fontSize: 16, fontFamily: "HankenGrotesk_600SemiBold" },
   counter: { flexDirection: "row", alignItems: "center", gap: 20 },
   counterBtn: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  counterValue: { fontSize: 24, fontFamily: "Inter_700Bold", minWidth: 40, textAlign: "center" },
-  capacityNote: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  counterValue: { fontSize: 24, fontFamily: "HankenGrotesk_700Bold", minWidth: 40, textAlign: "center" },
+  capacityNote: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular" },
   field: { gap: 8 },
-  fieldLabel: { fontSize: 14, fontFamily: "Inter_500Medium" },
+  fieldLabel: { fontSize: 14, fontFamily: "HankenGrotesk_500Medium" },
   textInput: {
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
   },
   noteInput: {
     borderRadius: 12,
@@ -994,18 +926,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
     height: 100,
   },
   summaryCard: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 10 },
-  summaryTitle: { fontSize: 16, fontFamily: "Inter_700Bold", marginBottom: 4 },
+  summaryTitle: { fontSize: 16, fontFamily: "HankenGrotesk_700Bold", marginBottom: 4 },
   summaryRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  summaryLabel: { fontSize: 14, fontFamily: "Inter_400Regular" },
-  summaryValue: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  summaryLabel: { fontSize: 14, fontFamily: "HankenGrotesk_400Regular" },
+  summaryValue: { fontSize: 14, fontFamily: "HankenGrotesk_600SemiBold" },
   divider: { height: 1 },
   totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 10, borderTopWidth: 1 },
-  totalLabel: { fontSize: 16, fontFamily: "Inter_700Bold" },
-  totalAmount: { fontSize: 20, fontFamily: "Inter_700Bold" },
+  totalLabel: { fontSize: 16, fontFamily: "HankenGrotesk_700Bold" },
+  totalAmount: { fontSize: 20, fontFamily: "HankenGrotesk_700Bold" },
   policyCard: {
     borderRadius: 16,
     borderWidth: 1,
@@ -1020,19 +952,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  policyTitle: { fontSize: 15, fontFamily: "Inter_700Bold" },
-  policySubtitle: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
+  policyTitle: { fontSize: 15, fontFamily: "HankenGrotesk_700Bold" },
+  policySubtitle: { fontSize: 11, fontFamily: "HankenGrotesk_400Regular", marginTop: 2 },
   policyRules: { gap: 9 },
   policyRule: { flexDirection: "row", alignItems: "center", gap: 7 },
   policyBullet: { width: 6, height: 6, borderRadius: 3 },
   policyRange: {
     flex: 1,
     fontSize: 11,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
     lineHeight: 16,
   },
-  policyFee: { fontSize: 11, fontFamily: "Inter_700Bold" },
-  policyError: { fontSize: 12, fontFamily: "Inter_500Medium", lineHeight: 17 },
+  policyFee: { fontSize: 11, fontFamily: "HankenGrotesk_700Bold" },
+  policyError: { fontSize: 12, fontFamily: "HankenGrotesk_500Medium", lineHeight: 17 },
   acceptanceRow: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -1042,7 +974,7 @@ const styles = StyleSheet.create({
   acceptanceText: {
     flex: 1,
     fontSize: 12,
-    fontFamily: "Inter_500Medium",
+    fontFamily: "HankenGrotesk_500Medium",
     lineHeight: 18,
   },
   stripeNote: {
@@ -1053,7 +985,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
   },
-  stripeText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  stripeText: { flex: 1, fontSize: 13, fontFamily: "HankenGrotesk_400Regular", lineHeight: 18 },
   paymentNoticeContent: { flex: 1, gap: 10 },
   paymentRetryButton: {
     alignSelf: "flex-start",
@@ -1069,7 +1001,7 @@ const styles = StyleSheet.create({
   paymentRetryText: {
     color: "#B91C1C",
     fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "HankenGrotesk_600SemiBold",
   },
   footer: {
     position: "absolute",
@@ -1083,19 +1015,19 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
   },
   backBtn: { borderRadius: 12, paddingVertical: 14, paddingHorizontal: 20, borderWidth: 1, alignItems: "center" },
-  backBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  backBtnText: { fontSize: 15, fontFamily: "HankenGrotesk_600SemiBold" },
   nextBtn: { flex: 1, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 8, borderRadius: 12, paddingVertical: 14 },
-  nextBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  nextBtnText: { color: "#fff", fontSize: 15, fontFamily: "HankenGrotesk_600SemiBold" },
   success: { flex: 1, alignItems: "center", paddingHorizontal: 32, gap: 20 },
   successIcon: { width: 96, height: 96, borderRadius: 48, alignItems: "center", justifyContent: "center" },
-  successTitle: { fontSize: 26, fontFamily: "Inter_700Bold", textAlign: "center" },
-  successText: { fontSize: 15, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 22 },
+  successTitle: { fontSize: 26, fontFamily: "Marcellus_400Regular", textAlign: "center" },
+  successText: { fontSize: 15, fontFamily: "HankenGrotesk_400Regular", textAlign: "center", lineHeight: 22 },
   confirmBox: { borderRadius: 16, borderWidth: 1, padding: 20, alignItems: "center", gap: 6, width: "100%" },
-  confirmLabel: { fontSize: 13, fontFamily: "Inter_500Medium" },
-  confirmAmount: { fontSize: 28, fontFamily: "Inter_700Bold" },
-  confirmSub: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center" },
+  confirmLabel: { fontSize: 13, fontFamily: "HankenGrotesk_500Medium" },
+  confirmAmount: { fontSize: 28, fontFamily: "HankenGrotesk_700Bold" },
+  confirmSub: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular", textAlign: "center" },
   doneBtn: { borderRadius: 14, paddingVertical: 15, paddingHorizontal: 32, marginTop: 8 },
-  doneBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  doneBtnText: { color: "#fff", fontSize: 15, fontFamily: "HankenGrotesk_600SemiBold" },
   errorBox: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -1106,5 +1038,5 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     width: "100%",
   },
-  errorText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", color: "#DC2626", lineHeight: 18 },
+  errorText: { flex: 1, fontSize: 13, fontFamily: "HankenGrotesk_400Regular", color: "#DC2626", lineHeight: 18 },
 });

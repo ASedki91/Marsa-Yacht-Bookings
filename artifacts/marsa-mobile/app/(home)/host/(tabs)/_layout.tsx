@@ -19,10 +19,10 @@ export default function HostTabsLayout() {
         headerShown: false,
         headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.foreground,
-        headerTitleStyle: { fontFamily: "Inter_700Bold", fontSize: 18 },
+        headerTitleStyle: { fontFamily: "Marcellus_400Regular", fontSize: 18 },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
-        tabBarLabelStyle: { fontFamily: "Inter_500Medium", fontSize: 10 },
+        tabBarLabelStyle: { fontFamily: "HankenGrotesk_500Medium", fontSize: 10 },
         tabBarStyle: {
           position: "absolute",
           backgroundColor: isIOS ? "transparent" : colors.background,

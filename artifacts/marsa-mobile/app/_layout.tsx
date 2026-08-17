@@ -1,9 +1,19 @@
 import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-} from "@expo-google-fonts/inter";
+  HankenGrotesk_400Regular,
+  HankenGrotesk_500Medium,
+  HankenGrotesk_600SemiBold,
+  HankenGrotesk_700Bold,
+} from "@expo-google-fonts/hanken-grotesk";
+import { Marcellus_400Regular } from "@expo-google-fonts/marcellus";
+import {
+  SpaceMono_400Regular,
+  SpaceMono_700Bold,
+} from "@expo-google-fonts/space-mono";
+import {
+  Tajawal_400Regular,
+  Tajawal_500Medium,
+  Tajawal_700Bold,
+} from "@expo-google-fonts/tajawal";
 import Feather from "@expo/vector-icons/Feather";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -55,6 +65,7 @@ function RootLayoutNav() {
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(home)" options={{ headerShown: false }} />
+      <Stack.Screen name="legal/[document]" options={{ headerShown: false }} />
     </Stack>
   );
 }
@@ -66,10 +77,16 @@ export default function RootLayout() {
     (async () => {
       try {
         await Font.loadAsync({
-          Inter_400Regular,
-          Inter_500Medium,
-          Inter_600SemiBold,
-          Inter_700Bold,
+          HankenGrotesk_400Regular,
+          HankenGrotesk_500Medium,
+          HankenGrotesk_600SemiBold,
+          HankenGrotesk_700Bold,
+          Marcellus_400Regular,
+          SpaceMono_400Regular,
+          SpaceMono_700Bold,
+          Tajawal_400Regular,
+          Tajawal_500Medium,
+          Tajawal_700Bold,
           ...Ionicons.font,
           ...Feather.font,
           ...MaterialIcons.font,

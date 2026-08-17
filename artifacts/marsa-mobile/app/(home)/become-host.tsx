@@ -164,7 +164,7 @@ export default function BecomeHostScreen() {
               <Ionicons name="alert-circle-outline" size={18} color="#EA580C" />
               <Text style={[styles.infoText, { color: "#9A3412" }]}>
                 You still need to submit your verification documents. Email them to{" "}
-                <Text style={{ fontFamily: "Inter_600SemiBold" }}>verify@marsa.app</Text> to speed up your review.
+                <Text style={{ fontFamily: "HankenGrotesk_600SemiBold" }}>verify@marsa.app</Text> to speed up your review.
               </Text>
             </View>
           )}
@@ -233,7 +233,7 @@ export default function BecomeHostScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.feeTitle, { color: colors.light.navy }]}>MARSA Service Fee: 20%</Text>
                   <Text style={[styles.feeSub, { color: c.mutedForeground }]}>
-                    You keep <Text style={{ fontFamily: "Inter_700Bold", color: "#22C55E" }}>80%</Text> of every booking.
+                    You keep <Text style={{ fontFamily: "HankenGrotesk_700Bold", color: "#22C55E" }}>80%</Text> of every booking.
                     No hidden charges — just a simple 20% platform fee to cover payments, support, and marketing.
                   </Text>
                 </View>
@@ -324,7 +324,7 @@ export default function BecomeHostScreen() {
             <View style={[styles.infoBox, { backgroundColor: c.card, borderColor: c.border }]}>
               <Ionicons name="information-circle-outline" size={16} color={c.mutedForeground} />
               <Text style={[styles.infoText, { color: c.mutedForeground }]}>
-                You can submit without all documents and send them later to <Text style={{ fontFamily: "Inter_600SemiBold" }}>verify@marsa.app</Text>
+                You can submit without all documents and send them later to <Text style={{ fontFamily: "HankenGrotesk_600SemiBold" }}>verify@marsa.app</Text>
               </Text>
             </View>
           </>
@@ -375,65 +375,65 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", gap: 12,
   },
   backBtn: { padding: 4 },
-  headerTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },
-  headerSub: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  headerTitle: { fontSize: 17, fontFamily: "Marcellus_400Regular" },
+  headerSub: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular" },
   dotRow: { flexDirection: "row", gap: 4 },
   stepDot: { width: 8, height: 8, borderRadius: 4 },
   content: { padding: 16, gap: 20 },
   heroCard: { borderRadius: 20, padding: 24, gap: 10, alignItems: "center" },
-  heroTitle: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#fff", textAlign: "center" },
-  heroSub: { fontSize: 14, fontFamily: "Inter_400Regular", color: "#CBD5E1", textAlign: "center", lineHeight: 20 },
+  heroTitle: { fontSize: 22, fontFamily: "HankenGrotesk_700Bold", color: "#fff", textAlign: "center" },
+  heroSub: { fontSize: 14, fontFamily: "HankenGrotesk_400Regular", color: "#CBD5E1", textAlign: "center", lineHeight: 20 },
   perksGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   perkCard: { flex: 1, minWidth: "44%", borderRadius: 14, borderWidth: 1, padding: 14, gap: 8 },
   perkIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  perkTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  perkDesc: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 16 },
+  perkTitle: { fontSize: 14, fontFamily: "HankenGrotesk_600SemiBold" },
+  perkDesc: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular", lineHeight: 16 },
   formSection: { gap: 10 },
-  formTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },
-  formSub: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  formTitle: { fontSize: 17, fontFamily: "HankenGrotesk_700Bold" },
+  formSub: { fontSize: 13, fontFamily: "HankenGrotesk_400Regular", lineHeight: 18 },
   bioInput: {
     borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 14, fontFamily: "Inter_400Regular", minHeight: 120, textAlignVertical: "top",
+    fontSize: 14, fontFamily: "HankenGrotesk_400Regular", minHeight: 120, textAlignVertical: "top",
   },
-  charCount: { fontSize: 12, fontFamily: "Inter_400Regular", alignSelf: "flex-end" },
+  charCount: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular", alignSelf: "flex-end" },
   docHeader: { alignItems: "center", gap: 12, paddingVertical: 8 },
   docIconBg: { width: 64, height: 64, borderRadius: 20, alignItems: "center", justifyContent: "center" },
-  docTitle: { fontSize: 20, fontFamily: "Inter_700Bold", textAlign: "center" },
-  docSub: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20 },
+  docTitle: { fontSize: 20, fontFamily: "HankenGrotesk_700Bold", textAlign: "center" },
+  docSub: { fontSize: 14, fontFamily: "HankenGrotesk_400Regular", textAlign: "center", lineHeight: 20 },
   docSlot: {
     flexDirection: "row", alignItems: "center", gap: 12,
     padding: 14, borderRadius: 16, borderWidth: 1,
   },
   docSlotIcon: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  docSlotLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  docSlotHint: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
-  docUploaded: { fontSize: 12, fontFamily: "Inter_500Medium", marginTop: 2 },
+  docSlotLabel: { fontSize: 14, fontFamily: "HankenGrotesk_600SemiBold" },
+  docSlotHint: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular", marginTop: 2 },
+  docUploaded: { fontSize: 12, fontFamily: "HankenGrotesk_500Medium", marginTop: 2 },
   docThumb: { width: 52, height: 52, borderRadius: 10, backgroundColor: "#E2E8F0" },
   uploadBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
-  uploadBtnText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  uploadBtnText: { fontSize: 12, fontFamily: "HankenGrotesk_500Medium" },
   infoBox: {
     flexDirection: "row", alignItems: "flex-start", gap: 10,
     padding: 14, borderRadius: 12, borderWidth: 1,
   },
-  infoText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  infoText: { flex: 1, fontSize: 13, fontFamily: "HankenGrotesk_400Regular", lineHeight: 18 },
   feeCard: { borderRadius: 14, borderWidth: 1, padding: 14 },
   feeCardRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   feeIconBg: { width: 38, height: 38, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  feeTitle: { fontSize: 14, fontFamily: "Inter_700Bold", marginBottom: 4 },
-  feeSub: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  feeTitle: { fontSize: 14, fontFamily: "HankenGrotesk_700Bold", marginBottom: 4 },
+  feeSub: { fontSize: 13, fontFamily: "HankenGrotesk_400Regular", lineHeight: 18 },
   footer: { position: "absolute", bottom: 0, left: 0, right: 0, padding: 16, paddingTop: 12, borderTopWidth: 1 },
   applyBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center",
     gap: 8, borderRadius: 14, paddingVertical: 15,
   },
-  applyBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  applyBtnText: { color: "#fff", fontSize: 15, fontFamily: "HankenGrotesk_600SemiBold" },
   successIcon: { width: 96, height: 96, borderRadius: 48, alignItems: "center", justifyContent: "center", alignSelf: "center" },
-  successTitle: { fontSize: 26, fontFamily: "Inter_700Bold", textAlign: "center" },
-  successText: { fontSize: 15, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 22 },
+  successTitle: { fontSize: 26, fontFamily: "Marcellus_400Regular", textAlign: "center" },
+  successText: { fontSize: 15, fontFamily: "HankenGrotesk_400Regular", textAlign: "center", lineHeight: 22 },
   statusCard: { borderRadius: 16, borderWidth: 1, overflow: "hidden" },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 14 },
   statusDivider: { height: 1 },
-  statusLabel: { fontSize: 14, fontFamily: "Inter_400Regular", flex: 1 },
+  statusLabel: { fontSize: 14, fontFamily: "HankenGrotesk_400Regular", flex: 1 },
   doneBtn: { borderRadius: 14, paddingVertical: 15, paddingHorizontal: 40, alignItems: "center" },
-  doneBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  doneBtnText: { color: "#fff", fontSize: 15, fontFamily: "HankenGrotesk_600SemiBold" },
 });
