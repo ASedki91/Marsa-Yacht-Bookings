@@ -231,9 +231,19 @@ router.post(
     const [yacht] = await db
       .update(yachtsTable)
       .set({ status: "live" })
-      .where(eq(yachtsTable.id, id))
+      .where(
+        and(
+          eq(yachtsTable.id, id),
+          eq(yachtsTable.status, "pending_review"),
+        ),
+      )
       .returning();
-    if (!yacht) { res.status(404).json({ error: "Yacht not found" }); return; }
+    if (!yacht) {
+      res.status(409).json({
+        error: "Only submitted listings pending review can be approved",
+      });
+      return;
+    }
 
     const [profile] = await db
       .select()

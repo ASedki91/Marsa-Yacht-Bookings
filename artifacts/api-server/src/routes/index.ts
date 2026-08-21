@@ -24,6 +24,7 @@ import adminYachtsMarketplaceRouter from "./adminYachtsMarketplace";
 import adminActivityRouter from "./adminActivity";
 import adminCampaignsRouter from "./adminCampaigns";
 import supportConfigRouter from "./supportConfig";
+import operatorRouter from "./operator";
 
 const router: IRouter = Router();
 
@@ -58,6 +59,7 @@ router.use(adminCampaignsRouter);
 router.use(supportConfigRouter);
 router.use(adminRouter);
 router.use(internalRouter);
+router.use(operatorRouter);
 
 // Dev-only shortcuts (not mounted in production)
 if (process.env.NODE_ENV !== "production") {
