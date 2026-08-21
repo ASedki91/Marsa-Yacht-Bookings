@@ -33,6 +33,7 @@
       "expo-font",
       "expo-web-browser",
       "expo-notifications",
+      "@clerk/expo",
       [
         "@stripe/stripe-react-native",
         {
