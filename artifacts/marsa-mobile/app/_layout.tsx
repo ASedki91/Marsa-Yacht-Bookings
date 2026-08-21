@@ -72,6 +72,8 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   const [loaded, setLoaded] = useState(false);
+  const clerkProxyUrl =
+    process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
 
   useEffect(() => {
     (async () => {
@@ -103,6 +105,7 @@ export default function RootLayout() {
   return (
     <ClerkProvider
       publishableKey={process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!}
+      proxyUrl={clerkProxyUrl}
       tokenCache={tokenCache}
     >
       <PaymentConfigProvider>

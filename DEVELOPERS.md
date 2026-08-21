@@ -613,6 +613,12 @@ Open Graph and Twitter link previews. The optional `EXPO_METRO_PORT` build
 variable changes only the local Metro port used while generating native
 bundles; production defaults to `8081`.
 
+For published web authentication, the Expo `ClerkProvider` receives
+`EXPO_PUBLIC_CLERK_PROXY_URL`. The production build expands
+`CLERK_PROXY_URL=/api/__clerk` against the published app domain, so Clerk JS
+loads through the API server's local proxy. Development intentionally leaves
+this value empty and uses Clerk's development endpoint directly.
+
 ### Screen map
 
 ```
