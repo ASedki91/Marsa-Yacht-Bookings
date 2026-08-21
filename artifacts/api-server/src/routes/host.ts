@@ -25,8 +25,10 @@ import {
 } from "../middlewares/index";
 import { recordAdminEvent } from "../lib/adminActivity";
 import { resolveYachtLocation } from "../lib/yachtLocation";
+import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage";
 
 const router: IRouter = Router();
+const objectStorageService = new ObjectStorageService();
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const timeSchema = z.string().regex(/^\d{2}:\d{2}(?::\d{2})?$/);
 const IMMUTABLE_SLOT_BOOKING_STATUSES = [
@@ -188,6 +190,8 @@ router.get(
     res.json({ documents });
   },
 );
+const hostDocumentObjectPath = /^\/objects\/uploads\/[A-Za-z0-9_-]+$/;
+
 const documentSchema = z.object({
   documentType: z.enum([
     "national_id",
@@ -195,7 +199,10 @@ const documentSchema = z.object({
     "yacht_license",
     "insurance",
   ]),
-  fileUrl: z.string().url(),
+  fileUrl: z.string().refine(
+    (value) => hostDocumentObjectPath.test(value),
+    "fileUrl must be a MARSA object storage path",
+  ),
 });
 
 router.post(
@@ -215,6 +222,29 @@ router.post(
           error: "No host application found. Submit one via POST /host/apply",
         });
       return;
+    }
+
+    // A valid-looking URL is not sufficient here: only object paths issued by
+    // MARSA's upload flow may be attached to a host document, and the object
+    // must have been finalized under this host's identity.
+    try {
+      const objectFile = await objectStorageService.getObjectEntityFile(
+        req.body.fileUrl,
+      );
+      const canAccess = await objectStorageService.canAccessObjectEntity({
+        userId: user.id,
+        objectFile,
+      });
+      if (!canAccess) {
+        res.status(403).json({ error: "Document upload is not owned by this host" });
+        return;
+      }
+    } catch (error) {
+      if (error instanceof ObjectNotFoundError) {
+        res.status(400).json({ error: "Document object was not found" });
+        return;
+      }
+      throw error;
     }
 
     const [doc] = await db

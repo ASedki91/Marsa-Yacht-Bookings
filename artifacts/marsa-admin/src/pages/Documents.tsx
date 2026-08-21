@@ -40,17 +40,34 @@ import {
   Image,
 } from "lucide-react";
 
+const hostDocumentObjectPath = /^\/objects\/uploads\/[A-Za-z0-9_-]+$/;
+
+function getSafeDocumentUrl(url: string): string | null {
+  return hostDocumentObjectPath.test(url) ? `/api/storage${url}` : null;
+}
+
 function isImageUrl(url: string) {
   return /\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?|$)/i.test(url);
 }
 
 function DocPreview({ url }: { url: string }) {
   if (!url) return null;
+  const safeUrl = getSafeDocumentUrl(url);
+  if (!safeUrl) {
+    return (
+      <div className="mt-2 flex items-center gap-2 p-2.5 rounded-md border border-border bg-muted/30 max-w-xs">
+        <FileText className="w-6 h-6 text-muted-foreground shrink-0" />
+        <p className="text-xs text-muted-foreground">
+          Document link unavailable
+        </p>
+      </div>
+    );
+  }
   if (isImageUrl(url)) {
     return (
       <div className="mt-2 rounded-md overflow-hidden border border-border max-w-xs">
         <img
-          src={url}
+          src={safeUrl}
           alt="Document preview"
           className="w-full object-cover max-h-48"
           onError={(e) => {
@@ -68,7 +85,7 @@ function DocPreview({ url }: { url: string }) {
           {url.split("/").pop() ?? "Document"}
         </p>
         <a
-          href={url}
+          href={safeUrl}
           target="_blank"
           rel="noreferrer"
           className="text-xs text-primary hover:underline flex items-center gap-0.5"
