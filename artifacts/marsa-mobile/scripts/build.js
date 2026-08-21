@@ -156,6 +156,56 @@ function exportWebApp(expoPublicDomain, expoPublicReplId) {
   });
 }
 
+function addWebMetadata(domain) {
+  const webRoot = path.join(projectRoot, "static-build", "web");
+  const indexPath = path.join(webRoot, "index.html");
+  const imageSource = path.join(
+    projectRoot,
+    "assets",
+    "images",
+    "yacht-hero.png",
+  );
+  const imageTarget = path.join(webRoot, "yacht-hero.png");
+
+  if (!fs.existsSync(indexPath)) {
+    throw new Error("Expo web export did not produce static-build/web/index.html");
+  }
+  if (!fs.existsSync(imageSource)) {
+    throw new Error(`SEO preview image not found: ${imageSource}`);
+  }
+
+  const baseUrl = `https://${domain}`;
+  const rootUrl = basePath ? `${baseUrl}${basePath}/` : `${baseUrl}/`;
+  const imageUrl = `${rootUrl}yacht-hero.png`;
+  const metadata = `
+    <title>MARSA | Premier Yacht Marketplace</title>
+    <meta name="description" content="Discover and book unforgettable yacht experiences with MARSA." />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="MARSA | Premier Yacht Marketplace" />
+    <meta property="og:description" content="Discover and book unforgettable yacht experiences with MARSA." />
+    <meta property="og:image" content="${imageUrl}" />
+    <meta property="og:url" content="${rootUrl}" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="MARSA | Premier Yacht Marketplace" />
+    <meta name="twitter:description" content="Discover and book unforgettable yacht experiences with MARSA." />
+    <meta name="twitter:image" content="${imageUrl}" />
+  `.trim();
+
+  const indexHtml = fs.readFileSync(indexPath, "utf-8");
+  if (!indexHtml.includes("<title>MARSA | Premier Yacht Marketplace</title>")) {
+    if (!indexHtml.includes("</head>")) {
+      throw new Error("Expo web index.html has no closing head tag");
+    }
+    const withoutDefaultTitle = indexHtml.replace(/\s*<title>[^<]*<\/title>/, "");
+    fs.writeFileSync(
+      indexPath,
+      withoutDefaultTitle.replace("</head>", `\n    ${metadata}\n  </head>`),
+    );
+  }
+  fs.copyFileSync(imageSource, imageTarget);
+  console.log("Added web SEO metadata and link-preview image");
+}
+
 function clearMetroCache() {
   console.log("Clearing Metro cache...");
 
@@ -586,6 +636,7 @@ async function main() {
   prepareDirectories(timestamp);
   clearMetroCache();
   await exportWebApp(domain, expoPublicReplId);
+  addWebMetadata(domain);
 
   await startMetro(domain, expoPublicReplId);
 
