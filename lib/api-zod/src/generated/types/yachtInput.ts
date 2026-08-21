@@ -10,7 +10,9 @@ export interface YachtInput {
   /** @minLength 3 */
   title: string;
   description?: string;
-  location: string;
+  location?: string;
+  locationId?: string;
+  customLocationName?: string;
   categoryId?: string;
   /** @minimum 1 */
   capacity: number;

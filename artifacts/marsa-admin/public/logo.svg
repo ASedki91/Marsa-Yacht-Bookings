@@ -1,8 +1,92 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" fill="none">
-  <rect x="0" y="0" width="32" height="32" rx="6" fill="#3B82F6"/>
-  <path d="M8 24 L16 12 L24 24" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <path d="M6 28 L26 28" stroke="white" stroke-width="2" stroke-linecap="round"/>
-  <path d="M4 32 L28 32" stroke="white" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
-  <text x="42" y="22" font-family="Inter, sans-serif" font-weight="700" font-size="16" fill="#1B2A4A">MARSA</text>
-  <text x="42" y="36" font-family="Inter, sans-serif" font-weight="400" font-size="10" fill="#6B7280" letter-spacing="2">ADMIN</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="Marsa app icon">
+  <defs>
+    <clipPath id="tile"><rect width="240" height="240" rx="54"/></clipPath>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F6F0E2"/>
+      <stop offset="62%" stop-color="#F2E6D0"/>
+      <stop offset="100%" stop-color="#ECD9BC"/>
+    </linearGradient>
+    <radialGradient id="haloGrad" cx="50%" cy="46%" r="58%">
+      <stop offset="0" stop-color="#F4B85F" stop-opacity=".55"/>
+      <stop offset="60%" stop-color="#F4B85F" stop-opacity=".14"/>
+      <stop offset="100%" stop-color="#F4B85F" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="sunGrad" cx="50%" cy="44%" r="56%">
+      <stop offset="0" stop-color="#B65E16"/>
+      <stop offset="38%" stop-color="#D2812B"/>
+      <stop offset="72%" stop-color="#E8A85E"/>
+      <stop offset="100%" stop-color="#F6D2A6"/>
+    </radialGradient>
+    <linearGradient id="seaGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#15405A"/>
+      <stop offset="100%" stop-color="#0B2231"/>
+    </linearGradient>
+    <linearGradient id="horizonGlow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#E9A85C" stop-opacity=".5"/>
+      <stop offset="100%" stop-color="#E9A85C" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="sheenGrad" cx="50%" cy="0%" r="80%">
+      <stop offset="0" stop-color="#F4C982" stop-opacity=".5"/>
+      <stop offset="100%" stop-color="#F4C982" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="reflFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".4"/>
+      <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="ripple" x="-25%" y="-25%" width="150%" height="150%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.008 0.045" numOctaves="2" seed="4" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="4.5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <mask id="reflMask" maskUnits="userSpaceOnUse" x="0" y="135" width="240" height="95">
+      <rect x="0" y="135" width="240" height="95" fill="url(#reflFade)"/>
+    </mask>
+    <radialGradient id="contactShadow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#06161f" stop-opacity=".55"/>
+      <stop offset="100%" stop-color="#06161f" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect width="240" height="240" fill="url(#bgGrad)"/>
+    <circle cx="120" cy="112" r="86" fill="url(#haloGrad)"/>
+    <circle cx="120" cy="114" r="64" fill="url(#sunGrad)"/>
+    <rect y="135" width="240" height="105" fill="url(#seaGrad)"/>
+    <rect y="135" width="240" height="30" fill="url(#horizonGlow)"/>
+    <rect x="78" y="135" width="84" height="74" fill="url(#sheenGrad)"/>
+    <ellipse cx="120" cy="136" rx="86" ry="6" fill="url(#contactShadow)"/>
+    <g>
+      <path fill="#0E2B3D" d="M40 135 L40 129 L146 129 Q176 129 203 119 L200 135 Z"/>
+      <path fill="#0E2B3D" d="M62 129 L62 121 L66 119 L138 119 L150 129 Z"/>
+      <path fill="#0E2B3D" d="M76 119 L76 112 L80 110 L128 110 L138 119 Z"/>
+      <path fill="#0E2B3D" d="M92 110 L92 104 L95 103 L122 103 L130 110 Z"/>
+      <path fill="#0E2B3D" d="M112 103 L107 90 L109.5 90 L116 103 Z"/>
+      <rect x="70" y="122.2" width="62" height="2.4" rx="1.2" fill="#E8A85E" opacity=".9"/>
+      <rect x="84" y="113" width="40" height="2.2" rx="1.1" fill="#E8A85E" opacity=".8"/>
+      <g fill="none" stroke="#F4C078" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity=".92">
+        <path d="M146 129 Q176 129 203 119"/>
+        <path d="M66 119 L138 119 L150 129"/>
+        <path d="M80 110 L128 110 L138 119"/>
+        <path d="M95 103 L122 103 L130 110"/>
+      </g>
+      <line x1="42" y1="132.4" x2="197" y2="132.4" stroke="#C68B45" stroke-width="1.2" opacity=".5"/>
+    </g>
+    <g mask="url(#reflMask)">
+      <g filter="url(#ripple)">
+        <g transform="matrix(1 0 0 -1 0 270)">
+          <path fill="#214863" d="M40 135 L40 129 L146 129 Q176 129 203 119 L200 135 Z"/>
+          <path fill="#214863" d="M62 129 L62 121 L66 119 L138 119 L150 129 Z"/>
+          <path fill="#214863" d="M76 119 L76 112 L80 110 L128 110 L138 119 Z"/>
+          <path fill="#214863" d="M92 110 L92 104 L95 103 L122 103 L130 110 Z"/>
+          <rect x="70" y="122.2" width="62" height="2.4" fill="#7d6435" opacity=".55"/>
+        </g>
+      </g>
+    </g>
+    <g stroke="#3f7494" fill="none" stroke-linecap="round" opacity=".5">
+      <path d="M146 146 q9 -3.4 18 0 t18 0 t18 0" stroke-width="1.6"/>
+      <path d="M30 156 q10 -3.8 20 0 t20 0 t20 0" stroke-width="1.6" opacity=".85"/>
+      <path d="M150 168 q9 -3.4 18 0 t18 0" stroke-width="1.6" opacity=".7"/>
+      <path d="M38 182 q11 -4 22 0 t22 0" stroke-width="1.6" opacity=".6"/>
+      <path d="M150 197 q10 -3.6 20 0 t20 0" stroke-width="1.6" opacity=".45"/>
+      <path d="M44 212 q11 -3.6 22 0 t22 0" stroke-width="1.6" opacity=".32"/>
+    </g>
+  </g>
 </svg>

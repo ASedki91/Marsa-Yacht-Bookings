@@ -9,12 +9,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useUser } from "@/contexts/UserContext";
+import { API_BASE_URL } from "@/lib/env";
 import colors from "@/constants/colors";
-
-const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
-const WHATSAPP_NUMBER = "201030303030";
-const PRIVACY_URL = "https://marsa.app/privacy";
-const TERMS_URL = "https://marsa.app/terms";
+import { CONTACT_EMAIL } from "@/constants/legal";
+import { useGetSupportConfig } from "@workspace/api-client-react";
 
 interface SettingRowProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -62,6 +60,7 @@ export default function ProfileScreen() {
   const { getToken } = useAuth();
   const router = useRouter();
   const { user, isHost, isAdmin, refetch } = useUser();
+  const supportConfig = useGetSupportConfig();
 
   const [hostLoading, setHostLoading] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -86,7 +85,7 @@ export default function ProfileScreen() {
     setSaving(true);
     try {
       const token = await getToken();
-      const res = await fetch(`${BASE_URL}/api/users/me`, {
+      const res = await fetch(`${API_BASE_URL}/api/users/me`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -129,7 +128,7 @@ export default function ProfileScreen() {
     setHostLoading(true);
     try {
       const token = await getToken();
-      const res = await fetch(`${BASE_URL}/api/dev/become-host`, {
+      const res = await fetch(`${API_BASE_URL}/api/dev/become-host`, {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -290,9 +289,19 @@ export default function ProfileScreen() {
             icon="logo-whatsapp"
             label="WhatsApp Support"
             iconColor="#22C55E"
-            onPress={() => Linking.openURL(`https://wa.me/${WHATSAPP_NUMBER}?text=Hi%2C%20I%20need%20help%20with%20MARSA`).catch(() =>
-              Alert.alert("WhatsApp", "Could not open WhatsApp. Please contact support@marsa.app")
-            )}
+            onPress={() => {
+              const whatsappNumber = supportConfig.data?.whatsappSupportNumber;
+              return (whatsappNumber
+                ? Linking.openURL(
+                    `https://wa.me/${whatsappNumber}?text=Hi%2C%20I%20need%20help%20with%20MARSA`,
+                  )
+                : Promise.reject()
+              ).catch(() =>
+                Linking.openURL(`mailto:${CONTACT_EMAIL}`).catch(() =>
+                  Alert.alert("Support", `Please contact ${CONTACT_EMAIL}.`),
+                ),
+              );
+            }}
           />
           <SettingRow
             icon="information-circle-outline"
@@ -302,12 +311,12 @@ export default function ProfileScreen() {
           <SettingRow
             icon="shield-outline"
             label="Privacy Policy"
-            onPress={() => Linking.openURL(PRIVACY_URL).catch(() => Alert.alert("Error", "Could not open link."))}
+            onPress={() => router.push("/legal/privacy" as any)}
           />
           <SettingRow
             icon="document-text-outline"
-            label="Terms of Service"
-            onPress={() => Linking.openURL(TERMS_URL).catch(() => Alert.alert("Error", "Could not open link."))}
+            label="Terms of Use"
+            onPress={() => router.push("/legal/terms" as any)}
           />
         </View>
 
@@ -413,45 +422,45 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.15)",
     alignItems: "center", justifyContent: "center",
   },
-  avatarInitials: { fontSize: 28, fontFamily: "Inter_700Bold", color: "#fff" },
-  avatarName: { fontSize: 20, fontFamily: "Inter_700Bold", color: "#fff" },
-  avatarEmail: { fontSize: 13, fontFamily: "Inter_400Regular", color: "#CBD5E1" },
+  avatarInitials: { fontSize: 28, fontFamily: "HankenGrotesk_700Bold", color: "#fff" },
+  avatarName: { fontSize: 20, fontFamily: "HankenGrotesk_700Bold", color: "#fff" },
+  avatarEmail: { fontSize: 13, fontFamily: "HankenGrotesk_400Regular", color: "#CBD5E1" },
   rolePill: { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20, borderWidth: 1, marginTop: 4 },
-  roleText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  roleText: { fontSize: 12, fontFamily: "HankenGrotesk_600SemiBold" },
   devBtn: {
     flexDirection: "row", alignItems: "center", gap: 6,
     marginTop: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.light.gold,
     paddingHorizontal: 14, paddingVertical: 8,
     backgroundColor: colors.light.gold + "15",
   },
-  devBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.light.gold },
-  sectionLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 1, paddingHorizontal: 4, marginTop: 6 },
+  devBtnText: { fontSize: 12, fontFamily: "HankenGrotesk_600SemiBold", color: colors.light.gold },
+  sectionLabel: { fontSize: 11, fontFamily: "SpaceMono_700Bold", letterSpacing: 1, paddingHorizontal: 4, marginTop: 6 },
   settingsGroup: { gap: 2, borderRadius: 14, overflow: "hidden" },
   settingRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14 },
   settingIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  settingLabel: { flex: 1, fontSize: 15, fontFamily: "Inter_400Regular" },
+  settingLabel: { flex: 1, fontSize: 15, fontFamily: "HankenGrotesk_400Regular" },
   settingRight: { flexDirection: "row", alignItems: "center", gap: 8 },
-  settingValue: { fontSize: 14, fontFamily: "Inter_400Regular" },
+  settingValue: { fontSize: 14, fontFamily: "HankenGrotesk_400Regular" },
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
-  badgeText: { color: "#fff", fontSize: 11, fontFamily: "Inter_600SemiBold" },
-  version: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 8 },
+  badgeText: { color: "#fff", fontSize: 11, fontFamily: "HankenGrotesk_600SemiBold" },
+  version: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular", textAlign: "center", marginTop: 8 },
   modalContainer: { flex: 1 },
   modalHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1,
   },
   modalClose: { padding: 4 },
-  modalTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },
+  modalTitle: { fontSize: 17, fontFamily: "Marcellus_400Regular" },
   modalSaveBtn: { padding: 4 },
-  modalSaveText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  modalSaveText: { fontSize: 15, fontFamily: "HankenGrotesk_600SemiBold" },
   modalContent: { padding: 16, gap: 12 },
   modalField: { borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, gap: 4 },
-  modalFieldLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.5 },
-  modalFieldInput: { fontSize: 16, fontFamily: "Inter_400Regular", paddingVertical: 4 },
-  modalFieldStatic: { fontSize: 16, fontFamily: "Inter_400Regular", paddingVertical: 4 },
-  modalFieldNote: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  modalFieldLabel: { fontSize: 11, fontFamily: "HankenGrotesk_600SemiBold", letterSpacing: 0.5 },
+  modalFieldInput: { fontSize: 16, fontFamily: "HankenGrotesk_400Regular", paddingVertical: 4 },
+  modalFieldStatic: { fontSize: 16, fontFamily: "HankenGrotesk_400Regular", paddingVertical: 4 },
+  modalFieldNote: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular" },
   saveBtnFull: {
     borderRadius: 14, paddingVertical: 15, alignItems: "center", marginTop: 8,
   },
-  saveBtnFullText: { color: "#fff", fontSize: 16, fontFamily: "Inter_700Bold" },
+  saveBtnFullText: { color: "#fff", fontSize: 16, fontFamily: "HankenGrotesk_700Bold" },
 });

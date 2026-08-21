@@ -11,4 +11,6 @@ export type AvailabilityBatchInputSlotsItem = {
   date: string;
   startTime: string;
   isAvailable: boolean;
+  /** @nullable */
+  priceOverrideEgp?: string | null;
 };

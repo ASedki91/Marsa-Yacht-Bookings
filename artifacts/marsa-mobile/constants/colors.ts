@@ -1,70 +1,70 @@
 const colors = {
   light: {
-    text: "#0F172A",
-    tint: "#3B82F6",
+    text: "#243F5D",
+    tint: "#254E7B",
 
-    background: "#F8FAFC",
-    foreground: "#0F172A",
+    background: "#F4EDDF",
+    foreground: "#243F5D",
 
-    card: "#FFFFFF",
-    cardForeground: "#0F172A",
+    card: "#FBF7EF",
+    cardForeground: "#243F5D",
 
-    primary: "#3B82F6",
+    primary: "#254E7B",
     primaryForeground: "#FFFFFF",
 
-    secondary: "#1B2A4A",
+    secondary: "#243F5D",
     secondaryForeground: "#FFFFFF",
 
-    muted: "#E2E8F0",
-    mutedForeground: "#64748B",
+    muted: "#ECDCC0",
+    mutedForeground: "#5C6B78",
 
-    accent: "#F59E0B",
-    accentForeground: "#FFFFFF",
+    accent: "#C2924F",
+    accentForeground: "#243F5D",
 
     destructive: "#EF4444",
     destructiveForeground: "#FFFFFF",
 
-    border: "#E2E8F0",
-    input: "#F1F5F9",
+    border: "#DED0B7",
+    input: "#FBF7EF",
 
-    navy: "#1B2A4A",
-    ocean: "#3B82F6",
-    gold: "#F59E0B",
-    goldLight: "#FEF3C7",
+    navy: "#243F5D",
+    ocean: "#254E7B",
+    gold: "#C2924F",
+    goldLight: "#F2E5CF",
   },
 
   dark: {
-    text: "#F8FAFC",
-    tint: "#60A5FA",
+    text: "#F4EDDF",
+    tint: "#D8AE73",
 
-    background: "#0F172A",
-    foreground: "#F8FAFC",
+    background: "#16283A",
+    foreground: "#F4EDDF",
 
-    card: "#1E293B",
-    cardForeground: "#F8FAFC",
+    card: "#243F5D",
+    cardForeground: "#F4EDDF",
 
-    primary: "#3B82F6",
-    primaryForeground: "#FFFFFF",
+    primary: "#D8AE73",
+    primaryForeground: "#16283A",
 
-    secondary: "#1E293B",
-    secondaryForeground: "#F8FAFC",
+    secondary: "#254E7B",
+    secondaryForeground: "#F4EDDF",
 
-    muted: "#1E293B",
-    mutedForeground: "#94A3B8",
+    muted: "#243F5D",
+    mutedForeground: "#C9BFAE",
 
-    accent: "#F59E0B",
-    accentForeground: "#FFFFFF",
+    accent: "#C2924F",
+    accentForeground: "#16283A",
 
     destructive: "#EF4444",
     destructiveForeground: "#FFFFFF",
 
-    border: "#1E293B",
-    input: "#1E293B",
+    border: "#3D4C5B",
+    input: "#243F5D",
 
-    navy: "#1B2A4A",
-    ocean: "#3B82F6",
-    gold: "#F59E0B",
-    goldLight: "#1C1A0A",
+    navy: "#243F5D",
+    ocean: "#254E7B",
+    gold: "#C2924F",
+    goldLight: "#4C3C2A",
   },
 
   radius: 12,

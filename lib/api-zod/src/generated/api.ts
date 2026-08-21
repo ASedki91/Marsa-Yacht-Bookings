@@ -76,15 +76,157 @@ export const GetMeResponse = zod.object({
 
 
 /**
+ * Server-only endpoint authenticated with MARSA_OPERATOR_SECRET. It is unavailable outside production and must never be called from browser or mobile clients. Always run a dry run, present its changes for explicit confirmation, then execute the exact same request with its confirmation token.
+
+ * @summary Prepare or execute a narrowly scoped production setup operation
+ */
+export const runProductionOperatorOperationBodyActionOneFullNameMax = 200;
+
+export const runProductionOperatorOperationBodyActionOneHostBioMin = 10;
+export const runProductionOperatorOperationBodyActionOneHostBioMax = 2000;
+
+export const runProductionOperatorOperationBodyActionTwoNameMax = 120;
+
+export const runProductionOperatorOperationBodyActionTwoCityMax = 120;
+
+export const runProductionOperatorOperationBodyActionTwoCountryMax = 120;
+
+export const runProductionOperatorOperationBodyActionTwoIsDefaultDefault = false;
+export const runProductionOperatorOperationBodyActionTwoSortOrderDefault = 0;
+export const runProductionOperatorOperationBodyActionTwoSortOrderMin = 0;
+
+export const runProductionOperatorOperationBodyActionThreeNameMax = 120;
+
+export const runProductionOperatorOperationBodyActionThreeSlugRegExp = new RegExp('^[a-z0-9]+(?:-[a-z0-9]+)\*$');
+export const runProductionOperatorOperationBodyActionThreeSortOrderDefault = 0;
+export const runProductionOperatorOperationBodyActionThreeSortOrderMin = 0;
+
+export const runProductionOperatorOperationBodyActionFourNameMax = 120;
+
+export const runProductionOperatorOperationBodyActionFourDurationHoursMax = 168;
+
+export const runProductionOperatorOperationBodyActionFourDescriptionMax = 1000;
+
+export const runProductionOperatorOperationBodyActionFourIsActiveDefault = true;
+export const runProductionOperatorOperationBodyActionFourSortOrderDefault = 0;
+export const runProductionOperatorOperationBodyActionFourSortOrderMin = 0;
+
+export const runProductionOperatorOperationBodyActionFiveTitleMin = 3;
+export const runProductionOperatorOperationBodyActionFiveTitleMax = 200;
+
+export const runProductionOperatorOperationBodyActionFiveDescriptionMax = 5000;
+
+export const runProductionOperatorOperationBodyActionFiveCapacityMax = 200;
+
+export const runProductionOperatorOperationBodyActionFiveLengthFtExclusiveMin = 0;
+
+export const runProductionOperatorOperationBodyActionFiveYearBuiltMin = 1800;
+
+export const runProductionOperatorOperationBodyActionFiveManufacturerMax = 100;
+
+export const runProductionOperatorOperationBodyActionFiveFeaturesItemMax = 100;
+
+export const runProductionOperatorOperationBodyActionFiveFeaturesMax = 50;
+
+export const runProductionOperatorOperationBodyActionFivePricingItemPriceEgpExclusiveMin = 0;
+
+export const runProductionOperatorOperationBodyActionFivePricingMax = 20;
+
+
+
+export const RunProductionOperatorOperationBody = zod.object({
+  "phase": zod.enum(['dry_run', 'execute']),
+  "operationId": zod.string().uuid(),
+  "action": zod.union([zod.object({
+  "kind": zod.enum(['user']),
+  "email": zod.string().email(),
+  "role": zod.enum(['guest', 'host', 'admin']),
+  "fullName": zod.string().max(runProductionOperatorOperationBodyActionOneFullNameMax).optional(),
+  "hostBio": zod.string().min(runProductionOperatorOperationBodyActionOneHostBioMin).max(runProductionOperatorOperationBodyActionOneHostBioMax).optional()
+}),zod.object({
+  "kind": zod.enum(['location']),
+  "name": zod.string().max(runProductionOperatorOperationBodyActionTwoNameMax),
+  "city": zod.string().max(runProductionOperatorOperationBodyActionTwoCityMax),
+  "country": zod.string().max(runProductionOperatorOperationBodyActionTwoCountryMax),
+  "timeZone": zod.string().describe('Valid IANA time zone'),
+  "isDefault": zod.boolean().default(runProductionOperatorOperationBodyActionTwoIsDefaultDefault),
+  "sortOrder": zod.number().min(runProductionOperatorOperationBodyActionTwoSortOrderMin).default(runProductionOperatorOperationBodyActionTwoSortOrderDefault)
+}),zod.object({
+  "kind": zod.enum(['category']),
+  "name": zod.string().max(runProductionOperatorOperationBodyActionThreeNameMax),
+  "slug": zod.string().regex(runProductionOperatorOperationBodyActionThreeSlugRegExp),
+  "iconUrl": zod.string().url().optional(),
+  "sortOrder": zod.number().min(runProductionOperatorOperationBodyActionThreeSortOrderMin).default(runProductionOperatorOperationBodyActionThreeSortOrderDefault)
+}),zod.object({
+  "kind": zod.enum(['booking_template']),
+  "name": zod.string().max(runProductionOperatorOperationBodyActionFourNameMax),
+  "durationHours": zod.number().min(1).max(runProductionOperatorOperationBodyActionFourDurationHoursMax),
+  "description": zod.string().max(runProductionOperatorOperationBodyActionFourDescriptionMax).optional(),
+  "isActive": zod.boolean().default(runProductionOperatorOperationBodyActionFourIsActiveDefault),
+  "sortOrder": zod.number().min(runProductionOperatorOperationBodyActionFourSortOrderMin).default(runProductionOperatorOperationBodyActionFourSortOrderDefault)
+}),zod.object({
+  "kind": zod.enum(['yacht_draft']),
+  "hostEmail": zod.string().email(),
+  "title": zod.string().min(runProductionOperatorOperationBodyActionFiveTitleMin).max(runProductionOperatorOperationBodyActionFiveTitleMax),
+  "description": zod.string().max(runProductionOperatorOperationBodyActionFiveDescriptionMax).optional(),
+  "locationId": zod.string().uuid(),
+  "categoryId": zod.string().uuid().nullish(),
+  "capacity": zod.number().min(1).max(runProductionOperatorOperationBodyActionFiveCapacityMax),
+  "lengthFt": zod.number().gt(runProductionOperatorOperationBodyActionFiveLengthFtExclusiveMin).optional(),
+  "yearBuilt": zod.number().min(runProductionOperatorOperationBodyActionFiveYearBuiltMin).optional(),
+  "manufacturer": zod.string().max(runProductionOperatorOperationBodyActionFiveManufacturerMax).optional(),
+  "features": zod.array(zod.string().max(runProductionOperatorOperationBodyActionFiveFeaturesItemMax)).max(runProductionOperatorOperationBodyActionFiveFeaturesMax).optional(),
+  "pricing": zod.array(zod.object({
+  "templateId": zod.string().uuid(),
+  "priceEgp": zod.number().gt(runProductionOperatorOperationBodyActionFivePricingItemPriceEgpExclusiveMin)
+})).max(runProductionOperatorOperationBodyActionFivePricingMax).optional()
+})]),
+  "confirmationToken": zod.string().optional().describe('Required only for phase=execute; obtained from a dry run.'),
+  "confirmed": zod.boolean().optional().describe('Must be true only after the dry-run changes have explicit approval.')
+})
+
+export const RunProductionOperatorOperationResponse = zod.object({
+  "operationId": zod.string(),
+  "expiresAt": zod.coerce.date().optional(),
+  "changes": zod.array(zod.object({
+  "entityType": zod.string(),
+  "entityId": zod.string(),
+  "action": zod.enum(['create', 'skip']),
+  "summary": zod.string()
+})).optional(),
+  "confirmationToken": zod.string().optional().describe('Returned only for a valid dry run; never store or log it.'),
+  "nextStep": zod.string().optional(),
+  "status": zod.enum(['completed', 'skipped', 'partial']).optional(),
+  "created": zod.array(zod.object({
+  "entityType": zod.string(),
+  "entityId": zod.string(),
+  "action": zod.enum(['create', 'skip']),
+  "summary": zod.string()
+})).optional(),
+  "skipped": zod.array(zod.object({
+  "entityType": zod.string(),
+  "entityId": zod.string(),
+  "action": zod.enum(['create', 'skip']),
+  "summary": zod.string()
+})).optional(),
+  "errors": zod.array(zod.string()).optional(),
+  "idempotent": zod.boolean().optional()
+})
+
+
+/**
  * @summary List live yachts
  */
 export const listYachtsQueryPageDefault = 1;
 export const listYachtsQueryLimitDefault = 20;
+export const listYachtsQueryIntentDefault = `rent`;
 
 export const ListYachtsQueryParams = zod.object({
   "page": zod.coerce.number().default(listYachtsQueryPageDefault),
   "limit": zod.coerce.number().default(listYachtsQueryLimitDefault),
   "categoryId": zod.coerce.string().optional(),
+  "locationId": zod.coerce.string().optional(),
+  "intent": zod.enum(['rent', 'buy']).default(listYachtsQueryIntentDefault),
   "capacity": zod.coerce.number().optional(),
   "date": zod.coerce.string().optional().describe('Filter by availability date (YYYY-MM-DD)'),
   "templateId": zod.coerce.string().optional(),
@@ -98,6 +240,8 @@ export const ListYachtsResponse = zod.object({
   "id": zod.string(),
   "hostId": zod.string(),
   "categoryId": zod.string().nullish(),
+  "locationId": zod.string().nullish(),
+  "customLocationName": zod.string().nullish(),
   "title": zod.string(),
   "description": zod.string().nullish(),
   "location": zod.string(),
@@ -108,6 +252,10 @@ export const ListYachtsResponse = zod.object({
   "manufacturer": zod.string().nullish(),
   "features": zod.array(zod.string()).optional(),
   "status": zod.string(),
+  "isFeatured": zod.boolean(),
+  "featuredSortOrder": zod.number(),
+  "featuredFrom": zod.string().nullish(),
+  "featuredUntil": zod.string().nullish(),
   "avgRating": zod.string(),
   "reviewCount": zod.number(),
   "createdAt": zod.string(),
@@ -131,6 +279,8 @@ export const GetYachtResponse = zod.object({
   "id": zod.string(),
   "hostId": zod.string(),
   "categoryId": zod.string().nullish(),
+  "locationId": zod.string().nullish(),
+  "customLocationName": zod.string().nullish(),
   "title": zod.string(),
   "description": zod.string().nullish(),
   "location": zod.string(),
@@ -141,6 +291,10 @@ export const GetYachtResponse = zod.object({
   "manufacturer": zod.string().nullish(),
   "features": zod.array(zod.string()).optional(),
   "status": zod.string(),
+  "isFeatured": zod.boolean(),
+  "featuredSortOrder": zod.number(),
+  "featuredFrom": zod.string().nullish(),
+  "featuredUntil": zod.string().nullish(),
   "avgRating": zod.string(),
   "reviewCount": zod.number(),
   "createdAt": zod.string(),
@@ -200,7 +354,12 @@ export const GetYachtSlotsResponse = zod.object({
   "templateId": zod.string(),
   "date": zod.string(),
   "startTime": zod.string(),
-  "isAvailable": zod.boolean()
+  "isAvailable": zod.boolean(),
+  "priceOverrideEgp": zod.string().nullish(),
+  "effectivePriceEgp": zod.string().nullable(),
+  "displayStatus": zod.enum(['available', 'blocked', 'held', 'booked', 'past']),
+  "editable": zod.boolean(),
+  "bookingId": zod.string().nullish()
 }))
 })
 
@@ -221,7 +380,12 @@ export const GetYachtAvailabilityResponse = zod.object({
   "templateId": zod.string(),
   "date": zod.string(),
   "startTime": zod.string(),
-  "isAvailable": zod.boolean()
+  "isAvailable": zod.boolean(),
+  "priceOverrideEgp": zod.string().nullish(),
+  "effectivePriceEgp": zod.string().nullable(),
+  "displayStatus": zod.enum(['available', 'blocked', 'held', 'booked', 'past']),
+  "editable": zod.boolean(),
+  "bookingId": zod.string().nullish()
 }))
 })
 
@@ -280,6 +444,171 @@ export const GetExchangeRateResponse = zod.object({
 
 
 /**
+ * @summary List active booking locations
+ */
+export const ListLocationsResponse = zod.object({
+  "locations": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "city": zod.string(),
+  "country": zod.string(),
+  "timeZone": zod.string(),
+  "slug": zod.string(),
+  "isActive": zod.boolean(),
+  "isDefault": zod.boolean(),
+  "sortOrder": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})),
+  "allowCustomLocation": zod.boolean()
+})
+
+
+/**
+ * @summary Get location-grouped guest Home content
+ */
+export const GetDiscoveryHomeResponse = zod.object({
+  "defaultLocationId": zod.string().nullable(),
+  "rails": zod.array(zod.object({
+  "location": zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "city": zod.string(),
+  "country": zod.string(),
+  "timeZone": zod.string(),
+  "slug": zod.string(),
+  "isActive": zod.boolean(),
+  "isDefault": zod.boolean(),
+  "sortOrder": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}),
+  "listings": zod.array(zod.object({
+  "listingType": zod.enum(['rental_yacht']),
+  "listingId": zod.string(),
+  "yachtId": zod.string(),
+  "title": zod.string(),
+  "location": zod.string(),
+  "primaryPhotoUrl": zod.string().nullish(),
+  "capacity": zod.number(),
+  "rating": zod.string(),
+  "reviewCount": zod.number(),
+  "fromPriceEgp": zod.string().nullish(),
+  "isFeatured": zod.boolean()
+}))
+}))
+})
+
+
+/**
+ * @summary List the current guest's live wishlist yachts
+ */
+export const ListWishlistResponse = zod.object({
+  "yachts": zod.array(zod.object({
+  "id": zod.string(),
+  "hostId": zod.string(),
+  "categoryId": zod.string().nullish(),
+  "locationId": zod.string().nullish(),
+  "customLocationName": zod.string().nullish(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "location": zod.string(),
+  "city": zod.string(),
+  "capacity": zod.number(),
+  "lengthFt": zod.string().nullish(),
+  "yearBuilt": zod.number().nullish(),
+  "manufacturer": zod.string().nullish(),
+  "features": zod.array(zod.string()).optional(),
+  "status": zod.string(),
+  "isFeatured": zod.boolean(),
+  "featuredSortOrder": zod.number(),
+  "featuredFrom": zod.string().nullish(),
+  "featuredUntil": zod.string().nullish(),
+  "avgRating": zod.string(),
+  "reviewCount": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary List live wishlisted yacht IDs
+ */
+export const ListWishlistIdsResponse = zod.object({
+  "yachtIds": zod.array(zod.string())
+})
+
+
+/**
+ * @summary Add a live yacht to the wishlist
+ */
+export const AddWishlistItemParams = zod.object({
+  "yachtId": zod.coerce.string()
+})
+
+
+/**
+ * @summary Remove a yacht from the wishlist
+ */
+export const RemoveWishlistItemParams = zod.object({
+  "yachtId": zod.coerce.string()
+})
+
+export const RemoveWishlistItemResponse = zod.object({
+  "yachtId": zod.string(),
+  "wishlisted": zod.boolean()
+})
+
+
+/**
+ * @summary Get the selected server payment gateway configuration
+ */
+export const GetPaymentConfigResponse = zod.object({
+  "gateway": zod.enum(['test', 'stripe', 'disabled']),
+  "checkoutEnabled": zod.boolean(),
+  "testMode": zod.boolean(),
+  "publishableKey": zod.string().nullable()
+})
+
+
+/**
+ * @summary Get public customer-support configuration
+ */
+export const getSupportConfigResponseWhatsappSupportNumberRegExp = new RegExp('^[0-9]{7,15}$');
+
+
+export const GetSupportConfigResponse = zod.object({
+  "whatsappSupportNumber": zod.string().regex(getSupportConfigResponseWhatsappSupportNumberRegExp).describe('International WhatsApp number, without a leading plus sign.')
+})
+
+
+/**
+ * @summary Get the active customer-facing cancellation policy
+ */
+export const getCurrentCancellationPolicyResponseRulesItemMinimumMinutesBeforeTripMin = 0;
+
+
+
+export const GetCurrentCancellationPolicyResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "version": zod.number(),
+  "status": zod.enum(['draft', 'active', 'retired']),
+  "rules": zod.array(zod.object({
+  "id": zod.string(),
+  "minimumMinutesBeforeTrip": zod.number().min(getCurrentCancellationPolicyResponseRulesItemMinimumMinutesBeforeTripMin),
+  "feePercentage": zod.string()
+})),
+  "createdBy": zod.string(),
+  "activatedAt": zod.string().nullish(),
+  "retiredAt": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
  * @summary Get the current guest's bookings (dedicated alias)
  */
 export const getMyBookingsQueryPageDefault = 1;
@@ -323,17 +652,19 @@ export const GetMyBookingsResponse = zod.object({
 
 
 export const CreateBookingBody = zod.object({
-  "yachtId": zod.string(),
-  "templateId": zod.string(),
-  "bookingDate": zod.string(),
-  "startTime": zod.string(),
+  "slotId": zod.string(),
+  "yachtId": zod.string().optional(),
+  "templateId": zod.string().optional(),
+  "bookingDate": zod.string().optional(),
+  "startTime": zod.string().optional(),
   "guestCount": zod.number().min(1),
   "guestName": zod.string(),
   "guestPhone": zod.string(),
   "guestEmail": zod.string().email(),
   "guestNationality": zod.string().optional(),
   "specialRequests": zod.string().optional(),
-  "addOnIds": zod.array(zod.string()).optional()
+  "addOnIds": zod.array(zod.string()).optional(),
+  "acceptedCancellationPolicyId": zod.string()
 })
 
 
@@ -406,6 +737,27 @@ export const GetBookingResponse = zod.object({
 
 
 /**
+ * @summary Get a fresh server-calculated cancellation quote
+ */
+export const GetBookingCancellationQuoteParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetBookingCancellationQuoteResponse = zod.object({
+  "bookingId": zod.string(),
+  "tripStartsAt": zod.string(),
+  "requestedAt": zod.string(),
+  "remainingMinutes": zod.number(),
+  "matchedRuleId": zod.string().nullable(),
+  "feePercentage": zod.string().nullable(),
+  "originalAmountEgp": zod.string(),
+  "feeAmountEgp": zod.string().nullable(),
+  "refundAmountEgp": zod.string().nullable(),
+  "manualReviewRequired": zod.boolean()
+})
+
+
+/**
  * @summary Request booking cancellation
  */
 export const CancelBookingParams = zod.object({
@@ -413,29 +765,30 @@ export const CancelBookingParams = zod.object({
 })
 
 export const CancelBookingBody = zod.object({
-  "reason": zod.string().optional()
+  "reason": zod.string().optional(),
+  "acceptedRuleId": zod.string().optional(),
+  "acceptedFeeAmountEgp": zod.string().optional()
 })
 
 export const CancelBookingResponse = zod.object({
   "id": zod.string(),
-  "guestId": zod.string(),
-  "yachtId": zod.string(),
-  "templateId": zod.string(),
-  "bookingDate": zod.string(),
-  "startTime": zod.string(),
-  "guestCount": zod.number(),
-  "guestName": zod.string(),
-  "guestPhone": zod.string(),
-  "guestEmail": zod.string(),
-  "guestNationality": zod.string().nullish(),
-  "specialRequests": zod.string().nullish(),
-  "baseAmountEgp": zod.string(),
-  "totalAmountEgp": zod.string(),
-  "platformFeeEgp": zod.string(),
-  "hostEarningsEgp": zod.string(),
-  "status": zod.string(),
-  "createdAt": zod.string(),
-  "updatedAt": zod.string()
+  "bookingId": zod.string(),
+  "requestedBy": zod.string(),
+  "reason": zod.string().nullish(),
+  "requestedAt": zod.string(),
+  "tripStartsAt": zod.string(),
+  "remainingMinutes": zod.number(),
+  "policyVersion": zod.number().nullable(),
+  "matchedRuleId": zod.string().nullable(),
+  "feePercentage": zod.string().nullable(),
+  "originalAmountEgp": zod.string(),
+  "feeAmountEgp": zod.string().nullable(),
+  "refundAmountEgp": zod.string().nullable(),
+  "status": zod.enum(['pending', 'processing', 'approved', 'rejected', 'refund_failed']),
+  "reviewedBy": zod.string().nullable(),
+  "reviewedAt": zod.string().nullable(),
+  "reviewNotes": zod.string().nullable(),
+  "manualReviewRequired": zod.boolean()
 })
 
 
@@ -567,6 +920,8 @@ export const ListHostYachtsResponse = zod.object({
   "id": zod.string(),
   "hostId": zod.string(),
   "categoryId": zod.string().nullish(),
+  "locationId": zod.string().nullish(),
+  "customLocationName": zod.string().nullish(),
   "title": zod.string(),
   "description": zod.string().nullish(),
   "location": zod.string(),
@@ -577,6 +932,10 @@ export const ListHostYachtsResponse = zod.object({
   "manufacturer": zod.string().nullish(),
   "features": zod.array(zod.string()).optional(),
   "status": zod.string(),
+  "isFeatured": zod.boolean(),
+  "featuredSortOrder": zod.number(),
+  "featuredFrom": zod.string().nullish(),
+  "featuredUntil": zod.string().nullish(),
   "avgRating": zod.string(),
   "reviewCount": zod.number(),
   "createdAt": zod.string(),
@@ -599,13 +958,82 @@ export const createYachtBodyTitleMin = 3;
 export const CreateYachtBody = zod.object({
   "title": zod.string().min(createYachtBodyTitleMin),
   "description": zod.string().optional(),
-  "location": zod.string(),
+  "location": zod.string().optional(),
+  "locationId": zod.string().optional(),
+  "customLocationName": zod.string().optional(),
   "categoryId": zod.string().optional(),
   "capacity": zod.number().min(1),
   "lengthFt": zod.number().optional(),
   "yearBuilt": zod.number().optional(),
   "manufacturer": zod.string().optional(),
   "features": zod.array(zod.string()).optional()
+})
+
+
+/**
+ * @summary Get an owned yacht in any workflow status
+ */
+export const GetHostYachtParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetHostYachtResponse = zod.object({
+  "yacht": zod.object({
+  "id": zod.string(),
+  "hostId": zod.string(),
+  "categoryId": zod.string().nullish(),
+  "locationId": zod.string().nullish(),
+  "customLocationName": zod.string().nullish(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "location": zod.string(),
+  "city": zod.string(),
+  "capacity": zod.number(),
+  "lengthFt": zod.string().nullish(),
+  "yearBuilt": zod.number().nullish(),
+  "manufacturer": zod.string().nullish(),
+  "features": zod.array(zod.string()).optional(),
+  "status": zod.string(),
+  "isFeatured": zod.boolean(),
+  "featuredSortOrder": zod.number(),
+  "featuredFrom": zod.string().nullish(),
+  "featuredUntil": zod.string().nullish(),
+  "avgRating": zod.string(),
+  "reviewCount": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}),
+  "photos": zod.array(zod.object({
+  "id": zod.string(),
+  "url": zod.string(),
+  "isPrimary": zod.boolean(),
+  "sortOrder": zod.number()
+})),
+  "pricing": zod.array(zod.object({
+  "templateId": zod.string(),
+  "templateName": zod.string(),
+  "durationHours": zod.number(),
+  "priceEgp": zod.string()
+})),
+  "reviews": zod.array(zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "reviewerId": zod.string(),
+  "revieweeId": zod.string(),
+  "yachtId": zod.string().nullish(),
+  "rating": zod.number(),
+  "comment": zod.string().nullish(),
+  "type": zod.string(),
+  "status": zod.string(),
+  "createdAt": zod.string()
+})),
+  "host": zod.object({
+  "id": zod.string(),
+  "fullName": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "bio": zod.string().nullish(),
+  "memberSince": zod.string()
+}).optional()
 })
 
 
@@ -620,6 +1048,8 @@ export const UpdateYachtBody = zod.object({
   "title": zod.string().optional(),
   "description": zod.string().optional(),
   "location": zod.string().optional(),
+  "locationId": zod.string().nullish(),
+  "customLocationName": zod.string().nullish(),
   "categoryId": zod.string().optional(),
   "capacity": zod.number().optional(),
   "features": zod.array(zod.string()).optional()
@@ -629,6 +1059,8 @@ export const UpdateYachtResponse = zod.object({
   "id": zod.string(),
   "hostId": zod.string(),
   "categoryId": zod.string().nullish(),
+  "locationId": zod.string().nullish(),
+  "customLocationName": zod.string().nullish(),
   "title": zod.string(),
   "description": zod.string().nullish(),
   "location": zod.string(),
@@ -639,6 +1071,10 @@ export const UpdateYachtResponse = zod.object({
   "manufacturer": zod.string().nullish(),
   "features": zod.array(zod.string()).optional(),
   "status": zod.string(),
+  "isFeatured": zod.boolean(),
+  "featuredSortOrder": zod.number(),
+  "featuredFrom": zod.string().nullish(),
+  "featuredUntil": zod.string().nullish(),
   "avgRating": zod.string(),
   "reviewCount": zod.number(),
   "createdAt": zod.string(),
@@ -659,6 +1095,32 @@ export const DeleteHostYachtResponse = zod.object({
 
 
 /**
+ * @summary Get owned yacht slots and computed calendar state
+ */
+export const GetHostYachtAvailabilityQueryParams = zod.object({
+  "yachtId": zod.coerce.string(),
+  "from": zod.coerce.string(),
+  "to": zod.coerce.string()
+})
+
+export const GetHostYachtAvailabilityResponse = zod.object({
+  "slots": zod.array(zod.object({
+  "id": zod.string(),
+  "yachtId": zod.string(),
+  "templateId": zod.string(),
+  "date": zod.string(),
+  "startTime": zod.string(),
+  "isAvailable": zod.boolean(),
+  "priceOverrideEgp": zod.string().nullish(),
+  "effectivePriceEgp": zod.string().nullable(),
+  "displayStatus": zod.enum(['available', 'blocked', 'held', 'booked', 'past']),
+  "editable": zod.boolean(),
+  "bookingId": zod.string().nullish()
+}))
+})
+
+
+/**
  * @summary Set availability slots for a yacht
  */
 export const SetYachtAvailabilityParams = zod.object({
@@ -670,8 +1132,18 @@ export const SetYachtAvailabilityBody = zod.object({
   "templateId": zod.string(),
   "date": zod.string(),
   "startTime": zod.string(),
-  "isAvailable": zod.boolean()
-}))
+  "isAvailable": zod.boolean(),
+  "priceOverrideEgp": zod.string().nullish()
+})).optional(),
+  "upsert": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "templateId": zod.string(),
+  "date": zod.string(),
+  "startTime": zod.string(),
+  "isAvailable": zod.boolean(),
+  "priceOverrideEgp": zod.string().nullish()
+})).optional(),
+  "deleteIds": zod.array(zod.string()).optional()
 })
 
 export const SetYachtAvailabilityResponse = zod.object({
@@ -681,7 +1153,12 @@ export const SetYachtAvailabilityResponse = zod.object({
   "templateId": zod.string(),
   "date": zod.string(),
   "startTime": zod.string(),
-  "isAvailable": zod.boolean()
+  "isAvailable": zod.boolean(),
+  "priceOverrideEgp": zod.string().nullish(),
+  "effectivePriceEgp": zod.string().nullable(),
+  "displayStatus": zod.enum(['available', 'blocked', 'held', 'booked', 'past']),
+  "editable": zod.boolean(),
+  "bookingId": zod.string().nullish()
 }))
 })
 
@@ -721,6 +1198,8 @@ export const SubmitYachtForReviewResponse = zod.object({
   "id": zod.string(),
   "hostId": zod.string(),
   "categoryId": zod.string().nullish(),
+  "locationId": zod.string().nullish(),
+  "customLocationName": zod.string().nullish(),
   "title": zod.string(),
   "description": zod.string().nullish(),
   "location": zod.string(),
@@ -731,6 +1210,10 @@ export const SubmitYachtForReviewResponse = zod.object({
   "manufacturer": zod.string().nullish(),
   "features": zod.array(zod.string()).optional(),
   "status": zod.string(),
+  "isFeatured": zod.boolean(),
+  "featuredSortOrder": zod.number(),
+  "featuredFrom": zod.string().nullish(),
+  "featuredUntil": zod.string().nullish(),
   "avgRating": zod.string(),
   "reviewCount": zod.number(),
   "createdAt": zod.string(),
@@ -887,6 +1370,43 @@ export const MarkNotificationReadResponse = zod.object({
 
 
 /**
+ * @summary Register or refresh the current user's Expo push token
+ */
+export const RegisterPushTokenBody = zod.object({
+  "expoPushToken": zod.string(),
+  "deviceId": zod.string().optional(),
+  "platform": zod.enum(['ios', 'android']),
+  "appVersion": zod.string().optional()
+})
+
+export const RegisterPushTokenResponse = zod.object({
+  "id": zod.string(),
+  "platform": zod.enum(['ios', 'android']),
+  "deviceId": zod.string().nullable(),
+  "appVersion": zod.string().nullable(),
+  "isActive": zod.boolean(),
+  "lastRegisteredAt": zod.string()
+})
+
+
+/**
+ * @summary Deactivate one owned push token
+ */
+export const DeactivatePushTokenParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeactivatePushTokenResponse = zod.object({
+  "id": zod.string(),
+  "platform": zod.enum(['ios', 'android']),
+  "deviceId": zod.string().nullable(),
+  "appVersion": zod.string().nullable(),
+  "isActive": zod.boolean(),
+  "lastRegisteredAt": zod.string()
+})
+
+
+/**
  * @summary Request a presigned upload URL for direct client-side upload
  */
 export const RequestUploadUrlBody = zod.object({
@@ -979,6 +1499,8 @@ export const AdminListYachtsResponse = zod.object({
   "id": zod.string(),
   "hostId": zod.string(),
   "categoryId": zod.string().nullish(),
+  "locationId": zod.string().nullish(),
+  "customLocationName": zod.string().nullish(),
   "title": zod.string(),
   "description": zod.string().nullish(),
   "location": zod.string(),
@@ -989,6 +1511,10 @@ export const AdminListYachtsResponse = zod.object({
   "manufacturer": zod.string().nullish(),
   "features": zod.array(zod.string()).optional(),
   "status": zod.string(),
+  "isFeatured": zod.boolean(),
+  "featuredSortOrder": zod.number(),
+  "featuredFrom": zod.string().nullish(),
+  "featuredUntil": zod.string().nullish(),
   "avgRating": zod.string(),
   "reviewCount": zod.number(),
   "createdAt": zod.string(),
@@ -1011,6 +1537,8 @@ export const AdminApproveYachtResponse = zod.object({
   "id": zod.string(),
   "hostId": zod.string(),
   "categoryId": zod.string().nullish(),
+  "locationId": zod.string().nullish(),
+  "customLocationName": zod.string().nullish(),
   "title": zod.string(),
   "description": zod.string().nullish(),
   "location": zod.string(),
@@ -1021,6 +1549,10 @@ export const AdminApproveYachtResponse = zod.object({
   "manufacturer": zod.string().nullish(),
   "features": zod.array(zod.string()).optional(),
   "status": zod.string(),
+  "isFeatured": zod.boolean(),
+  "featuredSortOrder": zod.number(),
+  "featuredFrom": zod.string().nullish(),
+  "featuredUntil": zod.string().nullish(),
   "avgRating": zod.string(),
   "reviewCount": zod.number(),
   "createdAt": zod.string(),
@@ -1043,6 +1575,8 @@ export const AdminRejectYachtResponse = zod.object({
   "id": zod.string(),
   "hostId": zod.string(),
   "categoryId": zod.string().nullish(),
+  "locationId": zod.string().nullish(),
+  "customLocationName": zod.string().nullish(),
   "title": zod.string(),
   "description": zod.string().nullish(),
   "location": zod.string(),
@@ -1053,6 +1587,10 @@ export const AdminRejectYachtResponse = zod.object({
   "manufacturer": zod.string().nullish(),
   "features": zod.array(zod.string()).optional(),
   "status": zod.string(),
+  "isFeatured": zod.boolean(),
+  "featuredSortOrder": zod.number(),
+  "featuredFrom": zod.string().nullish(),
+  "featuredUntil": zod.string().nullish(),
   "avgRating": zod.string(),
   "reviewCount": zod.number(),
   "createdAt": zod.string(),
@@ -1329,6 +1867,8 @@ export const AdminRequestYachtChangesResponse = zod.object({
   "id": zod.string(),
   "hostId": zod.string(),
   "categoryId": zod.string().nullish(),
+  "locationId": zod.string().nullish(),
+  "customLocationName": zod.string().nullish(),
   "title": zod.string(),
   "description": zod.string().nullish(),
   "location": zod.string(),
@@ -1339,6 +1879,10 @@ export const AdminRequestYachtChangesResponse = zod.object({
   "manufacturer": zod.string().nullish(),
   "features": zod.array(zod.string()).optional(),
   "status": zod.string(),
+  "isFeatured": zod.boolean(),
+  "featuredSortOrder": zod.number(),
+  "featuredFrom": zod.string().nullish(),
+  "featuredUntil": zod.string().nullish(),
   "avgRating": zod.string(),
   "reviewCount": zod.number(),
   "createdAt": zod.string(),
@@ -1361,6 +1905,8 @@ export const AdminSuspendYachtResponse = zod.object({
   "id": zod.string(),
   "hostId": zod.string(),
   "categoryId": zod.string().nullish(),
+  "locationId": zod.string().nullish(),
+  "customLocationName": zod.string().nullish(),
   "title": zod.string(),
   "description": zod.string().nullish(),
   "location": zod.string(),
@@ -1371,6 +1917,10 @@ export const AdminSuspendYachtResponse = zod.object({
   "manufacturer": zod.string().nullish(),
   "features": zod.array(zod.string()).optional(),
   "status": zod.string(),
+  "isFeatured": zod.boolean(),
+  "featuredSortOrder": zod.number(),
+  "featuredFrom": zod.string().nullish(),
+  "featuredUntil": zod.string().nullish(),
   "avgRating": zod.string(),
   "reviewCount": zod.number(),
   "createdAt": zod.string(),
@@ -1698,6 +2248,524 @@ export const AdminDeleteBookingTemplateParams = zod.object({
 
 export const AdminDeleteBookingTemplateResponse = zod.object({
   "deleted": zod.boolean()
+})
+
+
+/**
+ * @summary List all managed locations
+ */
+export const AdminListLocationsResponse = zod.object({
+  "locations": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "city": zod.string(),
+  "country": zod.string(),
+  "timeZone": zod.string(),
+  "slug": zod.string(),
+  "isActive": zod.boolean(),
+  "isDefault": zod.boolean(),
+  "sortOrder": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})),
+  "allowCustomLocation": zod.boolean()
+})
+
+
+/**
+ * @summary Create a managed location
+ */
+
+
+
+
+export const adminCreateLocationBodySortOrderMin = 0;
+
+
+
+export const AdminCreateLocationBody = zod.object({
+  "name": zod.string().min(1),
+  "city": zod.string().min(1),
+  "country": zod.string().min(1),
+  "timeZone": zod.string().min(1),
+  "isDefault": zod.boolean().optional(),
+  "sortOrder": zod.number().min(adminCreateLocationBodySortOrderMin).optional()
+})
+
+
+/**
+ * @summary Update a managed location
+ */
+export const AdminUpdateLocationParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+
+
+
+
+export const adminUpdateLocationBodySortOrderMin = 0;
+
+
+
+export const AdminUpdateLocationBody = zod.object({
+  "name": zod.string().min(1).optional(),
+  "city": zod.string().min(1).optional(),
+  "country": zod.string().min(1).optional(),
+  "timeZone": zod.string().min(1).optional(),
+  "isActive": zod.boolean().optional(),
+  "isDefault": zod.boolean().optional(),
+  "sortOrder": zod.number().min(adminUpdateLocationBodySortOrderMin).optional()
+})
+
+export const AdminUpdateLocationResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "city": zod.string(),
+  "country": zod.string(),
+  "timeZone": zod.string(),
+  "slug": zod.string(),
+  "isActive": zod.boolean(),
+  "isDefault": zod.boolean(),
+  "sortOrder": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Deactivate a non-default location
+ */
+export const AdminDeactivateLocationParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const AdminDeactivateLocationResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "city": zod.string(),
+  "country": zod.string(),
+  "timeZone": zod.string(),
+  "slug": zod.string(),
+  "isActive": zod.boolean(),
+  "isDefault": zod.boolean(),
+  "sortOrder": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Reactivate a suspended yacht
+ */
+export const AdminReactivateYachtParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const AdminReactivateYachtResponse = zod.object({
+  "id": zod.string(),
+  "hostId": zod.string(),
+  "categoryId": zod.string().nullish(),
+  "locationId": zod.string().nullish(),
+  "customLocationName": zod.string().nullish(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "location": zod.string(),
+  "city": zod.string(),
+  "capacity": zod.number(),
+  "lengthFt": zod.string().nullish(),
+  "yearBuilt": zod.number().nullish(),
+  "manufacturer": zod.string().nullish(),
+  "features": zod.array(zod.string()).optional(),
+  "status": zod.string(),
+  "isFeatured": zod.boolean(),
+  "featuredSortOrder": zod.number(),
+  "featuredFrom": zod.string().nullish(),
+  "featuredUntil": zod.string().nullish(),
+  "avgRating": zod.string(),
+  "reviewCount": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Configure featured-yacht placement
+ */
+export const AdminUpdateYachtFeaturedParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const adminUpdateYachtFeaturedBodyFeaturedSortOrderMin = 0;
+
+
+
+export const AdminUpdateYachtFeaturedBody = zod.object({
+  "isFeatured": zod.boolean(),
+  "featuredSortOrder": zod.number().min(adminUpdateYachtFeaturedBodyFeaturedSortOrderMin).optional(),
+  "featuredFrom": zod.string().nullish(),
+  "featuredUntil": zod.string().nullish()
+})
+
+export const AdminUpdateYachtFeaturedResponse = zod.object({
+  "id": zod.string(),
+  "hostId": zod.string(),
+  "categoryId": zod.string().nullish(),
+  "locationId": zod.string().nullish(),
+  "customLocationName": zod.string().nullish(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "location": zod.string(),
+  "city": zod.string(),
+  "capacity": zod.number(),
+  "lengthFt": zod.string().nullish(),
+  "yearBuilt": zod.number().nullish(),
+  "manufacturer": zod.string().nullish(),
+  "features": zod.array(zod.string()).optional(),
+  "status": zod.string(),
+  "isFeatured": zod.boolean(),
+  "featuredSortOrder": zod.number(),
+  "featuredFrom": zod.string().nullish(),
+  "featuredUntil": zod.string().nullish(),
+  "avgRating": zod.string(),
+  "reviewCount": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Get per-section unseen activity counts for the current admin
+ */
+export const AdminGetUnseenCountsResponse = zod.object({
+  "counts": zod.record(zod.string(), zod.number())
+})
+
+
+/**
+ * @summary Mark an admin section seen
+ */
+export const AdminMarkSectionSeenParams = zod.object({
+  "sectionKey": zod.coerce.string()
+})
+
+export const AdminMarkSectionSeenResponse = zod.object({
+  "sectionKey": zod.string(),
+  "lastSeenAt": zod.string()
+})
+
+
+/**
+ * @summary List broadcast notification campaigns
+ */
+export const AdminListNotificationCampaignsResponse = zod.object({
+  "campaigns": zod.array(zod.object({
+  "id": zod.string(),
+  "title": zod.string(),
+  "message": zod.string(),
+  "audience": zod.string(),
+  "status": zod.enum(['queued', 'sending', 'completed', 'partial_failed', 'failed']),
+  "createdBy": zod.string(),
+  "totalRecipients": zod.number(),
+  "inAppSentCount": zod.number(),
+  "pushSentCount": zod.number(),
+  "pushFailedCount": zod.number(),
+  "createdAt": zod.string(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Queue a broadcast for all users
+ */
+export const adminCreateNotificationCampaignBodyTitleMax = 120;
+
+export const adminCreateNotificationCampaignBodyMessageMax = 1000;
+
+export const adminCreateNotificationCampaignBodyAudienceDefault = `all`;
+
+export const AdminCreateNotificationCampaignBody = zod.object({
+  "title": zod.string().min(1).max(adminCreateNotificationCampaignBodyTitleMax),
+  "message": zod.string().min(1).max(adminCreateNotificationCampaignBodyMessageMax),
+  "audience": zod.enum(['all']).default(adminCreateNotificationCampaignBodyAudienceDefault)
+})
+
+
+/**
+ * @summary Get campaign status and delivery totals
+ */
+export const AdminGetNotificationCampaignParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const AdminGetNotificationCampaignResponse = zod.object({
+  "id": zod.string(),
+  "title": zod.string(),
+  "message": zod.string(),
+  "audience": zod.string(),
+  "status": zod.enum(['queued', 'sending', 'completed', 'partial_failed', 'failed']),
+  "createdBy": zod.string(),
+  "totalRecipients": zod.number(),
+  "inAppSentCount": zod.number(),
+  "pushSentCount": zod.number(),
+  "pushFailedCount": zod.number(),
+  "createdAt": zod.string(),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Get customer-support configuration
+ */
+export const adminGetSupportConfigResponseWhatsappSupportNumberRegExp = new RegExp('^[0-9]{7,15}$');
+
+
+export const AdminGetSupportConfigResponse = zod.object({
+  "whatsappSupportNumber": zod.string().regex(adminGetSupportConfigResponseWhatsappSupportNumberRegExp).describe('International WhatsApp number, without a leading plus sign.')
+})
+
+
+/**
+ * @summary Update the WhatsApp customer-support number
+ */
+export const adminUpdateSupportConfigBodyWhatsappSupportNumberMin = 7;
+export const adminUpdateSupportConfigBodyWhatsappSupportNumberMax = 32;
+
+
+
+export const AdminUpdateSupportConfigBody = zod.object({
+  "whatsappSupportNumber": zod.string().min(adminUpdateSupportConfigBodyWhatsappSupportNumberMin).max(adminUpdateSupportConfigBodyWhatsappSupportNumberMax).describe('International WhatsApp number. Spaces, dashes, and a leading plus are accepted.')
+})
+
+export const adminUpdateSupportConfigResponseWhatsappSupportNumberRegExp = new RegExp('^[0-9]{7,15}$');
+
+
+export const AdminUpdateSupportConfigResponse = zod.object({
+  "whatsappSupportNumber": zod.string().regex(adminUpdateSupportConfigResponseWhatsappSupportNumberRegExp).describe('International WhatsApp number, without a leading plus sign.')
+})
+
+
+/**
+ * @summary List cancellation-policy history
+ */
+export const adminListCancellationPoliciesResponsePoliciesItemRulesItemMinimumMinutesBeforeTripMin = 0;
+
+
+
+export const AdminListCancellationPoliciesResponse = zod.object({
+  "policies": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "version": zod.number(),
+  "status": zod.enum(['draft', 'active', 'retired']),
+  "rules": zod.array(zod.object({
+  "id": zod.string(),
+  "minimumMinutesBeforeTrip": zod.number().min(adminListCancellationPoliciesResponsePoliciesItemRulesItemMinimumMinutesBeforeTripMin),
+  "feePercentage": zod.string()
+})),
+  "createdBy": zod.string(),
+  "activatedAt": zod.string().nullish(),
+  "retiredAt": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Create a cancellation-policy draft
+ */
+export const adminCreateCancellationPolicyBodyNameMax = 120;
+
+
+
+export const AdminCreateCancellationPolicyBody = zod.object({
+  "name": zod.string().min(1).max(adminCreateCancellationPolicyBodyNameMax),
+  "clonePolicyId": zod.string().optional()
+})
+
+
+/**
+ * @summary Update a draft cancellation policy
+ */
+export const AdminUpdateCancellationPolicyParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const adminUpdateCancellationPolicyBodyNameMax = 120;
+
+
+
+export const AdminUpdateCancellationPolicyBody = zod.object({
+  "name": zod.string().min(1).max(adminUpdateCancellationPolicyBodyNameMax)
+})
+
+export const adminUpdateCancellationPolicyResponseRulesItemMinimumMinutesBeforeTripMin = 0;
+
+
+
+export const AdminUpdateCancellationPolicyResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "version": zod.number(),
+  "status": zod.enum(['draft', 'active', 'retired']),
+  "rules": zod.array(zod.object({
+  "id": zod.string(),
+  "minimumMinutesBeforeTrip": zod.number().min(adminUpdateCancellationPolicyResponseRulesItemMinimumMinutesBeforeTripMin),
+  "feePercentage": zod.string()
+})),
+  "createdBy": zod.string(),
+  "activatedAt": zod.string().nullish(),
+  "retiredAt": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Replace all rules on a draft policy
+ */
+export const AdminReplaceCancellationPolicyRulesParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const adminReplaceCancellationPolicyRulesBodyRulesItemMinimumMinutesBeforeTripMin = 0;
+
+export const adminReplaceCancellationPolicyRulesBodyRulesItemFeePercentageMin = 0;
+export const adminReplaceCancellationPolicyRulesBodyRulesItemFeePercentageMax = 100;
+
+
+
+
+export const AdminReplaceCancellationPolicyRulesBody = zod.object({
+  "rules": zod.array(zod.object({
+  "minimumMinutesBeforeTrip": zod.number().min(adminReplaceCancellationPolicyRulesBodyRulesItemMinimumMinutesBeforeTripMin),
+  "feePercentage": zod.number().min(adminReplaceCancellationPolicyRulesBodyRulesItemFeePercentageMin).max(adminReplaceCancellationPolicyRulesBodyRulesItemFeePercentageMax)
+})).min(1)
+})
+
+export const adminReplaceCancellationPolicyRulesResponseRulesItemMinimumMinutesBeforeTripMin = 0;
+
+
+
+export const AdminReplaceCancellationPolicyRulesResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "version": zod.number(),
+  "status": zod.enum(['draft', 'active', 'retired']),
+  "rules": zod.array(zod.object({
+  "id": zod.string(),
+  "minimumMinutesBeforeTrip": zod.number().min(adminReplaceCancellationPolicyRulesResponseRulesItemMinimumMinutesBeforeTripMin),
+  "feePercentage": zod.string()
+})),
+  "createdBy": zod.string(),
+  "activatedAt": zod.string().nullish(),
+  "retiredAt": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Activate a validated draft and retire the prior policy
+ */
+export const AdminActivateCancellationPolicyParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const adminActivateCancellationPolicyResponseRulesItemMinimumMinutesBeforeTripMin = 0;
+
+
+
+export const AdminActivateCancellationPolicyResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "version": zod.number(),
+  "status": zod.enum(['draft', 'active', 'retired']),
+  "rules": zod.array(zod.object({
+  "id": zod.string(),
+  "minimumMinutesBeforeTrip": zod.number().min(adminActivateCancellationPolicyResponseRulesItemMinimumMinutesBeforeTripMin),
+  "feePercentage": zod.string()
+})),
+  "createdBy": zod.string(),
+  "activatedAt": zod.string().nullish(),
+  "retiredAt": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary List durable cancellation requests
+ */
+export const AdminListCancellationsQueryParams = zod.object({
+  "status": zod.coerce.string().optional()
+})
+
+export const AdminListCancellationsResponse = zod.object({
+  "cancellations": zod.array(zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "requestedBy": zod.string(),
+  "reason": zod.string().nullish(),
+  "requestedAt": zod.string(),
+  "tripStartsAt": zod.string(),
+  "remainingMinutes": zod.number(),
+  "policyVersion": zod.number().nullable(),
+  "matchedRuleId": zod.string().nullable(),
+  "feePercentage": zod.string().nullable(),
+  "originalAmountEgp": zod.string(),
+  "feeAmountEgp": zod.string().nullable(),
+  "refundAmountEgp": zod.string().nullable(),
+  "status": zod.enum(['pending', 'processing', 'approved', 'rejected', 'refund_failed']),
+  "reviewedBy": zod.string().nullable(),
+  "reviewedAt": zod.string().nullable(),
+  "reviewNotes": zod.string().nullable(),
+  "manualReviewRequired": zod.boolean()
+}))
+})
+
+
+/**
+ * @summary Approve, reject, or retry a cancellation request
+ */
+export const AdminProcessCancellationParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const adminProcessCancellationBodyManualFeePercentageMin = 0;
+export const adminProcessCancellationBodyManualFeePercentageMax = 100;
+
+
+
+export const AdminProcessCancellationBody = zod.object({
+  "decision": zod.enum(['approve', 'reject']),
+  "notes": zod.string().optional(),
+  "manualFeePercentage": zod.number().min(adminProcessCancellationBodyManualFeePercentageMin).max(adminProcessCancellationBodyManualFeePercentageMax).optional()
+})
+
+export const AdminProcessCancellationResponse = zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "requestedBy": zod.string(),
+  "reason": zod.string().nullish(),
+  "requestedAt": zod.string(),
+  "tripStartsAt": zod.string(),
+  "remainingMinutes": zod.number(),
+  "policyVersion": zod.number().nullable(),
+  "matchedRuleId": zod.string().nullable(),
+  "feePercentage": zod.string().nullable(),
+  "originalAmountEgp": zod.string(),
+  "feeAmountEgp": zod.string().nullable(),
+  "refundAmountEgp": zod.string().nullable(),
+  "status": zod.enum(['pending', 'processing', 'approved', 'rejected', 'refund_failed']),
+  "reviewedBy": zod.string().nullable(),
+  "reviewedAt": zod.string().nullable(),
+  "reviewNotes": zod.string().nullable(),
+  "manualReviewRequired": zod.boolean()
 })
 
 

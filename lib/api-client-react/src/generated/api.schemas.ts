@@ -142,11 +142,97 @@ export interface ExchangeRateResponse {
   fetchedAt: string;
 }
 
+export interface Location {
+  id: string;
+  name: string;
+  city: string;
+  country: string;
+  timeZone: string;
+  slug: string;
+  isActive: boolean;
+  isDefault: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LocationListResponse {
+  locations: Location[];
+  allowCustomLocation: boolean;
+}
+
+export interface LocationInput {
+  /** @minLength 1 */
+  name: string;
+  /** @minLength 1 */
+  city: string;
+  /** @minLength 1 */
+  country: string;
+  /** @minLength 1 */
+  timeZone: string;
+  isDefault?: boolean;
+  /** @minimum 0 */
+  sortOrder?: number;
+}
+
+export interface LocationUpdate {
+  /** @minLength 1 */
+  name?: string;
+  /** @minLength 1 */
+  city?: string;
+  /** @minLength 1 */
+  country?: string;
+  /** @minLength 1 */
+  timeZone?: string;
+  isActive?: boolean;
+  isDefault?: boolean;
+  /** @minimum 0 */
+  sortOrder?: number;
+}
+
+export type DiscoveryListingListingType = typeof DiscoveryListingListingType[keyof typeof DiscoveryListingListingType];
+
+
+export const DiscoveryListingListingType = {
+  rental_yacht: 'rental_yacht',
+} as const;
+
+export interface DiscoveryListing {
+  listingType: DiscoveryListingListingType;
+  listingId: string;
+  yachtId: string;
+  title: string;
+  location: string;
+  /** @nullable */
+  primaryPhotoUrl?: string | null;
+  capacity: number;
+  rating: string;
+  reviewCount: number;
+  /** @nullable */
+  fromPriceEgp?: string | null;
+  isFeatured: boolean;
+}
+
+export interface DiscoveryLocationRail {
+  location: Location;
+  listings: DiscoveryListing[];
+}
+
+export interface DiscoveryHomeResponse {
+  /** @nullable */
+  defaultLocationId: string | null;
+  rails: DiscoveryLocationRail[];
+}
+
 export interface Yacht {
   id: string;
   hostId: string;
   /** @nullable */
   categoryId?: string | null;
+  /** @nullable */
+  locationId?: string | null;
+  /** @nullable */
+  customLocationName?: string | null;
   title: string;
   /** @nullable */
   description?: string | null;
@@ -161,10 +247,63 @@ export interface Yacht {
   manufacturer?: string | null;
   features?: string[];
   status: string;
+  isFeatured: boolean;
+  featuredSortOrder: number;
+  /** @nullable */
+  featuredFrom?: string | null;
+  /** @nullable */
+  featuredUntil?: string | null;
   avgRating: string;
   reviewCount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface WishlistResponse {
+  yachts: Yacht[];
+}
+
+export interface WishlistIdsResponse {
+  yachtIds: string[];
+}
+
+export interface WishlistMutationResponse {
+  yachtId: string;
+  wishlisted: boolean;
+}
+
+export type PaymentConfigGateway = typeof PaymentConfigGateway[keyof typeof PaymentConfigGateway];
+
+
+export const PaymentConfigGateway = {
+  test: 'test',
+  stripe: 'stripe',
+  disabled: 'disabled',
+} as const;
+
+export interface PaymentConfig {
+  gateway: PaymentConfigGateway;
+  checkoutEnabled: boolean;
+  testMode: boolean;
+  /** @nullable */
+  publishableKey: string | null;
+}
+
+export interface SupportConfig {
+  /**
+     * International WhatsApp number, without a leading plus sign.
+     * @pattern ^[0-9]{7,15}$
+     */
+  whatsappSupportNumber: string;
+}
+
+export interface SupportConfigUpdateInput {
+  /**
+     * International WhatsApp number. Spaces, dashes, and a leading plus are accepted.
+     * @minLength 7
+     * @maxLength 32
+     */
+  whatsappSupportNumber: string;
 }
 
 export interface YachtPhoto {
@@ -226,7 +365,9 @@ export interface YachtInput {
   /** @minLength 3 */
   title: string;
   description?: string;
-  location: string;
+  location?: string;
+  locationId?: string;
+  customLocationName?: string;
   categoryId?: string;
   /** @minimum 1 */
   capacity: number;
@@ -240,10 +381,25 @@ export interface YachtUpdate {
   title?: string;
   description?: string;
   location?: string;
+  /** @nullable */
+  locationId?: string | null;
+  /** @nullable */
+  customLocationName?: string | null;
   categoryId?: string;
   capacity?: number;
   features?: string[];
 }
+
+export type AvailabilitySlotDisplayStatus = typeof AvailabilitySlotDisplayStatus[keyof typeof AvailabilitySlotDisplayStatus];
+
+
+export const AvailabilitySlotDisplayStatus = {
+  available: 'available',
+  blocked: 'blocked',
+  held: 'held',
+  booked: 'booked',
+  past: 'past',
+} as const;
 
 export interface AvailabilitySlot {
   id: string;
@@ -252,6 +408,14 @@ export interface AvailabilitySlot {
   date: string;
   startTime: string;
   isAvailable: boolean;
+  /** @nullable */
+  priceOverrideEgp?: string | null;
+  /** @nullable */
+  effectivePriceEgp: string | null;
+  displayStatus: AvailabilitySlotDisplayStatus;
+  editable: boolean;
+  /** @nullable */
+  bookingId?: string | null;
 }
 
 export interface AvailabilityListResponse {
@@ -263,10 +427,24 @@ export type AvailabilityBatchInputSlotsItem = {
   date: string;
   startTime: string;
   isAvailable: boolean;
+  /** @nullable */
+  priceOverrideEgp?: string | null;
+};
+
+export type AvailabilityBatchInputUpsertItem = {
+  id?: string;
+  templateId: string;
+  date: string;
+  startTime: string;
+  isAvailable: boolean;
+  /** @nullable */
+  priceOverrideEgp?: string | null;
 };
 
 export interface AvailabilityBatchInput {
-  slots: AvailabilityBatchInputSlotsItem[];
+  slots?: AvailabilityBatchInputSlotsItem[];
+  upsert?: AvailabilityBatchInputUpsertItem[];
+  deleteIds?: string[];
 }
 
 export interface PricingItem {
@@ -307,10 +485,11 @@ export interface Booking {
 }
 
 export interface BookingInput {
-  yachtId: string;
-  templateId: string;
-  bookingDate: string;
-  startTime: string;
+  slotId: string;
+  yachtId?: string;
+  templateId?: string;
+  bookingDate?: string;
+  startTime?: string;
   /** @minimum 1 */
   guestCount: number;
   guestName: string;
@@ -319,12 +498,66 @@ export interface BookingInput {
   guestNationality?: string;
   specialRequests?: string;
   addOnIds?: string[];
+  acceptedCancellationPolicyId: string;
+}
+
+export interface CancellationPolicyRule {
+  id: string;
+  /** @minimum 0 */
+  minimumMinutesBeforeTrip: number;
+  feePercentage: string;
+}
+
+export interface CancellationTermsSummary {
+  policyName: string;
+  policyVersion: number;
+  tripStartsAt: string;
+  timeZone: string;
+  rules: CancellationPolicyRule[];
+}
+
+export type PaymentCheckoutGateway = typeof PaymentCheckoutGateway[keyof typeof PaymentCheckoutGateway];
+
+
+export const PaymentCheckoutGateway = {
+  test: 'test',
+  stripe: 'stripe',
+} as const;
+
+export type PaymentCheckoutStatus = typeof PaymentCheckoutStatus[keyof typeof PaymentCheckoutStatus];
+
+
+export const PaymentCheckoutStatus = {
+  created: 'created',
+  succeeded: 'succeeded',
+  failed: 'failed',
+} as const;
+
+export type PaymentActionType = typeof PaymentActionType[keyof typeof PaymentActionType];
+
+
+export const PaymentActionType = {
+  none: 'none',
+  stripe_payment_sheet: 'stripe_payment_sheet',
+} as const;
+
+export interface PaymentAction {
+  type: PaymentActionType;
+  clientSecret?: string;
+}
+
+export interface PaymentCheckout {
+  gateway: PaymentCheckoutGateway;
+  testMode: boolean;
+  status: PaymentCheckoutStatus;
+  action: PaymentAction;
+  providerPaymentId: string;
 }
 
 export interface BookingCreateResponse {
   booking: Booking;
-  clientSecret: string;
-  paymentIntentId: string;
+  cancellationTerms: CancellationTermsSummary;
+  payment: PaymentCheckout;
 }
 
 export interface BookingListResponse {
@@ -335,6 +568,152 @@ export interface BookingListResponse {
 
 export interface CancellationInput {
   reason?: string;
+  acceptedRuleId?: string;
+  acceptedFeeAmountEgp?: string;
+}
+
+export type CancellationPolicyStatus = typeof CancellationPolicyStatus[keyof typeof CancellationPolicyStatus];
+
+
+export const CancellationPolicyStatus = {
+  draft: 'draft',
+  active: 'active',
+  retired: 'retired',
+} as const;
+
+export interface CancellationPolicy {
+  id: string;
+  name: string;
+  version: number;
+  status: CancellationPolicyStatus;
+  rules: CancellationPolicyRule[];
+  createdBy: string;
+  /** @nullable */
+  activatedAt?: string | null;
+  /** @nullable */
+  retiredAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CancellationPolicyListResponse {
+  policies: CancellationPolicy[];
+}
+
+export interface CancellationPolicyRuleInput {
+  /** @minimum 0 */
+  minimumMinutesBeforeTrip: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  feePercentage: number;
+}
+
+export interface CancellationPolicyCreateInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  clonePolicyId?: string;
+}
+
+export interface CancellationPolicyUpdateInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+}
+
+export interface CancellationPolicyRulesInput {
+  /** @minItems 1 */
+  rules: CancellationPolicyRuleInput[];
+}
+
+export interface CancellationQuote {
+  bookingId: string;
+  tripStartsAt: string;
+  requestedAt: string;
+  remainingMinutes: number;
+  /** @nullable */
+  matchedRuleId: string | null;
+  /** @nullable */
+  feePercentage: string | null;
+  originalAmountEgp: string;
+  /** @nullable */
+  feeAmountEgp: string | null;
+  /** @nullable */
+  refundAmountEgp: string | null;
+  manualReviewRequired: boolean;
+}
+
+export type CancellationQuoteConflict = ErrorResponse & {
+  quote: CancellationQuote;
+};
+
+export type BookingCancellationStatus = typeof BookingCancellationStatus[keyof typeof BookingCancellationStatus];
+
+
+export const BookingCancellationStatus = {
+  pending: 'pending',
+  processing: 'processing',
+  approved: 'approved',
+  rejected: 'rejected',
+  refund_failed: 'refund_failed',
+} as const;
+
+export interface BookingCancellation {
+  id: string;
+  bookingId: string;
+  requestedBy: string;
+  /** @nullable */
+  reason?: string | null;
+  requestedAt: string;
+  tripStartsAt: string;
+  remainingMinutes: number;
+  /** @nullable */
+  policyVersion: number | null;
+  /** @nullable */
+  matchedRuleId: string | null;
+  /** @nullable */
+  feePercentage: string | null;
+  originalAmountEgp: string;
+  /** @nullable */
+  feeAmountEgp: string | null;
+  /** @nullable */
+  refundAmountEgp: string | null;
+  status: BookingCancellationStatus;
+  /** @nullable */
+  reviewedBy: string | null;
+  /** @nullable */
+  reviewedAt: string | null;
+  /** @nullable */
+  reviewNotes: string | null;
+  manualReviewRequired: boolean;
+}
+
+export interface BookingCancellationListResponse {
+  cancellations: BookingCancellation[];
+}
+
+export type CancellationProcessInputDecision = typeof CancellationProcessInputDecision[keyof typeof CancellationProcessInputDecision];
+
+
+export const CancellationProcessInputDecision = {
+  approve: 'approve',
+  reject: 'reject',
+} as const;
+
+export interface CancellationProcessInput {
+  decision: CancellationProcessInputDecision;
+  notes?: string;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  manualFeePercentage?: number;
 }
 
 export interface RejectionInput {
@@ -526,6 +905,115 @@ export interface EarningsLedgerListResponse {
   total: number;
 }
 
+export interface FeaturedYachtInput {
+  isFeatured: boolean;
+  /** @minimum 0 */
+  featuredSortOrder?: number;
+  /** @nullable */
+  featuredFrom?: string | null;
+  /** @nullable */
+  featuredUntil?: string | null;
+}
+
+export type AdminUnseenCountsCounts = {[key: string]: number};
+
+export interface AdminUnseenCounts {
+  counts: AdminUnseenCountsCounts;
+}
+
+export interface AdminSectionSeen {
+  sectionKey: string;
+  lastSeenAt: string;
+}
+
+export type PushTokenInputPlatform = typeof PushTokenInputPlatform[keyof typeof PushTokenInputPlatform];
+
+
+export const PushTokenInputPlatform = {
+  ios: 'ios',
+  android: 'android',
+} as const;
+
+export interface PushTokenInput {
+  expoPushToken: string;
+  deviceId?: string;
+  platform: PushTokenInputPlatform;
+  appVersion?: string;
+}
+
+export type PushTokenPlatform = typeof PushTokenPlatform[keyof typeof PushTokenPlatform];
+
+
+export const PushTokenPlatform = {
+  ios: 'ios',
+  android: 'android',
+} as const;
+
+export interface PushToken {
+  id: string;
+  platform: PushTokenPlatform;
+  /** @nullable */
+  deviceId: string | null;
+  /** @nullable */
+  appVersion: string | null;
+  isActive: boolean;
+  lastRegisteredAt: string;
+}
+
+export type NotificationCampaignInputAudience = typeof NotificationCampaignInputAudience[keyof typeof NotificationCampaignInputAudience];
+
+
+export const NotificationCampaignInputAudience = {
+  all: 'all',
+} as const;
+
+export interface NotificationCampaignInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  title: string;
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  message: string;
+  audience?: NotificationCampaignInputAudience;
+}
+
+export type NotificationCampaignStatus = typeof NotificationCampaignStatus[keyof typeof NotificationCampaignStatus];
+
+
+export const NotificationCampaignStatus = {
+  queued: 'queued',
+  sending: 'sending',
+  completed: 'completed',
+  partial_failed: 'partial_failed',
+  failed: 'failed',
+} as const;
+
+export interface NotificationCampaign {
+  id: string;
+  title: string;
+  message: string;
+  audience: string;
+  status: NotificationCampaignStatus;
+  createdBy: string;
+  totalRecipients: number;
+  inAppSentCount: number;
+  pushSentCount: number;
+  pushFailedCount: number;
+  createdAt: string;
+  /** @nullable */
+  startedAt?: string | null;
+  /** @nullable */
+  completedAt?: string | null;
+}
+
+export interface NotificationCampaignListResponse {
+  campaigns: NotificationCampaign[];
+}
+
 export interface Notification {
   id: string;
   userId: string;
@@ -648,6 +1136,199 @@ export interface ExamplePhotoInput {
   isActive?: boolean;
 }
 
+export type OperatorUserActionKind = typeof OperatorUserActionKind[keyof typeof OperatorUserActionKind];
+
+
+export const OperatorUserActionKind = {
+  user: 'user',
+} as const;
+
+export type OperatorUserActionRole = typeof OperatorUserActionRole[keyof typeof OperatorUserActionRole];
+
+
+export const OperatorUserActionRole = {
+  guest: 'guest',
+  host: 'host',
+  admin: 'admin',
+} as const;
+
+export interface OperatorUserAction {
+  kind: OperatorUserActionKind;
+  email: string;
+  role: OperatorUserActionRole;
+  /** @maxLength 200 */
+  fullName?: string;
+  /**
+     * @minLength 10
+     * @maxLength 2000
+     */
+  hostBio?: string;
+}
+
+export type OperatorLocationActionKind = typeof OperatorLocationActionKind[keyof typeof OperatorLocationActionKind];
+
+
+export const OperatorLocationActionKind = {
+  location: 'location',
+} as const;
+
+export interface OperatorLocationAction {
+  kind: OperatorLocationActionKind;
+  /** @maxLength 120 */
+  name: string;
+  /** @maxLength 120 */
+  city: string;
+  /** @maxLength 120 */
+  country: string;
+  /** Valid IANA time zone */
+  timeZone: string;
+  isDefault?: boolean;
+  /** @minimum 0 */
+  sortOrder?: number;
+}
+
+export type OperatorCategoryActionKind = typeof OperatorCategoryActionKind[keyof typeof OperatorCategoryActionKind];
+
+
+export const OperatorCategoryActionKind = {
+  category: 'category',
+} as const;
+
+export interface OperatorCategoryAction {
+  kind: OperatorCategoryActionKind;
+  /** @maxLength 120 */
+  name: string;
+  /** @pattern ^[a-z0-9]+(?:-[a-z0-9]+)*$ */
+  slug: string;
+  iconUrl?: string;
+  /** @minimum 0 */
+  sortOrder?: number;
+}
+
+export type OperatorBookingTemplateActionKind = typeof OperatorBookingTemplateActionKind[keyof typeof OperatorBookingTemplateActionKind];
+
+
+export const OperatorBookingTemplateActionKind = {
+  booking_template: 'booking_template',
+} as const;
+
+export interface OperatorBookingTemplateAction {
+  kind: OperatorBookingTemplateActionKind;
+  /** @maxLength 120 */
+  name: string;
+  /**
+     * @minimum 1
+     * @maximum 168
+     */
+  durationHours: number;
+  /** @maxLength 1000 */
+  description?: string;
+  isActive?: boolean;
+  /** @minimum 0 */
+  sortOrder?: number;
+}
+
+export type OperatorYachtDraftActionKind = typeof OperatorYachtDraftActionKind[keyof typeof OperatorYachtDraftActionKind];
+
+
+export const OperatorYachtDraftActionKind = {
+  yacht_draft: 'yacht_draft',
+} as const;
+
+export type OperatorYachtDraftActionPricingItem = {
+  templateId: string;
+  /** @exclusiveMinimum 0 */
+  priceEgp: number;
+};
+
+export interface OperatorYachtDraftAction {
+  kind: OperatorYachtDraftActionKind;
+  hostEmail: string;
+  /**
+     * @minLength 3
+     * @maxLength 200
+     */
+  title: string;
+  /** @maxLength 5000 */
+  description?: string;
+  locationId: string;
+  /** @nullable */
+  categoryId?: string | null;
+  /**
+     * @minimum 1
+     * @maximum 200
+     */
+  capacity: number;
+  /** @exclusiveMinimum 0 */
+  lengthFt?: number;
+  /** @minimum 1800 */
+  yearBuilt?: number;
+  /** @maxLength 100 */
+  manufacturer?: string;
+  /** @maxItems 50 */
+  features?: string[];
+  /** @maxItems 20 */
+  pricing?: OperatorYachtDraftActionPricingItem[];
+}
+
+export type OperatorAction = OperatorUserAction | OperatorLocationAction | OperatorCategoryAction | OperatorBookingTemplateAction | OperatorYachtDraftAction;
+
+export type OperatorOperationRequestPhase = typeof OperatorOperationRequestPhase[keyof typeof OperatorOperationRequestPhase];
+
+
+export const OperatorOperationRequestPhase = {
+  dry_run: 'dry_run',
+  execute: 'execute',
+} as const;
+
+export interface OperatorOperationRequest {
+  phase: OperatorOperationRequestPhase;
+  operationId: string;
+  action: OperatorAction;
+  /** Required only for phase=execute; obtained from a dry run. */
+  confirmationToken?: string;
+  /** Must be true only after the dry-run changes have explicit approval. */
+  confirmed?: boolean;
+}
+
+export type OperatorPlannedChangeAction = typeof OperatorPlannedChangeAction[keyof typeof OperatorPlannedChangeAction];
+
+
+export const OperatorPlannedChangeAction = {
+  create: 'create',
+  skip: 'skip',
+} as const;
+
+export interface OperatorPlannedChange {
+  entityType: string;
+  entityId: string;
+  action: OperatorPlannedChangeAction;
+  summary: string;
+}
+
+export type OperatorOperationResponseStatus = typeof OperatorOperationResponseStatus[keyof typeof OperatorOperationResponseStatus];
+
+
+export const OperatorOperationResponseStatus = {
+  completed: 'completed',
+  skipped: 'skipped',
+  partial: 'partial',
+} as const;
+
+export interface OperatorOperationResponse {
+  operationId: string;
+  expiresAt?: string;
+  changes?: OperatorPlannedChange[];
+  /** Returned only for a valid dry run; never store or log it. */
+  confirmationToken?: string;
+  nextStep?: string;
+  status?: OperatorOperationResponseStatus;
+  created?: OperatorPlannedChange[];
+  skipped?: OperatorPlannedChange[];
+  errors?: string[];
+  idempotent?: boolean;
+}
+
 export interface CategoryInput {
   name: string;
   slug: string;
@@ -679,6 +1360,8 @@ export type ListYachtsParams = {
 page?: number;
 limit?: number;
 categoryId?: string;
+locationId?: string;
+intent?: ListYachtsIntent;
 capacity?: number;
 /**
  * Filter by availability date (YYYY-MM-DD)
@@ -698,6 +1381,14 @@ maxPrice?: number;
  */
 features?: string;
 };
+
+export type ListYachtsIntent = typeof ListYachtsIntent[keyof typeof ListYachtsIntent];
+
+
+export const ListYachtsIntent = {
+  rent: 'rent',
+  buy: 'buy',
+} as const;
 
 export type GetYachtSlotsParams = {
 from: string;
@@ -728,8 +1419,13 @@ export type ListMyBookingsRole = typeof ListMyBookingsRole[keyof typeof ListMyBo
 export const ListMyBookingsRole = {
   guest: 'guest',
   host: 'host',
-  all: 'all',
 } as const;
+
+export type GetHostYachtAvailabilityParams = {
+yachtId: string;
+from: string;
+to: string;
+};
 
 export type ListNotificationsParams = {
 unreadOnly?: boolean;
@@ -809,5 +1505,9 @@ export const AdminListDocumentsStatus = {
 export type AdminListPhotographerRequestsParams = {
 status?: string;
 page?: number;
+};
+
+export type AdminListCancellationsParams = {
+status?: string;
 };
 

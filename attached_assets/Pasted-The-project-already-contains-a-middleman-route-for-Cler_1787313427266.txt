@@ -1,0 +1,91 @@
+The project already contains a “middleman” route for Clerk, but the mobile app is not being told to use it.
+
+Current behavior:
+
+```text
+Mobile web app
+   ↓
+https://clerk.getmarsa.app/...
+   ↓
+TLS connection fails
+   ↓
+Clerk never initializes
+   ↓
+Loading animation remains forever
+```
+
+The intended behavior is:
+
+```text
+Mobile web app
+   ↓
+https://getmarsa.app/api/__clerk/...
+   ↓
+Your Replit server forwards the request to Clerk
+   ↓
+Clerk initializes successfully
+   ↓
+Sign-in page appears
+```
+
+Why the proxy is currently ignored
+----------------------------------
+
+During the production build, [build.js](<C:/Users/ahmed/OneDrive/المستندات/Marsa/artifacts/marsa-mobile/scripts/build.js:105>) creates this public variable:
+
+```ts
+EXPO_PUBLIC_CLERK_PROXY_URL=https://getmarsa.app/api/__clerk
+```
+
+But defining an environment variable does not automatically configure Clerk. The value must be explicitly supplied to `ClerkProvider`.
+
+Currently, [\_layout.tsx](<C:/Users/ahmed/OneDrive/المستندات/Marsa/artifacts/marsa-mobile/app/_layout.tsx:104>) has:
+
+```tsx
+<ClerkProvider
+  publishableKey={process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!}
+  tokenCache={tokenCache}
+>
+```
+
+Because there is no `proxyUrl` property, Clerk ignores `EXPO_PUBLIC_CLERK_PROXY_URL`. It reads the hostname encoded inside the production publishable key instead, which is:
+
+```text
+clerk.getmarsa.app
+```
+
+That domain is currently failing its HTTPS/TLS handshake.
+
+The required change
+-------------------
+
+First, read the generated proxy URL:
+
+```tsx
+const clerkProxyUrl =
+  process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
+```
+
+Then give it to Clerk:
+
+```tsx
+<ClerkProvider
+  publishableKey={process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!}
+  proxyUrl={clerkProxyUrl}
+  tokenCache={tokenCache}
+>
+```
+
+Replit should have this production secret:
+
+```env
+CLERK_PROXY_URL=/api/__clerk
+```
+
+The build script converts that relative path into:
+
+```text
+https://getmarsa.app/api/__clerk
+```
+
+Your server already implements that route, and I verified it is functioning and successfully returns Clerk’s JavaScript. After adding `proxyUrl` and rebuilding the deployment, the web app should use the working proxy instead of the broken `clerk.getmarsa.app` connection.

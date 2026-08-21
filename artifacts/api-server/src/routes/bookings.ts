@@ -15,17 +15,44 @@ import {
   hostProfilesTable,
   availabilitySlotsTable,
   auditLogsTable,
+  bookingCancellationTermsTable,
+  bookingCancellationsTable,
+  locationsTable,
 } from "@workspace/db";
 import { and, eq, sql, desc, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { requireAuth, requireRole, validateBody, validateQuery } from "../middlewares/index";
-import { getStripeClient } from "../lib/stripe";
-import { egpToUsdCents, getEgpUsdRate } from "../lib/exchange";
+import {
+  requireAuth,
+  requireRole,
+  validateBody,
+  validateQuery,
+} from "../middlewares/index";
+import { getEgpUsdRate } from "../lib/exchange";
 import { notify } from "../lib/notify";
+import {
+  getConfiguredPaymentGateway,
+  getPaymentGatewayForStoredProvider,
+  PaymentGatewayUnavailableError,
+  type RefundResult,
+} from "../lib/payments";
+import {
+  addPiasters,
+  egpToPiasters,
+  percentageOfPiasters,
+  piastersToEgp,
+} from "../lib/money";
+import { getActiveCancellationPolicy } from "../lib/cancellations/policy";
+import { calculateCancellationQuote } from "../lib/cancellations/quote";
+import { tripStartToUtc } from "../lib/cancellations/time";
+import { recordAdminEvent } from "../lib/adminActivity";
+import {
+  BookingCreationError,
+  createBookingForGuest,
+} from "../lib/bookings/createBooking";
 
 const router: IRouter = Router();
 
-const PLATFORM_FEE_PCT = 0.20;
+const PLATFORM_FEE_PERCENTAGE = 20;
 
 // ── Enrich bookings with yacht + template display data ───────────────────────
 async function enrichBookings(bookings: (typeof bookingsTable.$inferSelect)[]) {
@@ -43,7 +70,11 @@ async function enrichBookings(bookings: (typeof bookingsTable.$inferSelect)[]) {
       .from(yachtPhotosTable)
       .where(inArray(yachtPhotosTable.yachtId, yachtIds)),
     db
-      .select({ id: bookingTemplatesTable.id, name: bookingTemplatesTable.name, durationHours: bookingTemplatesTable.durationHours })
+      .select({
+        id: bookingTemplatesTable.id,
+        name: bookingTemplatesTable.name,
+        durationHours: bookingTemplatesTable.durationHours,
+      })
       .from(bookingTemplatesTable)
       .where(inArray(bookingTemplatesTable.id, templateIds)),
   ]);
@@ -59,28 +90,54 @@ async function enrichBookings(bookings: (typeof bookingsTable.$inferSelect)[]) {
   return bookings.map((b) => ({
     ...b,
     yacht: yachtMap.has(b.yachtId)
-      ? { name: yachtMap.get(b.yachtId)!.name, photos: (photoMap.get(b.yachtId) ?? []).slice(0, 1) }
+      ? {
+          name: yachtMap.get(b.yachtId)!.name,
+          photos: (photoMap.get(b.yachtId) ?? []).slice(0, 1),
+        }
       : undefined,
     template: templateMap.has(b.templateId)
-      ? { name: templateMap.get(b.templateId)!.name, durationHours: templateMap.get(b.templateId)!.durationHours }
+      ? {
+          name: templateMap.get(b.templateId)!.name,
+          durationHours: templateMap.get(b.templateId)!.durationHours,
+        }
       : undefined,
   }));
 }
 
 // ── Create Booking ──────────────────────────────────────────────────────────
-const bookingInputSchema = z.object({
-  yachtId: z.string().min(1),
-  templateId: z.string().min(1),
-  bookingDate: z.string().min(1),
-  startTime: z.string().min(1),
-  guestCount: z.number().int().min(1),
-  guestName: z.string().min(2).max(200),
-  guestPhone: z.string().min(6).max(30),
-  guestEmail: z.string().email(),
-  guestNationality: z.string().max(100).optional(),
-  specialRequests: z.string().max(1000).optional(),
-  addOnIds: z.array(z.string()).optional(),
-});
+const bookingInputSchema = z
+  .object({
+    slotId: z.string().min(1).optional(),
+    yachtId: z.string().min(1).optional(),
+    templateId: z.string().min(1).optional(),
+    bookingDate: z.string().min(1).optional(),
+    startTime: z.string().min(1).optional(),
+    guestCount: z.number().int().min(1),
+    guestName: z.string().min(2).max(200),
+    guestPhone: z.string().min(6).max(30),
+    guestEmail: z.string().email(),
+    guestNationality: z.string().max(100).optional(),
+    specialRequests: z.string().max(1000).optional(),
+    addOnIds: z.array(z.string()).optional(),
+    acceptedCancellationPolicyId: z.string().min(1),
+  })
+  .superRefine((value, context) => {
+    if (
+      !value.slotId &&
+      !(
+        value.yachtId &&
+        value.templateId &&
+        value.bookingDate &&
+        value.startTime
+      )
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "slotId is required",
+        path: ["slotId"],
+      });
+    }
+  });
 
 router.post(
   "/bookings",
@@ -89,165 +146,20 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).localUser;
     const body = req.body as z.infer<typeof bookingInputSchema>;
-
-    // Verify yacht is live
-    const [yacht] = await db
-      .select()
-      .from(yachtsTable)
-      .where(and(eq(yachtsTable.id, body.yachtId), eq(yachtsTable.status, "live")))
-      .limit(1);
-
-    if (!yacht) {
-      res.status(404).json({ error: "Yacht not found or not available" });
-      return;
-    }
-
-    if (body.guestCount > yacht.capacity) {
-      res.status(400).json({ error: `Guest count exceeds yacht capacity of ${yacht.capacity}` });
-      return;
-    }
-
-    // Verify pricing
-    const [pricing] = await db
-      .select()
-      .from(yachtTemplatePricingTable)
-      .where(
-        and(
-          eq(yachtTemplatePricingTable.yachtId, body.yachtId),
-          eq(yachtTemplatePricingTable.templateId, body.templateId),
-          eq(yachtTemplatePricingTable.isActive, true),
-        ),
-      )
-      .limit(1);
-
-    if (!pricing) {
-      res.status(400).json({ error: "Pricing not available for this template" });
-      return;
-    }
-
-    // Check slot availability
-    const [slot] = await db
-      .select()
-      .from(availabilitySlotsTable)
-      .where(
-        and(
-          eq(availabilitySlotsTable.yachtId, body.yachtId),
-          eq(availabilitySlotsTable.templateId, body.templateId),
-          eq(availabilitySlotsTable.date, body.bookingDate),
-          eq(availabilitySlotsTable.startTime, body.startTime),
-          eq(availabilitySlotsTable.isAvailable, true),
-        ),
-      )
-      .limit(1);
-
-    if (!slot) {
-      res.status(400).json({ error: "Requested slot is not available" });
-      return;
-    }
-
-    // Calculate add-on totals
-    let addOnTotal = 0;
-    const addOns =
-      body.addOnIds?.length
-        ? await db
-            .select()
-            .from(addOnsTable)
-            .where(inArray(addOnsTable.id, body.addOnIds))
-        : [];
-    for (const addOn of addOns) addOnTotal += parseFloat(addOn.priceEgp);
-
-    const baseAmount = parseFloat(pricing.price);
-    const totalAmount = baseAmount + addOnTotal;
-    const platformFee = parseFloat((totalAmount * PLATFORM_FEE_PCT).toFixed(2));
-    const hostEarnings = parseFloat((totalAmount - platformFee).toFixed(2));
-
-    const amountUsdCents = await egpToUsdCents(totalAmount);
-    const { rate: exchangeRate } = await getEgpUsdRate();
-
-    // Create Stripe PaymentIntent
-    let paymentIntent;
     try {
-      const stripeClient = await getStripeClient();
-      paymentIntent = await stripeClient.paymentIntents.create({
-        amount: amountUsdCents,
-        currency: "usd",
-        metadata: {
-          yachtId: body.yachtId,
-          templateId: body.templateId,
-          guestId: user.id,
-          egpAmount: String(totalAmount),
-        },
-        automatic_payment_methods: { enabled: true },
-      });
-    } catch (err: any) {
-      req.log.error({ err }, "Stripe PaymentIntent creation failed");
-      res.status(502).json({ error: "Payment service unavailable. Please try again." });
-      return;
-    }
-
-    const bookingId = randomUUID();
-    const [booking] = await db
-      .insert(bookingsTable)
-      .values({
-        id: bookingId,
-        guestId: user.id,
-        yachtId: body.yachtId,
-        templateId: body.templateId,
-        slotId: slot.id,
-        bookingDate: body.bookingDate,
-        startTime: body.startTime,
-        guestCount: body.guestCount,
-        guestName: body.guestName,
-        guestPhone: body.guestPhone,
-        guestEmail: body.guestEmail,
-        guestNationality: body.guestNationality ?? null,
-        specialRequests: body.specialRequests ?? null,
-        baseAmountEgp: String(baseAmount),
-        baseAmountUsd: String((amountUsdCents / 100).toFixed(2)),
-        exchangeRateUsed: String(exchangeRate),
-        platformFeeEgp: String(platformFee),
-        hostEarningsEgp: String(hostEarnings),
-        totalAmountEgp: String(totalAmount),
-        status: "pending_payment",
-      })
-      .returning();
-
-    // Create payment record
-    await db.insert(paymentsTable).values({
-      id: randomUUID(),
-      bookingId,
-      stripePaymentIntentId: paymentIntent.id,
-      amountEgp: String(totalAmount),
-      amountUsd: String((amountUsdCents / 100).toFixed(2)),
-      currency: "EGP",
-      status: "created",
-    });
-
-    // Add-on line items
-    if (addOns.length > 0) {
-      await db.insert(bookingAddOnsTable).values(
-        addOns.map((a) => ({
-          id: randomUUID(),
-          bookingId,
-          addOnId: a.id,
-          priceAtBookingEgp: a.priceEgp,
-        })),
+      const result = await createBookingForGuest(user.id, body);
+      req.log.info(
+        { bookingId: result.booking.id, guestId: user.id },
+        "Booking created",
       );
+      res.status(201).json(result);
+    } catch (error) {
+      if (error instanceof BookingCreationError) {
+        res.status(error.statusCode).json({ error: error.message });
+        return;
+      }
+      throw error;
     }
-
-    // Reserve the slot
-    await db
-      .update(availabilitySlotsTable)
-      .set({ isAvailable: false })
-      .where(eq(availabilitySlotsTable.id, slot.id));
-
-    req.log.info({ bookingId, guestId: user.id }, "Booking created");
-
-    res.status(201).json({
-      booking,
-      clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id,
-    });
   },
 );
 
@@ -264,12 +176,17 @@ router.get(
   validateQuery(meBookingsQuery),
   async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).localUser;
-    const { status, page } = req.query as unknown as z.infer<typeof meBookingsQuery>;
+    const { status, page } = req.query as unknown as z.infer<
+      typeof meBookingsQuery
+    >;
     const limit = 20;
     const offset = (page - 1) * limit;
 
     const where = status
-      ? and(eq(bookingsTable.guestId, user.id), eq(bookingsTable.status, status as any))
+      ? and(
+          eq(bookingsTable.guestId, user.id),
+          eq(bookingsTable.status, status as any),
+        )
       : eq(bookingsTable.guestId, user.id);
 
     const [bookings, [countRow]] = await Promise.all([
@@ -280,10 +197,17 @@ router.get(
         .orderBy(desc(bookingsTable.createdAt))
         .limit(limit)
         .offset(offset),
-      db.select({ count: sql<number>`count(*)::int` }).from(bookingsTable).where(where),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(bookingsTable)
+        .where(where),
     ]);
 
-    res.json({ bookings: await enrichBookings(bookings), total: countRow?.count ?? 0, page });
+    res.json({
+      bookings: await enrichBookings(bookings),
+      total: countRow?.count ?? 0,
+      page,
+    });
   },
 );
 
@@ -300,7 +224,9 @@ router.get(
   validateQuery(listBookingsQuery),
   async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).localUser;
-    const { role, status, page } = req.query as unknown as z.infer<typeof listBookingsQuery>;
+    const { role, status, page } = req.query as unknown as z.infer<
+      typeof listBookingsQuery
+    >;
     const limit = 20;
     const offset = (page - 1) * limit;
 
@@ -309,7 +235,10 @@ router.get(
     if (role === "all") {
       // Return both guest bookings and host (incoming) bookings merged
       const guestWhere = status
-        ? and(eq(bookingsTable.guestId, user.id), eq(bookingsTable.status, status as any))
+        ? and(
+            eq(bookingsTable.guestId, user.id),
+            eq(bookingsTable.status, status as any),
+          )
         : eq(bookingsTable.guestId, user.id);
 
       const [profile] = await db
@@ -319,7 +248,10 @@ router.get(
         .limit(1);
 
       const hostYachts = profile
-        ? await db.select({ id: yachtsTable.id }).from(yachtsTable).where(eq(yachtsTable.hostId, profile.id))
+        ? await db
+            .select({ id: yachtsTable.id })
+            .from(yachtsTable)
+            .where(eq(yachtsTable.hostId, profile.id))
         : [];
       const yachtIds = hostYachts.map((y) => y.id);
 
@@ -327,7 +259,10 @@ router.get(
 
       if (yachtIds.length > 0) {
         const hostWhere = status
-          ? and(inArray(bookingsTable.yachtId, yachtIds), eq(bookingsTable.status, status as any))
+          ? and(
+              inArray(bookingsTable.yachtId, yachtIds),
+              eq(bookingsTable.status, status as any),
+            )
           : inArray(bookingsTable.yachtId, yachtIds);
 
         const [guestBookings, hostBookings] = await Promise.all([
@@ -348,7 +283,11 @@ router.get(
         allBookings = await db.select().from(bookingsTable).where(guestWhere);
       }
 
-      allBookings.sort((a, b) => new Date(String(b.createdAt)).getTime() - new Date(String(a.createdAt)).getTime());
+      allBookings.sort(
+        (a, b) =>
+          new Date(String(b.createdAt)).getTime() -
+          new Date(String(a.createdAt)).getTime(),
+      );
       const total = allBookings.length;
       const bookings = allBookings.slice(offset, offset + limit);
       res.json({ bookings: await enrichBookings(bookings), total, page });
@@ -377,11 +316,17 @@ router.get(
 
       const yachtIds = hostYachts.map((y) => y.id);
       whereClause = status
-        ? and(inArray(bookingsTable.yachtId, yachtIds), eq(bookingsTable.status, status as any))
+        ? and(
+            inArray(bookingsTable.yachtId, yachtIds),
+            eq(bookingsTable.status, status as any),
+          )
         : inArray(bookingsTable.yachtId, yachtIds);
     } else {
       whereClause = status
-        ? and(eq(bookingsTable.guestId, user.id), eq(bookingsTable.status, status as any))
+        ? and(
+            eq(bookingsTable.guestId, user.id),
+            eq(bookingsTable.status, status as any),
+          )
         : eq(bookingsTable.guestId, user.id);
     }
 
@@ -399,7 +344,11 @@ router.get(
         .where(whereClause),
     ]);
 
-    res.json({ bookings: await enrichBookings(bookings), total: countRow?.count ?? 0, page });
+    res.json({
+      bookings: await enrichBookings(bookings),
+      total: countRow?.count ?? 0,
+      page,
+    });
   },
 );
 
@@ -432,7 +381,12 @@ router.get(
         ? await db
             .select()
             .from(yachtsTable)
-            .where(and(eq(yachtsTable.id, booking.yachtId), eq(yachtsTable.hostId, profile.id)))
+            .where(
+              and(
+                eq(yachtsTable.id, booking.yachtId),
+                eq(yachtsTable.hostId, profile.id),
+              ),
+            )
             .limit(1)
         : [];
       if (!ownedYacht) {
@@ -442,42 +396,69 @@ router.get(
     }
 
     // Fetch add-ons and payment info in parallel for receipt display
-    const [bookingAddOnRows, payment, template] = await Promise.all([
-      db
-        .select({
-          id: addOnsTable.id,
-          name: addOnsTable.name,
-          priceEgp: addOnsTable.priceEgp,
-        })
-        .from(bookingAddOnsTable)
-        .innerJoin(addOnsTable, eq(bookingAddOnsTable.addOnId, addOnsTable.id))
-        .where(eq(bookingAddOnsTable.bookingId, id)),
-      db
-        .select({
-          stripePaymentIntentId: paymentsTable.stripePaymentIntentId,
-          status: paymentsTable.status,
-          amountEgp: paymentsTable.amountEgp,
-          amountUsd: paymentsTable.amountUsd,
-          receiptUrl: paymentsTable.receiptUrl,
-        })
-        .from(paymentsTable)
-        .where(eq(paymentsTable.bookingId, id))
-        .limit(1),
-      db
-        .select({ name: bookingTemplatesTable.name, durationHours: bookingTemplatesTable.durationHours })
-        .from(bookingTemplatesTable)
-        .where(eq(bookingTemplatesTable.id, booking.templateId))
-        .limit(1),
-    ]);
+    const [bookingAddOnRows, payment, template, cancellationTerms] =
+      await Promise.all([
+        db
+          .select({
+            id: addOnsTable.id,
+            name: addOnsTable.name,
+            priceEgp: addOnsTable.priceEgp,
+          })
+          .from(bookingAddOnsTable)
+          .innerJoin(
+            addOnsTable,
+            eq(bookingAddOnsTable.addOnId, addOnsTable.id),
+          )
+          .where(eq(bookingAddOnsTable.bookingId, id)),
+        db
+          .select({
+            provider: paymentsTable.provider,
+            providerPaymentId: paymentsTable.providerPaymentId,
+            isTest: paymentsTable.isTest,
+            stripePaymentIntentId: paymentsTable.stripePaymentIntentId,
+            status: paymentsTable.status,
+            amountEgp: paymentsTable.amountEgp,
+            amountUsd: paymentsTable.amountUsd,
+            receiptUrl: paymentsTable.receiptUrl,
+          })
+          .from(paymentsTable)
+          .where(eq(paymentsTable.bookingId, id))
+          .limit(1),
+        db
+          .select({
+            name: bookingTemplatesTable.name,
+            durationHours: bookingTemplatesTable.durationHours,
+          })
+          .from(bookingTemplatesTable)
+          .where(eq(bookingTemplatesTable.id, booking.templateId))
+          .limit(1),
+        db
+          .select()
+          .from(bookingCancellationTermsTable)
+          .where(eq(bookingCancellationTermsTable.bookingId, id))
+          .limit(1),
+      ]);
 
     res.json({
       ...booking,
       addOns: bookingAddOnRows,
       paymentStatus: payment[0]?.status ?? null,
+      paymentProvider: payment[0]?.provider ?? null,
+      providerPaymentId: payment[0]?.providerPaymentId ?? null,
+      isTestPayment: payment[0]?.isTest ?? false,
       stripePaymentIntentId: payment[0]?.stripePaymentIntentId ?? null,
       receiptUrl: payment[0]?.receiptUrl ?? null,
       totalAmountUsd: payment[0]?.amountUsd ?? null,
       templateName: template[0]?.name ?? null,
+      cancellationTerms: cancellationTerms[0]
+        ? {
+            policyName: cancellationTerms[0].policyName,
+            policyVersion: cancellationTerms[0].policyVersion,
+            tripStartsAt: cancellationTerms[0].tripStartsAt,
+            timeZone: cancellationTerms[0].timeZone,
+            rules: cancellationTerms[0].rulesSnapshot,
+          }
+        : null,
     });
   },
 );
@@ -485,7 +466,71 @@ router.get(
 // ── Cancel Booking ──────────────────────────────────────────────────────────
 const cancellationSchema = z.object({
   reason: z.string().max(500).optional(),
+  acceptedRuleId: z.string().optional(),
+  acceptedFeeAmountEgp: z
+    .string()
+    .regex(/^\d+(\.\d{1,2})?$/)
+    .optional(),
 });
+
+function cancellationResponse(
+  cancellation: typeof bookingCancellationsTable.$inferSelect,
+) {
+  return {
+    ...cancellation,
+    manualReviewRequired:
+      cancellation.policyId === null ||
+      cancellation.feeAmountEgp === null ||
+      cancellation.refundAmountEgp === null,
+  };
+}
+
+router.get(
+  "/bookings/:id/cancellation-quote",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const user = (req as any).localUser;
+    const bookingId = String(req.params.id);
+    const [booking] = await db
+      .select()
+      .from(bookingsTable)
+      .where(eq(bookingsTable.id, bookingId))
+      .limit(1);
+    if (!booking) {
+      res.status(404).json({ error: "Booking not found" });
+      return;
+    }
+    if (booking.guestId !== user.id && user.role !== "admin") {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+    if (
+      !["pending_payment", "paid_under_review", "confirmed"].includes(
+        booking.status,
+      )
+    ) {
+      res
+        .status(409)
+        .json({ error: "Booking cannot be cancelled in its current status" });
+      return;
+    }
+    const [terms] = await db
+      .select()
+      .from(bookingCancellationTermsTable)
+      .where(eq(bookingCancellationTermsTable.bookingId, bookingId))
+      .limit(1);
+    try {
+      res.json(calculateCancellationQuote(booking, terms ?? null));
+    } catch (error) {
+      res.status(409).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Booking can no longer be cancelled",
+      });
+    }
+  },
+);
 
 router.post(
   "/bookings/:id/cancel",
@@ -509,38 +554,163 @@ router.post(
       res.status(403).json({ error: "Forbidden" });
       return;
     }
-    if (!["pending_payment", "paid_under_review", "confirmed"].includes(booking.status)) {
-      res.status(400).json({ error: "Booking cannot be cancelled in its current status" });
+    if (
+      !["pending_payment", "paid_under_review", "confirmed"].includes(
+        booking.status,
+      )
+    ) {
+      const [existing] = await db
+        .select()
+        .from(bookingCancellationsTable)
+        .where(
+          and(
+            eq(bookingCancellationsTable.bookingId, id),
+            inArray(bookingCancellationsTable.status, [
+              "pending",
+              "processing",
+            ]),
+          ),
+        )
+        .limit(1);
+      if (existing) {
+        res.json(cancellationResponse(existing));
+        return;
+      }
+      res
+        .status(409)
+        .json({ error: "Booking cannot be cancelled in its current status" });
       return;
     }
 
-    const [updated] = await db
-      .update(bookingsTable)
-      .set({ status: "cancel_requested" })
-      .where(eq(bookingsTable.id, id))
-      .returning();
-
-    if (booking.slotId) {
-      await db
-        .update(availabilitySlotsTable)
-        .set({ isAvailable: true })
-        .where(eq(availabilitySlotsTable.id, booking.slotId));
+    const [terms] = await db
+      .select()
+      .from(bookingCancellationTermsTable)
+      .where(eq(bookingCancellationTermsTable.bookingId, id))
+      .limit(1);
+    let quote;
+    try {
+      quote = calculateCancellationQuote(booking, terms ?? null);
+    } catch (error) {
+      res.status(409).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Booking can no longer be cancelled",
+      });
+      return;
+    }
+    const body = req.body as z.infer<typeof cancellationSchema>;
+    const quoteAcceptanceMissing =
+      !quote.manualReviewRequired &&
+      (body.acceptedRuleId === undefined ||
+        body.acceptedFeeAmountEgp === undefined);
+    const acceptedQuoteChanged =
+      quoteAcceptanceMissing ||
+      (body.acceptedRuleId !== undefined &&
+        body.acceptedRuleId !== (quote.matchedRuleId ?? undefined)) ||
+      (body.acceptedFeeAmountEgp !== undefined &&
+        quote.feeAmountEgp !== null &&
+        egpToPiasters(body.acceptedFeeAmountEgp) !==
+          egpToPiasters(quote.feeAmountEgp));
+    if (acceptedQuoteChanged) {
+      res.status(409).json({
+        error: "Cancellation terms changed. Review the latest quote.",
+        quote,
+      });
+      return;
     }
 
-    await db
-      .insert(auditLogsTable)
-      .values({
-        id: randomUUID(),
-        userId: user.id,
-        action: "booking.cancel_requested",
-        entityType: "booking",
-        entityId: id,
-        newValue: { reason: (req.body as any).reason ?? null },
-        ipAddress: req.ip,
-      })
-      .catch(() => {});
+    const cancellationId = randomUUID();
+    try {
+      const cancellation = await db.transaction(async (tx) => {
+        const [updatedBooking] = await tx
+          .update(bookingsTable)
+          .set({ status: "cancel_requested" })
+          .where(
+            and(
+              eq(bookingsTable.id, id),
+              inArray(bookingsTable.status, [
+                "pending_payment",
+                "paid_under_review",
+                "confirmed",
+              ]),
+            ),
+          )
+          .returning({ id: bookingsTable.id });
+        if (!updatedBooking) throw new Error("BOOKING_STATUS_CHANGED");
 
-    res.json(updated);
+        const [created] = await tx
+          .insert(bookingCancellationsTable)
+          .values({
+            id: cancellationId,
+            bookingId: id,
+            requestedBy: user.id,
+            reason: body.reason ?? null,
+            requestedAt: new Date(quote.requestedAt),
+            bookingStatusBeforeRequest: booking.status,
+            tripStartsAt: new Date(quote.tripStartsAt),
+            remainingMinutes: quote.remainingMinutes,
+            policyId: terms?.policyId ?? null,
+            policyVersion: terms?.policyVersion ?? null,
+            matchedRuleId: quote.matchedRuleId,
+            feePercentage: quote.feePercentage,
+            originalAmountEgp: quote.originalAmountEgp,
+            feeAmountEgp: quote.feeAmountEgp,
+            refundAmountEgp: quote.refundAmountEgp,
+            status: "pending",
+          })
+          .returning();
+        await tx.insert(auditLogsTable).values({
+          id: randomUUID(),
+          userId: user.id,
+          action: "booking.cancel_requested",
+          entityType: "booking",
+          entityId: id,
+          newValue: {
+            cancellationId,
+            reason: body.reason ?? null,
+            feePercentage: quote.feePercentage,
+          },
+          ipAddress: req.ip,
+        });
+        return created;
+      });
+      void recordAdminEvent({
+        sectionKey: "cancellations",
+        entityType: "booking_cancellation",
+        entityId: cancellation.id,
+        eventType: "cancellation.requested",
+      }).catch(() => {});
+      res.json(cancellationResponse(cancellation));
+    } catch (error) {
+      const [existing] = await db
+        .select()
+        .from(bookingCancellationsTable)
+        .where(
+          and(
+            eq(bookingCancellationsTable.bookingId, id),
+            inArray(bookingCancellationsTable.status, [
+              "pending",
+              "processing",
+            ]),
+          ),
+        )
+        .limit(1);
+      if (existing) {
+        res.json(cancellationResponse(existing));
+        return;
+      }
+      if (
+        error instanceof Error &&
+        error.message === "BOOKING_STATUS_CHANGED"
+      ) {
+        res
+          .status(409)
+          .json({ error: "Booking status changed; refresh and try again" });
+        return;
+      }
+      throw error;
+    }
   },
 );
 
@@ -574,7 +744,12 @@ router.post(
         ? await db
             .select()
             .from(yachtsTable)
-            .where(and(eq(yachtsTable.id, booking.yachtId), eq(yachtsTable.hostId, profile.id)))
+            .where(
+              and(
+                eq(yachtsTable.id, booking.yachtId),
+                eq(yachtsTable.hostId, profile.id),
+              ),
+            )
             .limit(1)
         : [];
       if (!ownedYacht) {
@@ -680,7 +855,12 @@ router.post(
         ? await db
             .select()
             .from(yachtsTable)
-            .where(and(eq(yachtsTable.id, booking.yachtId), eq(yachtsTable.hostId, profile.id)))
+            .where(
+              and(
+                eq(yachtsTable.id, booking.yachtId),
+                eq(yachtsTable.hostId, profile.id),
+              ),
+            )
             .limit(1)
         : [];
       if (!ownedYacht) {
@@ -689,8 +869,13 @@ router.post(
       }
     }
 
-    if (!["paid_under_review", "cancel_requested"].includes(booking.status)) {
-      res.status(400).json({ error: "Cannot reject booking in current status" });
+    if (booking.status !== "paid_under_review") {
+      res.status(409).json({
+        error:
+          booking.status === "cancel_requested"
+            ? "Cancellation requests must be processed by an admin"
+            : "Cannot reject booking in current status",
+      });
       return;
     }
 
@@ -701,33 +886,73 @@ router.post(
     const [payment] = await db
       .select()
       .from(paymentsTable)
-      .where(and(eq(paymentsTable.bookingId, id), eq(paymentsTable.status, "succeeded")))
+      .where(
+        and(
+          eq(paymentsTable.bookingId, id),
+          eq(paymentsTable.status, "succeeded"),
+        ),
+      )
       .limit(1);
 
-    if (payment?.stripePaymentIntentId) {
+    const providerPaymentId =
+      payment?.providerPaymentId ?? payment?.stripePaymentIntentId ?? null;
+    if (!payment || !providerPaymentId) {
+      res.status(409).json({ error: "A succeeded payment could not be found" });
+      return;
+    }
+
+    const reason =
+      (req.body as z.infer<typeof rejectionSchema>).reason ??
+      "Booking rejected";
+    let providerRefund: RefundResult | undefined;
+    if (providerPaymentId) {
       try {
-        const stripeClient = await getStripeClient();
-        const stripeRefund = await stripeClient.refunds.create({
-          payment_intent: payment.stripePaymentIntentId,
+        const gateway = getPaymentGatewayForStoredProvider(payment.provider);
+        const refundResult = await gateway.refund({
+          providerPaymentId,
+          amountEgp: booking.totalAmountEgp,
+          idempotencyKey: `booking-rejection:${id}`,
+          reason,
         });
+        providerRefund = refundResult;
         await db
           .insert(refundsTable)
           .values({
             id: randomUUID(),
             paymentId: payment.id,
             bookingId: id,
-            stripeRefundId: stripeRefund.id,
+            provider: refundResult.provider,
+            providerRefundId: refundResult.providerRefundId,
+            stripeRefundId:
+              refundResult.provider === "stripe"
+                ? refundResult.providerRefundId
+                : null,
+            isTest: refundResult.isTest,
             amountEgp: booking.totalAmountEgp,
-            reason: (req.body as any).reason ?? "Booking rejected",
-            status: "pending",
+            reason,
+            status: refundResult.status,
             initiatedBy: user.id,
           })
-          .catch(() => {});
+          .then(async () => {
+            await db
+              .update(paymentsTable)
+              .set({
+                status:
+                  refundResult.status === "succeeded"
+                    ? "refunded"
+                    : "refund_pending",
+              })
+              .where(eq(paymentsTable.id, payment.id));
+          });
       } catch (err) {
         // Refund creation failed — do NOT change booking status; let caller retry.
-        req.log.error({ err }, "Stripe refund failed during booking rejection");
+        req.log.error(
+          { err, provider: payment.provider },
+          "Payment refund failed during booking rejection",
+        );
         res.status(502).json({
-          error: "Refund could not be initiated with Stripe. Booking status unchanged — please retry.",
+          error:
+            "Refund could not be initiated. Booking status is unchanged; please retry.",
         });
         return;
       }
@@ -736,23 +961,49 @@ router.post(
     const [updated] = await db
       .update(bookingsTable)
       .set({ status: "rejected_refunded" })
-      .where(eq(bookingsTable.id, id))
+      .where(
+        and(
+          eq(bookingsTable.id, id),
+          eq(bookingsTable.status, "paid_under_review"),
+        ),
+      )
       .returning();
+    if (!updated) {
+      res
+        .status(409)
+        .json({ error: "Booking status changed; refresh and try again" });
+      return;
+    }
 
     if (booking.slotId) {
-      await db
+      const [oldSlot] = await db
         .update(availabilitySlotsTable)
-        .set({ isAvailable: true })
-        .where(eq(availabilitySlotsTable.id, booking.slotId));
+        .set({ holdExpiresAt: null })
+        .where(eq(availabilitySlotsTable.id, booking.slotId))
+        .returning();
+      if (oldSlot && providerRefund?.status === "succeeded") {
+        await db
+          .insert(availabilitySlotsTable)
+          .values({
+            id: randomUUID(),
+            yachtId: oldSlot.yachtId,
+            templateId: oldSlot.templateId,
+            date: oldSlot.date,
+            startTime: oldSlot.startTime,
+            isAvailable: true,
+            priceOverrideEgp: oldSlot.priceOverrideEgp,
+          })
+          .onConflictDoNothing();
+      }
     }
 
     notify({
       userId: booking.guestId,
       type: "booking.rejected",
       title: "Booking rejected",
-      message:
-        (req.body as any).reason ??
-        "Your booking has been rejected and a refund has been initiated.",
+      message: `${reason}. Your refund has been ${
+        providerRefund?.status === "succeeded" ? "completed" : "initiated"
+      }.`,
       relatedEntityType: "booking",
       relatedEntityId: id,
     });
@@ -765,7 +1016,11 @@ router.post(
         action: "booking.rejected",
         entityType: "booking",
         entityId: id,
-        newValue: { reason: (req.body as any).reason ?? null },
+        newValue: {
+          reason,
+          refundStatus: providerRefund?.status ?? "pending",
+          provider: payment.provider,
+        },
         ipAddress: req.ip,
       })
       .catch(() => {});

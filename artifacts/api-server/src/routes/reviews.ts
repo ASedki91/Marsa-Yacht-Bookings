@@ -11,6 +11,7 @@ import { and, eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { requireAuth, validateBody } from "../middlewares/index";
 import { notify } from "../lib/notify";
+import { recordAdminEvent } from "../lib/adminActivity";
 
 const router: IRouter = Router();
 
@@ -123,6 +124,12 @@ router.post(
       relatedEntityType: "review",
       relatedEntityId: reviewId,
     });
+    void recordAdminEvent({
+      sectionKey: "reviews",
+      entityType: "review",
+      entityId: reviewId,
+      eventType: "review.submitted",
+    }).catch(() => {});
 
     res.status(201).json(review);
   },
@@ -183,6 +190,12 @@ router.post(
       relatedEntityType: "review",
       relatedEntityId: reviewId,
     });
+    void recordAdminEvent({
+      sectionKey: "reviews",
+      entityType: "review",
+      entityId: reviewId,
+      eventType: "review.submitted",
+    }).catch(() => {});
 
     res.status(201).json(review);
   },

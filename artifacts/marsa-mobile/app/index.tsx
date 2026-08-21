@@ -6,6 +6,6 @@ export default function Root() {
   const { isSignedIn, isLoaded } = useAuth();
 
   if (!isLoaded) return <LoadingScreen />;
-  if (isSignedIn) return <Redirect href="/(home)/(tabs)/explore" />;
+  if (isSignedIn) return <Redirect href={"/(home)" as any} />;
   return <Redirect href="/(auth)/sign-in" />;
 }

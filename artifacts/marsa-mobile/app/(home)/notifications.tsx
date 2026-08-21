@@ -113,8 +113,8 @@ const styles = StyleSheet.create({
   },
   iconBox: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   content: { flex: 1, gap: 3 },
-  title: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  message: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
-  time: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
+  title: { fontSize: 14, fontFamily: "HankenGrotesk_600SemiBold" },
+  message: { fontSize: 13, fontFamily: "HankenGrotesk_400Regular", lineHeight: 18 },
+  time: { fontSize: 11, fontFamily: "HankenGrotesk_400Regular", marginTop: 2 },
   dot: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
 });

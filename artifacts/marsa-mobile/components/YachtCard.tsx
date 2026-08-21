@@ -14,20 +14,34 @@ import colors from "@/constants/colors";
 interface YachtCardProps {
   yacht: {
     id: string;
-    name: string;
+    name?: string;
+    title?: string;
     description?: string;
+    location?: string;
     capacity?: number;
     basePriceEgp?: string;
     rating?: number;
+    avgRating?: string;
     reviewCount?: number;
     photos?: Array<{ url: string; isPrimary?: boolean }>;
     category?: { name: string };
+    isFeatured?: boolean;
   };
   onPress: () => void;
   compact?: boolean;
+  wishlisted?: boolean;
+  wishlistPending?: boolean;
+  onToggleWishlist?: () => void;
 }
 
-export function YachtCard({ yacht, onPress, compact }: YachtCardProps) {
+export function YachtCard({
+  yacht,
+  onPress,
+  compact,
+  wishlisted,
+  wishlistPending,
+  onToggleWishlist,
+}: YachtCardProps) {
   const c = useColors();
 
   const primaryPhoto =
@@ -35,6 +49,10 @@ export function YachtCard({ yacht, onPress, compact }: YachtCardProps) {
   const price = yacht.basePriceEgp
     ? Number(yacht.basePriceEgp).toLocaleString("en-EG")
     : null;
+  const title = yacht.title ?? yacht.name ?? "Yacht";
+  const rating =
+    yacht.rating ??
+    (yacht.avgRating !== undefined ? Number(yacht.avgRating) : undefined);
 
   return (
     <Pressable
@@ -73,10 +91,54 @@ export function YachtCard({ yacht, onPress, compact }: YachtCardProps) {
         </View>
       )}
 
+      {yacht.isFeatured && !yacht.category && (
+        <View style={[styles.badge, { backgroundColor: colors.light.navy }]}>
+          <Ionicons name="sparkles" size={11} color={colors.light.gold} />
+          <Text style={styles.badgeText}>Featured</Text>
+        </View>
+      )}
+
+      {onToggleWishlist && (
+        <Pressable
+          accessibilityLabel={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
+          disabled={wishlistPending}
+          hitSlop={8}
+          style={[
+            styles.heartButton,
+            {
+              backgroundColor: "rgba(255,255,255,0.94)",
+              opacity: wishlistPending ? 0.6 : 1,
+            },
+          ]}
+          onPress={(event) => {
+            event.stopPropagation();
+            onToggleWishlist();
+          }}
+        >
+          <Ionicons
+            name={wishlisted ? "heart" : "heart-outline"}
+            size={20}
+            color={wishlisted ? "#E11D48" : colors.light.navy}
+          />
+        </Pressable>
+      )}
+
       <View style={styles.content}>
         <Text style={[styles.name, { color: c.foreground }]} numberOfLines={1}>
-          {yacht.name}
+          {title}
         </Text>
+
+        {!!yacht.location && (
+          <View style={styles.metaRow}>
+            <Ionicons name="location-outline" size={13} color={c.mutedForeground} />
+            <Text
+              style={[styles.metaText, { color: c.mutedForeground }]}
+              numberOfLines={1}
+            >
+              {yacht.location}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.meta}>
           {yacht.capacity && (
@@ -87,11 +149,11 @@ export function YachtCard({ yacht, onPress, compact }: YachtCardProps) {
               </Text>
             </View>
           )}
-          {yacht.rating != null && (
+          {rating != null && Number.isFinite(rating) && (
             <View style={styles.metaRow}>
               <Ionicons name="star" size={13} color={colors.light.gold} />
               <Text style={[styles.metaText, { color: c.mutedForeground }]}>
-                {yacht.rating.toFixed(1)}{" "}
+                {rating.toFixed(1)}{" "}
                 {yacht.reviewCount ? `(${yacht.reviewCount})` : ""}
               </Text>
             </View>
@@ -140,19 +202,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 100,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   badgeText: {
     color: "#FFFFFF",
     fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "HankenGrotesk_600SemiBold",
   },
   content: {
     padding: 14,
     gap: 6,
   },
+  heartButton: {
+    position: "absolute",
+    right: 12,
+    top: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
   name: {
     fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "HankenGrotesk_600SemiBold",
   },
   meta: {
     flexDirection: "row",
@@ -166,7 +246,7 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 13,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
   },
   priceRow: {
     flexDirection: "row",
@@ -176,10 +256,10 @@ const styles = StyleSheet.create({
   },
   price: {
     fontSize: 16,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "HankenGrotesk_700Bold",
   },
   perNight: {
     fontSize: 12,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
   },
 });

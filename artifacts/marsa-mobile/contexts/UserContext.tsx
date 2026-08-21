@@ -1,12 +1,15 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useAuth, useUser as useClerkUser } from "@clerk/expo";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { API_BASE_URL } from "@/lib/env";
 
 interface UserProfile {
   id: string;
   clerkId: string;
   email: string;
   name?: string;
+  phone?: string;
+  nationality?: string;
   role: string;
   avatarUrl?: string;
 }
@@ -27,10 +30,8 @@ const UserContext = createContext<UserContextType>({
   refetch: () => {},
 });
 
-const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
-
 async function fetchMe(token: string | null): Promise<UserProfile> {
-  const res = await fetch(`${BASE_URL}/api/auth/me`, {
+  const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) throw new Error("Failed to fetch user");
@@ -41,6 +42,8 @@ async function fetchMe(token: string | null): Promise<UserProfile> {
     clerkId: raw.clerkId,
     email: raw.email,
     name: raw.fullName ?? raw.name ?? undefined,
+    phone: raw.phone ?? undefined,
+    nationality: raw.nationality ?? undefined,
     role: raw.role ?? "guest",
     avatarUrl: raw.avatarUrl ?? undefined,
   };
@@ -50,7 +53,7 @@ async function syncUser(
   token: string | null,
   payload: { email: string; fullName?: string; avatarUrl?: string },
 ): Promise<void> {
-  await fetch(`${BASE_URL}/api/auth/sync`, {
+  await fetch(`${API_BASE_URL}/api/auth/sync`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

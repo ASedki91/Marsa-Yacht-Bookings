@@ -8,4 +8,6 @@
 
 export interface CancellationInput {
   reason?: string;
+  acceptedRuleId?: string;
+  acceptedFeeAmountEgp?: string;
 }

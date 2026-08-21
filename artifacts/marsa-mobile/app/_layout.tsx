@@ -1,32 +1,38 @@
 import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-} from "@expo-google-fonts/inter";
-import * as Font from "expo-font";
-import Ionicons from "@expo/vector-icons/Ionicons";
+  HankenGrotesk_400Regular,
+  HankenGrotesk_500Medium,
+  HankenGrotesk_600SemiBold,
+  HankenGrotesk_700Bold,
+} from "@expo-google-fonts/hanken-grotesk";
+import { Marcellus_400Regular } from "@expo-google-fonts/marcellus";
+import {
+  SpaceMono_400Regular,
+  SpaceMono_700Bold,
+} from "@expo-google-fonts/space-mono";
+import {
+  Tajawal_400Regular,
+  Tajawal_500Medium,
+  Tajawal_700Bold,
+} from "@expo-google-fonts/tajawal";
 import Feather from "@expo/vector-icons/Feather";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { ClerkProvider } from "@clerk/expo";
-import type { TokenCache } from "@clerk/expo";
-import * as SecureStore from "expo-secure-store";
+import { ClerkProvider, type TokenCache } from "@clerk/expo";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import * as Font from "expo-font";
 import { Stack } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { StripeProvider } from "@/components/StripeProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { PaymentConfigProvider } from "@/contexts/PaymentConfigContext";
 
 SplashScreen.preventAutoHideAsync();
 
-// Wrap SecureStore in try/catch — some Android emulators reject key names
-// that contain special characters (e.g. Clerk's "__clerk_client_jwt:..."),
-// which would crash the tokenCache and silently block sign-in.
 const tokenCache: TokenCache = {
   getToken: async (key: string) => {
     try {
@@ -39,14 +45,14 @@ const tokenCache: TokenCache = {
     try {
       await SecureStore.setItemAsync(key, token);
     } catch {
-      // Ignore — session still works, just won't persist across restarts
+      // A session can continue even when a device rejects a SecureStore key.
     }
   },
   clearToken: async (key: string) => {
     try {
       await SecureStore.deleteItemAsync(key);
     } catch {
-      // Ignore
+      // Clerk will still clear the in-memory session.
     }
   },
 };
@@ -59,52 +65,34 @@ function RootLayoutNav() {
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(home)" options={{ headerShown: false }} />
+      <Stack.Screen name="legal/[document]" options={{ headerShown: false }} />
     </Stack>
   );
 }
 
 export default function RootLayout() {
   const [loaded, setLoaded] = useState(false);
-  const [stripeKey, setStripeKey] = useState("");
-
-  // Fetch the Stripe publishable key from the API at runtime. The key lives in
-  // the Replit Stripe connector (server-side), so the client never depends on a
-  // build-time env var that would otherwise fall back to a placeholder.
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch(
-          `https://${process.env.EXPO_PUBLIC_DOMAIN}/api/payments/config`,
-        );
-        if (res.ok) {
-          const data = (await res.json()) as { publishableKey?: string };
-          if (data.publishableKey) setStripeKey(data.publishableKey);
-        }
-      } catch {
-        // Leave key empty — payment screens will surface a clear error if unset.
-      }
-    })();
-  }, []);
+  const clerkProxyUrl =
+    process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
 
   useEffect(() => {
     (async () => {
       try {
         await Font.loadAsync({
-          Inter_400Regular,
-          Inter_500Medium,
-          Inter_600SemiBold,
-          Inter_700Bold,
+          HankenGrotesk_400Regular,
+          HankenGrotesk_500Medium,
+          HankenGrotesk_600SemiBold,
+          HankenGrotesk_700Bold,
+          Marcellus_400Regular,
+          SpaceMono_400Regular,
+          SpaceMono_700Bold,
+          Tajawal_400Regular,
+          Tajawal_500Medium,
+          Tajawal_700Bold,
           ...Ionicons.font,
           ...Feather.font,
           ...MaterialIcons.font,
         });
-        console.log("[MARSA] fonts loaded OK", {
-          ionicons: Font.isLoaded("ionicons"),
-          feather: Font.isLoaded("feather"),
-          material: Font.isLoaded("material"),
-        });
-      } catch (e) {
-        console.log("[MARSA] FONT LOAD FAILED:", e);
       } finally {
         setLoaded(true);
         SplashScreen.hideAsync();
@@ -117,12 +105,10 @@ export default function RootLayout() {
   return (
     <ClerkProvider
       publishableKey={process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!}
+      proxyUrl={clerkProxyUrl}
       tokenCache={tokenCache}
     >
-      <StripeProvider
-        publishableKey={stripeKey}
-        merchantIdentifier="merchant.com.marsa"
-      >
+      <PaymentConfigProvider>
         <SafeAreaProvider>
           <ErrorBoundary>
             <QueryClientProvider client={queryClient}>
@@ -134,7 +120,7 @@ export default function RootLayout() {
             </QueryClientProvider>
           </ErrorBoundary>
         </SafeAreaProvider>
-      </StripeProvider>
+      </PaymentConfigProvider>
     </ClerkProvider>
   );
 }

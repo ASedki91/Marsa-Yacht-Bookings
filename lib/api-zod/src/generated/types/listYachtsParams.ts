@@ -5,11 +5,14 @@
  * MARSA Yacht Booking API
  * OpenAPI spec version: 0.1.0
  */
+import type { ListYachtsIntent } from './listYachtsIntent';
 
 export type ListYachtsParams = {
 page?: number;
 limit?: number;
 categoryId?: string;
+locationId?: string;
+intent?: ListYachtsIntent;
 capacity?: number;
 /**
  * Filter by availability date (YYYY-MM-DD)

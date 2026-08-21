@@ -1,11 +1,12 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { getAuth } from "@clerk/express";
+import { clerkClient, getAuth } from "@clerk/express";
 import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod/v4";
 import rateLimit from "express-rate-limit";
 import { validateBody, auditLog } from "../middlewares/index";
+import { recordAdminEvent } from "../lib/adminActivity";
 
 const router: IRouter = Router();
 
@@ -29,6 +30,17 @@ const userSyncBodySchema = z.object({
   nationality: z.string().max(100).optional(),
 });
 
+function normalizeEmail(email: string): string {
+  return email.trim().toLocaleLowerCase();
+}
+
+export function submittedEmailMatchesVerifiedEmail(
+  submittedEmail: string,
+  verifiedEmail: string,
+): boolean {
+  return normalizeEmail(submittedEmail) === normalizeEmail(verifiedEmail);
+}
+
 /**
  * POST /auth/sync
  * Called by the mobile/web app after Clerk sign-in to ensure a local user record exists.
@@ -48,9 +60,29 @@ router.post(
       return;
     }
 
-    const { email, fullName, avatarUrl, phone, nationality } = req.body as z.infer<
+    const { email: submittedEmail, fullName, avatarUrl, phone, nationality } = req.body as z.infer<
       typeof userSyncBodySchema
     >;
+    let email: string;
+    try {
+      const clerkUser = await clerkClient.users.getUser(clerkUserId);
+      const primaryEmail = clerkUser.emailAddresses.find(
+        (address) => address.id === clerkUser.primaryEmailAddressId,
+      );
+      if (!primaryEmail || primaryEmail.verification?.status !== "verified") {
+        res.status(403).json({ error: "A verified primary email is required" });
+        return;
+      }
+      email = normalizeEmail(primaryEmail.emailAddress);
+    } catch (err) {
+      req.log.error({ err, clerkUserId }, "Unable to verify Clerk email");
+      res.status(502).json({ error: "Unable to verify your account email" });
+      return;
+    }
+    if (!submittedEmailMatchesVerifiedEmail(submittedEmail, email)) {
+      res.status(403).json({ error: "Account email does not match the signed-in user" });
+      return;
+    }
 
     let [existing] = await db
       .select()
@@ -58,22 +90,32 @@ router.post(
       .where(eq(usersTable.clerkId, clerkUserId))
       .limit(1);
 
-    // If no match by clerkId, try to find by email (e.g. pre-seeded admin accounts).
-    // Relink the clerkId so subsequent lookups succeed and the role is preserved.
+    // If no match by clerkId, safely match a pre-provisioned account by its
+    // Clerk-verified primary email. The request body is never trusted for roles.
     if (!existing) {
-      const [byEmail] = await db
+      const byEmail = await db
         .select()
         .from(usersTable)
-        .where(eq(usersTable.email, email))
-        .limit(1);
+        .where(sql`lower(${usersTable.email}) = ${email}`)
+        .limit(2);
+      if (byEmail.length > 1) {
+        res.status(409).json({ error: "Multiple accounts use this email" });
+        return;
+      }
 
-      if (byEmail) {
-        req.log.info({ userId: byEmail.id, email }, "Relinking clerkId for existing user");
+      if (byEmail[0]) {
+        req.log.info({ userId: byEmail[0].id }, "Relinking Clerk identity for existing user");
         const [relinked] = await db
           .update(usersTable)
           .set({ clerkId: clerkUserId })
-          .where(eq(usersTable.id, byEmail.id))
+          .where(
+            sql`${usersTable.id} = ${byEmail[0].id} AND (${usersTable.clerkId} LIKE 'invited:%' OR ${usersTable.clerkId} LIKE 'pending_invitation:%')`,
+          )
           .returning();
+        if (!relinked) {
+          res.status(409).json({ error: "This email is already linked to another account" });
+          return;
+        }
         existing = relinked;
       }
     }
@@ -114,6 +156,12 @@ router.post(
       .returning();
 
     req.log.info({ userId: created.id }, "New user provisioned");
+    void recordAdminEvent({
+      sectionKey: "users",
+      entityType: "user",
+      entityId: created.id,
+      eventType: "user.created",
+    }).catch(() => {});
     res.status(201).json({ user: created, created: true });
   },
 );

@@ -6,3 +6,6 @@
 - [Stripe React Native web bundling](stripe-rn-web-fix.md) — @stripe/stripe-react-native must be excluded from web builds via platform-specific files (StripeProvider.web.tsx no-op stub + StripeProvider.tsx re-exports Stripe).
 - [MARSA platform fee](marsa-platform-fee.md) — 20% platform fee (not 15%); host earns 80%. Update: bookings.ts PLATFORM_FEE_PCT, new-yacht.tsx, become-host.tsx, dashboard.tsx (mobile), Dashboard.tsx (admin).
 - [Stripe client key sourcing](stripe-client-key-sourcing.md) — client must fetch publishable key from `/api/payments/config` (connector-backed); build-time EXPO_PUBLIC env falls back to placeholder.
+- [Expo Clerk proxy origin](expo-clerk-proxy-origin.md) — keep production `CLERK_PROXY_URL` root-relative so Clerk requests follow the opened custom or Replit domain.
+- [MARSA mobile font stack](marsa-mobile-fonts.md) — Hanken Grotesk (UI/body), Marcellus (wordmark/display), Space Mono (labels), Tajawal (Arabic); all via @expo-google-fonts/* declared in marsa-mobile/package.json.
+- [Production operator protocol](production-operator-protocol.md) — provision through signed dry-run/confirm plans with durable leases, never direct database access or client-claimed identities.

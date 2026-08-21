@@ -7,10 +7,11 @@
  */
 
 export interface BookingInput {
-  yachtId: string;
-  templateId: string;
-  bookingDate: string;
-  startTime: string;
+  slotId: string;
+  yachtId?: string;
+  templateId?: string;
+  bookingDate?: string;
+  startTime?: string;
   /** @minimum 1 */
   guestCount: number;
   guestName: string;
@@ -19,4 +20,5 @@ export interface BookingInput {
   guestNationality?: string;
   specialRequests?: string;
   addOnIds?: string[];
+  acceptedCancellationPolicyId: string;
 }

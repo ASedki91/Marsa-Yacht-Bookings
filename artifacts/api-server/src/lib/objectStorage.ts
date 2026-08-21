@@ -185,6 +185,10 @@ export class ObjectStorageService {
     }
 
     const objectFile = await this.getObjectEntityFile(normalizedPath);
+    const existingPolicy = await getObjectAclPolicy(objectFile);
+    if (existingPolicy && existingPolicy.owner !== aclPolicy.owner) {
+      throw new Error("Only the current object owner can replace its access policy");
+    }
     await setObjectAclPolicy(objectFile, aclPolicy);
     return normalizedPath;
   }

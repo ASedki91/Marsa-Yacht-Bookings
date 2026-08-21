@@ -17,8 +17,16 @@ const { isLoaded } = useAuth();   // Future hooks have NO isLoaded/setActive —
 
 Future API has no `isLoaded`/`setActive`. Every method returns `{ error: ClerkError | null }` (do NOT rely on try/catch alone — check `error`). After an awaited call, read `signIn.status` / `signUp.status` synchronously (canonical pattern). User-facing error text: `err?.errors?.[0]?.longMessage ?? err?.message ?? fallback`.
 
-### Sign-in (email/password)
-`signIn.password({ identifier, password })` → if `signIn.status === "complete"` → `signIn.finalize()` (sets active session; `navigate` is optional). `needs_second_factor` → MFA via `signIn.mfa.verifyPhoneCode({ code })` (MFA/phone unsupported on Replit-managed Clerk, so effectively dead).
+### Sign-in (email/password) — two-step approach (canonical for this project)
+1. `signIn.create({ identifier: normalizedEmail })` — establishes the sign-in attempt.
+2. Check `signIn.supportedFirstFactors.some(f => f.strategy === "password")` — confirm password is available.
+3. `signIn.password({ password })` — submit ONLY the password; do NOT pass `emailAddress` or `identifier` here.
+4. If `signIn.status === "complete"` → `signIn.finalize()` → `router.replace("/(home)")`.
+5. Handle `"needs_second_factor"` and `"needs_client_trust"` before finalizing.
+
+Key: do NOT pass the email directly to `signIn.password()`. The identifier is established in step 1. Shared normalization and Clerk error parsing live in `lib/clerkAuth.ts`.
+
+`useSignIn()` returns `{ signIn, errors, fetchStatus }` — `errors.fields.identifier.message` / `errors.fields.password.message` give field-level errors; `fetchStatus === 'fetching'` tracks in-flight state. The Future API has NO `isLoaded` on the `signIn` signal — guard with `!signIn` directly plus `isLoaded` from `useAuth()`.
 
 ### Sign-up (email/password)
 `signUp.password({ emailAddress, password, unsafeMetadata? })` → `signUp.verifications.sendEmailCode()` → `signUp.verifications.verifyEmailCode({ code })` → if `complete` → `signUp.finalize()`.

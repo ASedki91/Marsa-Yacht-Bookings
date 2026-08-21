@@ -10,6 +10,10 @@ export interface YachtUpdate {
   title?: string;
   description?: string;
   location?: string;
+  /** @nullable */
+  locationId?: string | null;
+  /** @nullable */
+  customLocationName?: string | null;
   categoryId?: string;
   capacity?: number;
   features?: string[];

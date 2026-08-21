@@ -6,9 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Booking } from './booking';
+import type { CancellationTermsSummary } from './cancellationTermsSummary';
+import type { PaymentCheckout } from './paymentCheckout';
 
 export interface BookingCreateResponse {
   booking: Booking;
-  clientSecret: string;
-  paymentIntentId: string;
+  cancellationTerms: CancellationTermsSummary;
+  payment: PaymentCheckout;
 }

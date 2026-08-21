@@ -61,7 +61,9 @@ export default function ReviewScreen() {
           </Text>
           <Pressable
             style={[styles.doneBtn, { backgroundColor: colors.light.navy }]}
-            onPress={() => router.replace("/(home)/(tabs)/bookings")}
+            onPress={() =>
+              router.replace("/(home)/guest/(tabs)/bookings" as any)
+            }
           >
             <Text style={styles.doneBtnText}>Back to Bookings</Text>
           </Pressable>
@@ -150,29 +152,29 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   header: { paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1, flexDirection: "row", alignItems: "center", gap: 12 },
   backBtn: { padding: 4 },
-  headerTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },
+  headerTitle: { fontSize: 17, fontFamily: "Marcellus_400Regular" },
   content: { flex: 1, padding: 16, gap: 20 },
   ratingSection: { borderRadius: 16, borderWidth: 1, padding: 20, alignItems: "center", gap: 16 },
-  ratingTitle: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
+  ratingTitle: { fontSize: 16, fontFamily: "HankenGrotesk_600SemiBold" },
   stars: { flexDirection: "row", gap: 8 },
   starBtn: { padding: 4 },
-  ratingLabel: { fontSize: 16, fontFamily: "Inter_700Bold" },
+  ratingLabel: { fontSize: 16, fontFamily: "HankenGrotesk_700Bold" },
   commentSection: { gap: 8 },
-  commentLabel: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  commentLabel: { fontSize: 15, fontFamily: "HankenGrotesk_600SemiBold" },
   commentInput: {
     borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 14, fontFamily: "Inter_400Regular", minHeight: 140, textAlignVertical: "top",
+    fontSize: 14, fontFamily: "HankenGrotesk_400Regular", minHeight: 140, textAlignVertical: "top",
   },
-  charCount: { fontSize: 12, fontFamily: "Inter_400Regular", alignSelf: "flex-end" },
+  charCount: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular", alignSelf: "flex-end" },
   tipCard: { flexDirection: "row", gap: 10, padding: 14, borderRadius: 12, borderWidth: 1, alignItems: "flex-start" },
-  tipText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  tipText: { flex: 1, fontSize: 13, fontFamily: "HankenGrotesk_400Regular", lineHeight: 18 },
   footer: { position: "absolute", bottom: 0, left: 0, right: 0, padding: 16, paddingTop: 12, borderTopWidth: 1 },
   submitBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 15 },
-  submitBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  submitBtnText: { color: "#fff", fontSize: 15, fontFamily: "HankenGrotesk_600SemiBold" },
   successContainer: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 20 },
   successIcon: { width: 96, height: 96, borderRadius: 48, alignItems: "center", justifyContent: "center" },
-  successTitle: { fontSize: 26, fontFamily: "Inter_700Bold" },
-  successText: { fontSize: 15, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 22 },
+  successTitle: { fontSize: 26, fontFamily: "Marcellus_400Regular" },
+  successText: { fontSize: 15, fontFamily: "HankenGrotesk_400Regular", textAlign: "center", lineHeight: 22 },
   doneBtn: { borderRadius: 14, paddingVertical: 15, paddingHorizontal: 40, marginTop: 8 },
-  doneBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  doneBtnText: { color: "#fff", fontSize: 15, fontFamily: "HankenGrotesk_600SemiBold" },
 });

@@ -13,6 +13,18 @@ import adminRouter from "./admin";
 import webhooksRouter from "./webhooks";
 import internalRouter from "./internal";
 import devRouter from "./dev";
+import locationsRouter from "./locations";
+import discoveryRouter from "./discovery";
+import wishlistRouter from "./wishlist";
+import pushTokensRouter from "./pushTokens";
+import cancellationPoliciesRouter from "./cancellationPolicies";
+import adminCancellationsRouter from "./adminCancellations";
+import adminLocationsRouter from "./adminLocations";
+import adminYachtsMarketplaceRouter from "./adminYachtsMarketplace";
+import adminActivityRouter from "./adminActivity";
+import adminCampaignsRouter from "./adminCampaigns";
+import supportConfigRouter from "./supportConfig";
+import operatorRouter from "./operator";
 
 const router: IRouter = Router();
 
@@ -28,14 +40,26 @@ router.use(storageRouter);
 
 // Domain routes
 router.use(usersRouter);
+router.use(locationsRouter);
+router.use(discoveryRouter);
 router.use(yachtsRouter);
 router.use(hostRouter);
 router.use(bookingsRouter);
 router.use(reviewsRouter);
 router.use(notificationsRouter);
 router.use(paymentsRouter);
+router.use(wishlistRouter);
+router.use(pushTokensRouter);
+router.use(cancellationPoliciesRouter);
+router.use(adminCancellationsRouter);
+router.use(adminLocationsRouter);
+router.use(adminYachtsMarketplaceRouter);
+router.use(adminActivityRouter);
+router.use(adminCampaignsRouter);
+router.use(supportConfigRouter);
 router.use(adminRouter);
 router.use(internalRouter);
+router.use(operatorRouter);
 
 // Dev-only shortcuts (not mounted in production)
 if (process.env.NODE_ENV !== "production") {

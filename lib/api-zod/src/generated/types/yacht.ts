@@ -11,6 +11,10 @@ export interface Yacht {
   hostId: string;
   /** @nullable */
   categoryId?: string | null;
+  /** @nullable */
+  locationId?: string | null;
+  /** @nullable */
+  customLocationName?: string | null;
   title: string;
   /** @nullable */
   description?: string | null;
@@ -25,6 +29,12 @@ export interface Yacht {
   manufacturer?: string | null;
   features?: string[];
   status: string;
+  isFeatured: boolean;
+  featuredSortOrder: number;
+  /** @nullable */
+  featuredFrom?: string | null;
+  /** @nullable */
+  featuredUntil?: string | null;
   avgRating: string;
   reviewCount: number;
   createdAt: string;

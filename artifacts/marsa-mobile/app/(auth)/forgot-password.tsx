@@ -9,6 +9,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import colors from "@/constants/colors";
+import {
+  getClerkErrorMessage,
+  isValidEmailAddress,
+  normalizeEmailAddress,
+} from "@/lib/clerkAuth";
 
 type Stage = "email" | "code";
 
@@ -29,21 +34,49 @@ export default function ForgotPasswordScreen() {
 
   const sendCode = async () => {
     if (!isLoaded || !email) return;
+
+    const normalizedEmail = normalizeEmailAddress(email);
+    if (!isValidEmailAddress(normalizedEmail)) {
+      Alert.alert("Invalid email", "Enter a valid email address.");
+      return;
+    }
+
+    setEmail(normalizedEmail);
     setLoading(true);
     try {
-      const { error: createError } = await signIn.create({ identifier: email });
+      const { error: createError } = await signIn.create({
+        identifier: normalizedEmail,
+      });
       if (createError) {
-        Alert.alert("Error", (createError as any)?.errors?.[0]?.longMessage ?? "Could not send reset email.");
+        Alert.alert(
+          "Error",
+          getClerkErrorMessage(
+            createError,
+            "Could not send reset email.",
+          ),
+        );
         return;
       }
       const { error: sendError } = await signIn.resetPasswordEmailCode.sendCode();
       if (sendError) {
-        Alert.alert("Error", (sendError as any)?.errors?.[0]?.longMessage ?? "Could not send reset email.");
+        Alert.alert(
+          "Error",
+          getClerkErrorMessage(
+            sendError,
+            "Could not send reset email.",
+          ),
+        );
         return;
       }
       setStage("code");
-    } catch (err: any) {
-      Alert.alert("Error", err?.errors?.[0]?.longMessage ?? "Could not send reset email.");
+    } catch (resetError: unknown) {
+      Alert.alert(
+        "Error",
+        getClerkErrorMessage(
+          resetError,
+          "Could not send reset email.",
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -55,20 +88,48 @@ export default function ForgotPasswordScreen() {
     try {
       const { error: verifyError } = await signIn.resetPasswordEmailCode.verifyCode({ code });
       if (verifyError) {
-        Alert.alert("Error", (verifyError as any)?.errors?.[0]?.longMessage ?? "Invalid code or password.");
+        Alert.alert(
+          "Error",
+          getClerkErrorMessage(
+            verifyError,
+            "Invalid code or password.",
+          ),
+        );
         return;
       }
       const { error: submitError } = await signIn.resetPasswordEmailCode.submitPassword({ password: newPassword });
       if (submitError) {
-        Alert.alert("Error", (submitError as any)?.errors?.[0]?.longMessage ?? "Invalid code or password.");
+        Alert.alert(
+          "Error",
+          getClerkErrorMessage(
+            submitError,
+            "Invalid code or password.",
+          ),
+        );
         return;
       }
       if (signIn.status === "complete") {
-        await signIn.finalize();
-        router.replace("/(home)/(tabs)/explore");
+        const { error: finalizeError } = await signIn.finalize();
+        if (finalizeError) {
+          Alert.alert(
+            "Error",
+            getClerkErrorMessage(
+              finalizeError,
+              "Your password was changed, but the session could not be started.",
+            ),
+          );
+          return;
+        }
+        router.replace("/(home)" as any);
       }
-    } catch (err: any) {
-      Alert.alert("Error", err?.errors?.[0]?.longMessage ?? "Invalid code or password.");
+    } catch (resetError: unknown) {
+      Alert.alert(
+        "Error",
+        getClerkErrorMessage(
+          resetError,
+          "Invalid code or password.",
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -178,15 +239,15 @@ const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 24, gap: 16 },
   backBtn: { alignSelf: "flex-start", padding: 4, marginBottom: 8 },
   iconBox: { width: 72, height: 72, borderRadius: 20, alignItems: "center", justifyContent: "center", alignSelf: "center" },
-  title: { fontSize: 24, fontFamily: "Inter_700Bold", textAlign: "center" },
-  subtitle: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20 },
+  title: { fontSize: 24, fontFamily: "Marcellus_400Regular", textAlign: "center" },
+  subtitle: { fontSize: 14, fontFamily: "HankenGrotesk_400Regular", textAlign: "center", lineHeight: 20 },
   field: { gap: 6 },
-  label: { fontSize: 14, fontFamily: "Inter_500Medium" },
-  input: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: "Inter_400Regular" },
+  label: { fontSize: 14, fontFamily: "HankenGrotesk_500Medium" },
+  input: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: "HankenGrotesk_400Regular" },
   eyeBtn: { position: "absolute", right: 14, top: 0, bottom: 0, justifyContent: "center" },
   primaryBtn: { borderRadius: 12, paddingVertical: 15, alignItems: "center" },
-  primaryBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  primaryBtnText: { color: "#fff", fontSize: 15, fontFamily: "HankenGrotesk_600SemiBold" },
   footer: { flexDirection: "row", justifyContent: "center", flexWrap: "wrap", marginTop: 8 },
-  footerText: { fontSize: 14, fontFamily: "Inter_400Regular" },
-  linkText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  footerText: { fontSize: 14, fontFamily: "HankenGrotesk_400Regular" },
+  linkText: { fontSize: 14, fontFamily: "HankenGrotesk_600SemiBold" },
 });

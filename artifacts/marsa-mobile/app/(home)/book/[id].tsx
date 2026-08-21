@@ -19,14 +19,52 @@ import {
   useListAddOns,
   useGetYachtSlots,
   useCreateBooking,
+  useGetCurrentCancellationPolicy,
 } from "@workspace/api-client-react";
-import { useStripe } from "@stripe/stripe-react-native";
+import { useStripe } from "@/lib/stripe";
 import { useColors } from "@/hooks/useColors";
 import { useUser } from "@/contexts/UserContext";
+import { usePaymentConfig } from "@/contexts/PaymentConfigContext";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { WhatsAppSupportButton } from "@/components/WhatsAppSupportButton";
+import {
+  addDaysToDateKey,
+  DateMatrixPicker,
+  toLocalDateKey,
+} from "@/components/DateMatrixPicker";
 import colors from "@/constants/colors";
 
 const STEPS = ["Duration", "Date & Time", "Add-ons", "Details", "Payment"];
+
+function formatWindow(minutes: number) {
+  if (minutes % 1440 === 0) {
+    const days = minutes / 1440;
+    return `${days} day${days === 1 ? "" : "s"}`;
+  }
+  if (minutes % 60 === 0) {
+    const hours = minutes / 60;
+    return `${hours} hour${hours === 1 ? "" : "s"}`;
+  }
+  return `${minutes} minutes`;
+}
+
+function policyRuleLabels(rules: any[]) {
+  const ordered = [...rules].sort(
+    (left, right) =>
+      right.minimumMinutesBeforeTrip - left.minimumMinutesBeforeTrip,
+  );
+  return ordered.map((rule, index) => {
+    const threshold = rule.minimumMinutesBeforeTrip;
+    const previous = ordered[index - 1]?.minimumMinutesBeforeTrip;
+    const range =
+      index === 0
+        ? `${formatWindow(threshold)} or more before departure`
+        : threshold === 0
+          ? `Less than ${formatWindow(previous)} before departure`
+          : `${formatWindow(threshold)} to less than ${formatWindow(previous)} before departure`;
+    return { ...rule, range };
+  });
+}
 
 function StepIndicator({ current, total }: { current: number; total: number }) {
   const c = useColors();
@@ -71,7 +109,7 @@ const stepStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  num: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  num: { fontSize: 11, fontFamily: "HankenGrotesk_600SemiBold" },
   line: { height: 2, width: 24, marginHorizontal: 2 },
 });
 
@@ -82,18 +120,23 @@ export default function BookScreen() {
   const router = useRouter();
 
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const {
+    config: paymentConfig,
+    isLoading: paymentConfigLoading,
+    error: paymentConfigError,
+    refresh: refreshPaymentConfig,
+  } = usePaymentConfig();
   const { user } = useUser();
+  const todayDate = React.useMemo(() => toLocalDateKey(new Date()), []);
+  const maximumBookingDate = React.useMemo(
+    () => addDaysToDateKey(todayDate, 20),
+    [todayDate],
+  );
   const [step, setStep] = useState(0);
   const [payError, setPayError] = useState<string | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  });
+  const [selectedDate, setSelectedDate] = useState(todayDate);
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
   const [guestCount, setGuestCount] = useState(2);
   const [guestName, setGuestName] = useState("");
@@ -101,43 +144,28 @@ export default function BookScreen() {
   const [guestEmail, setGuestEmail] = useState("");
   const [specialNote, setSpecialNote] = useState("");
   const [booking, setBooking] = useState<any>(null);
+  const [paymentResult, setPaymentResult] = useState<any>(null);
+  const [cancellationTerms, setCancellationTerms] = useState<any>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   React.useEffect(() => {
     if (user?.name) setGuestName(user.name);
     if (user?.email) setGuestEmail(user.email);
-  }, [user?.name, user?.email]);
+    if (user?.phone) setGuestPhone(user.phone);
+  }, [user?.name, user?.email, user?.phone]);
 
   const { data: yachtData, isLoading: yachtLoading } = useGetYacht(id!);
   const { data: templatesData, isLoading: templatesLoading } = useListBookingTemplates();
   const { data: addOnsData } = useListAddOns();
   const createBooking = useCreateBooking();
+  const cancellationPolicyQuery = useGetCurrentCancellationPolicy();
 
   const yacht = (yachtData as any) ?? null;
   const templates = (templatesData as any)?.templates ?? [];
   const allAddOns = (addOnsData as any)?.addOns ?? [];
 
-  const fromDate = selectedDate || new Date().toISOString().split("T")[0];
+  const fromDate = selectedDate || todayDate;
   const toDate = fromDate;
-
-  const dateOptions = React.useMemo(() => {
-    const opts: { value: string; dow: string; day: string; mon: string }[] = [];
-    const base = new Date();
-    base.setHours(0, 0, 0, 0);
-    for (let i = 0; i < 21; i++) {
-      const d = new Date(base);
-      d.setDate(base.getDate() + i);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      opts.push({
-        value: `${year}-${month}-${day}`,
-        dow: d.toLocaleDateString("en-US", { weekday: "short" }),
-        day: String(d.getDate()),
-        mon: d.toLocaleDateString("en-US", { month: "short" }),
-      });
-    }
-    return opts;
-  }, []);
 
   const { data: slotsData, isLoading: slotsLoading } = useGetYachtSlots(
     id!,
@@ -160,6 +188,7 @@ export default function BookScreen() {
     try {
       const result = await createBooking.mutateAsync({
         data: {
+          slotId: selectedSlot.id,
           yachtId: id!,
           templateId: selectedTemplate.id,
           bookingDate: selectedDate,
@@ -170,17 +199,31 @@ export default function BookScreen() {
           guestEmail: guestEmail.trim(),
           specialRequests: specialNote.trim() || undefined,
           addOnIds: selectedAddOns.length > 0 ? selectedAddOns : undefined,
+          acceptedCancellationPolicyId: (cancellationPolicyQuery.data as any)?.id,
         },
       });
 
-      const { booking: createdBooking, clientSecret } = result as any;
+      const {
+        booking: createdBooking,
+        payment,
+        cancellationTerms: acceptedTerms,
+      } = result as any;
       setBooking(createdBooking);
+      setPaymentResult(payment);
+      setCancellationTerms(acceptedTerms);
 
-      if (clientSecret) {
+      if (
+        payment?.gateway === "stripe" &&
+        payment?.action?.type === "stripe_payment_sheet" &&
+        payment?.action?.clientSecret
+      ) {
         const { error: initError } = await initPaymentSheet({
           merchantDisplayName: "MARSA Charter",
-          paymentIntentClientSecret: clientSecret,
-          defaultBillingDetails: { name: "" },
+          paymentIntentClientSecret: payment.action.clientSecret,
+          defaultBillingDetails: {
+            name: guestName.trim(),
+            email: guestEmail.trim(),
+          },
           returnURL: "marsa://payment-complete",
         });
 
@@ -196,6 +239,11 @@ export default function BookScreen() {
           setPayError(sheetError.message ?? "Payment failed. Please try again.");
           return;
         }
+      } else if (payment?.status !== "succeeded") {
+        setPayError(
+          "The payment gateway did not complete checkout. Please try again.",
+        );
+        return;
       }
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -218,11 +266,14 @@ export default function BookScreen() {
   }, 0);
 
   const basePrice = selectedTemplate
-    ? (yacht?.pricing?.find((p: any) => p.templateId === selectedTemplate.id)?.priceEgp ??
+    ? (selectedSlot?.effectivePriceEgp ??
+       yacht?.pricing?.find((p: any) => p.templateId === selectedTemplate.id)?.priceEgp ??
        yacht?.basePriceEgp ?? 0)
     : 0;
 
   const totalPrice = parseFloat(String(basePrice)) + totalAddOnPrice;
+  const currentPolicy = cancellationPolicyQuery.data as any;
+  const currentPolicyRules = policyRuleLabels(currentPolicy?.rules ?? []);
 
   const canNext = (() => {
     switch (step) {
@@ -230,7 +281,13 @@ export default function BookScreen() {
       case 1: return !!selectedSlot;
       case 2: return true;
       case 3: return guestCount > 0 && guestName.trim().length >= 2 && guestPhone.trim().length >= 6 && guestEmail.trim().includes("@");
-      case 4: return true;
+      case 4:
+        return (
+          !paymentConfigLoading &&
+          paymentConfig.checkoutEnabled &&
+          !!cancellationPolicyQuery.data &&
+          termsAccepted
+        );
       default: return false;
     }
   })();
@@ -249,17 +306,28 @@ export default function BookScreen() {
           <View style={[styles.confirmBox, { backgroundColor: c.card, borderColor: c.border }]}>
             <Text style={[styles.confirmLabel, { color: c.mutedForeground }]}>Total Amount</Text>
             <Text style={[styles.confirmAmount, { color: c.foreground }]}>
-              EGP {totalPrice.toLocaleString("en-EG")}
+              EGP{" "}
+              {Number(booking.totalAmountEgp ?? totalPrice).toLocaleString(
+                "en-EG",
+              )}
             </Text>
             <Text style={[styles.confirmSub, { color: c.mutedForeground }]}>
-              Payment processed by Stripe — pending host confirmation
+              {paymentResult?.gateway === "test"
+                ? "Virtual test payment completed — no card was charged"
+                : "Payment received — pending host confirmation"}
             </Text>
+            {!!cancellationTerms && (
+              <Text style={[styles.confirmSub, { color: c.mutedForeground }]}>
+                Cancellation terms: {cancellationTerms.policyName} v
+                {cancellationTerms.policyVersion}
+              </Text>
+            )}
           </View>
         )}
         <Pressable
           style={[styles.doneBtn, { backgroundColor: colors.light.navy }]}
           onPress={() => {
-            router.replace("/(home)/(tabs)/bookings");
+            router.replace("/(home)/guest/(tabs)/bookings" as any);
           }}
         >
           <Text style={styles.doneBtnText}>View My Bookings</Text>
@@ -328,56 +396,16 @@ export default function BookScreen() {
         {step === 1 && (
           <View style={styles.stepContent}>
             <Text style={[styles.stepLabel, { color: c.foreground }]}>Select Date</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.dateRow}
-            >
-              {dateOptions.map((d) => {
-                const isSelected = selectedDate === d.value;
-                return (
-                  <Pressable
-                    key={d.value}
-                    style={[
-                      styles.dateChip,
-                      {
-                        backgroundColor: isSelected ? colors.light.navy : c.card,
-                        borderColor: isSelected ? colors.light.navy : c.border,
-                      },
-                    ]}
-                    onPress={() => {
-                      setSelectedDate(d.value);
-                      setSelectedSlot(null);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.dateChipDow,
-                        { color: isSelected ? "rgba(255,255,255,0.7)" : c.mutedForeground },
-                      ]}
-                    >
-                      {d.dow}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.dateChipDay,
-                        { color: isSelected ? "#fff" : c.foreground },
-                      ]}
-                    >
-                      {d.day}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.dateChipMon,
-                        { color: isSelected ? "rgba(255,255,255,0.7)" : c.mutedForeground },
-                      ]}
-                    >
-                      {d.mon}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+            <DateMatrixPicker
+              value={selectedDate}
+              minimumDate={todayDate}
+              maximumDate={maximumBookingDate}
+              accessibilityLabel="Choose a booking date"
+              onChange={(date) => {
+                setSelectedDate(date);
+                setSelectedSlot(null);
+              }}
+            />
 
             {slotsLoading ? (
               <ActivityIndicator color={c.primary} style={{ marginTop: 16 }} />
@@ -393,24 +421,38 @@ export default function BookScreen() {
                 <Text style={[styles.slotsLabel, { color: c.foreground }]}>Available Slots</Text>
                 {slots.map((slot: any) => {
                   const startTime = slot.startTime?.slice(0, 5) ?? "";
-                  const endTime = slot.endTime?.slice(0, 5) ?? "";
                   return (
                     <Pressable
-                      key={slot.startTime}
+                      key={slot.id}
                       style={[
                         styles.slotCard,
                         {
                           backgroundColor: c.card,
-                          borderColor: selectedSlot?.startTime === slot.startTime ? colors.light.navy : c.border,
-                          borderWidth: selectedSlot?.startTime === slot.startTime ? 2 : 1,
+                          borderColor: selectedSlot?.id === slot.id ? colors.light.navy : c.border,
+                          borderWidth: selectedSlot?.id === slot.id ? 2 : 1,
                         },
                       ]}
                       onPress={() => setSelectedSlot(slot)}
                     >
-                      <Text style={[styles.slotTime, { color: c.foreground }]}>
-                        {startTime} — {endTime}
-                      </Text>
-                      {selectedSlot?.startTime === slot.startTime && (
+                      <View>
+                        <Text style={[styles.slotTime, { color: c.foreground }]}>
+                          {startTime}
+                        </Text>
+                        {!!slot.effectivePriceEgp && (
+                          <Text
+                            style={[
+                              styles.slotPrice,
+                              { color: c.mutedForeground },
+                            ]}
+                          >
+                            EGP{" "}
+                            {Number(slot.effectivePriceEgp).toLocaleString(
+                              "en-EG",
+                            )}
+                          </Text>
+                        )}
+                      </View>
+                      {selectedSlot?.id === slot.id && (
                         <Ionicons name="checkmark-circle" size={20} color={colors.light.navy} />
                       )}
                     </Pressable>
@@ -630,11 +672,140 @@ export default function BookScreen() {
               </View>
             </View>
 
-            <View style={[styles.stripeNote, { backgroundColor: "#EFF6FF", borderColor: "#BFDBFE" }]}>
-              <Ionicons name="lock-closed-outline" size={16} color={colors.light.ocean} />
-              <Text style={[styles.stripeText, { color: colors.light.ocean }]}>
-                Secured by Stripe. Your payment details are encrypted and safe.
-              </Text>
+            <View
+              style={[
+                styles.policyCard,
+                { backgroundColor: c.card, borderColor: c.border },
+              ]}
+            >
+              <View style={styles.policyHeader}>
+                <View style={[styles.policyIcon, { backgroundColor: c.primary + "14" }]}>
+                  <Ionicons name="shield-checkmark-outline" size={20} color={c.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.policyTitle, { color: c.foreground }]}>
+                    Cancellation terms
+                  </Text>
+                  <Text style={[styles.policySubtitle, { color: c.mutedForeground }]}>
+                    {currentPolicy
+                      ? `${currentPolicy.name} · version ${currentPolicy.version}`
+                      : "No active policy is available"}
+                  </Text>
+                </View>
+              </View>
+
+              {cancellationPolicyQuery.isLoading ? (
+                <ActivityIndicator color={c.primary} />
+              ) : currentPolicyRules.length > 0 ? (
+                <View style={styles.policyRules}>
+                  {currentPolicyRules.map((rule) => (
+                    <View key={rule.id} style={styles.policyRule}>
+                      <View style={[styles.policyBullet, { backgroundColor: c.primary }]} />
+                      <Text style={[styles.policyRange, { color: c.mutedForeground }]}>
+                        {rule.range}
+                      </Text>
+                      <Text style={[styles.policyFee, { color: c.foreground }]}>
+                        {Number(rule.feePercentage).toLocaleString("en-EG", {
+                          maximumFractionDigits: 2,
+                        })}
+                        % fee
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={[styles.policyError, { color: c.destructive }]}>
+                  Booking is temporarily unavailable until MARSA activates a
+                  cancellation policy.
+                </Text>
+              )}
+
+              <Pressable
+                disabled={!currentPolicy}
+                onPress={() => setTermsAccepted((accepted) => !accepted)}
+                style={styles.acceptanceRow}
+              >
+                <Ionicons
+                  name={termsAccepted ? "checkbox" : "square-outline"}
+                  size={23}
+                  color={termsAccepted ? c.primary : c.mutedForeground}
+                />
+                <Text style={[styles.acceptanceText, { color: c.foreground }]}>
+                  I have reviewed and accept these cancellation terms.
+                </Text>
+              </Pressable>
+            </View>
+
+            <View
+              style={[
+                styles.stripeNote,
+                {
+                  backgroundColor:
+                    !paymentConfigLoading &&
+                    paymentConfig.gateway === "disabled"
+                      ? "#FEF2F2"
+                      : "#EFF6FF",
+                  borderColor:
+                    !paymentConfigLoading &&
+                    paymentConfig.gateway === "disabled"
+                      ? "#FECACA"
+                      : "#BFDBFE",
+                },
+              ]}
+            >
+              <Ionicons
+                name={
+                  paymentConfigLoading
+                    ? "hourglass-outline"
+                    : paymentConfig.gateway === "test"
+                    ? "flask-outline"
+                    : paymentConfig.gateway === "stripe"
+                      ? "lock-closed-outline"
+                      : "pause-circle-outline"
+                }
+                size={17}
+                color={
+                  !paymentConfigLoading &&
+                  paymentConfig.gateway === "disabled"
+                    ? "#DC2626"
+                    : colors.light.ocean
+                }
+              />
+              <View style={styles.paymentNoticeContent}>
+                <Text
+                  style={[
+                    styles.stripeText,
+                    {
+                      color:
+                        !paymentConfigLoading &&
+                        paymentConfig.gateway === "disabled"
+                          ? "#B91C1C"
+                          : colors.light.ocean,
+                    },
+                  ]}
+                >
+                  {paymentConfigLoading
+                    ? "Checking payment availability..."
+                    : paymentConfig.gateway === "test"
+                      ? "Virtual payment is ready. Completing it will record a successful test transaction and create the booking. No card or real money is used."
+                      : paymentConfig.gateway === "stripe"
+                        ? "Secure card checkout is enabled for this booking."
+                        : "Checkout configuration is unavailable. Reload it to enable test payment in the development environment."}
+                </Text>
+                {!paymentConfigLoading &&
+                  paymentConfig.gateway === "disabled" &&
+                  paymentConfigError && (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Retry loading payment configuration"
+                      onPress={() => void refreshPaymentConfig()}
+                      style={styles.paymentRetryButton}
+                    >
+                      <Ionicons name="refresh" size={14} color="#B91C1C" />
+                      <Text style={styles.paymentRetryText}>Retry</Text>
+                    </Pressable>
+                  )}
+              </View>
             </View>
           </View>
         )}
@@ -655,6 +826,9 @@ export default function BookScreen() {
             <Ionicons name="alert-circle-outline" size={16} color="#DC2626" />
             <Text style={styles.errorText}>{payError}</Text>
           </View>
+        )}
+        {step === 4 && (
+          <WhatsAppSupportButton context="a pending or failed checkout" />
         )}
         {step > 0 && (
           <Pressable
@@ -677,7 +851,15 @@ export default function BookScreen() {
           ) : (
             <>
               <Text style={styles.nextBtnText}>
-                {step === 4 ? "Confirm & Pay" : "Continue"}
+                {step === 4
+                  ? paymentConfigLoading
+                    ? "Checking Checkout..."
+                    : paymentConfig.gateway === "test"
+                      ? "Complete Virtual Payment"
+                      : paymentConfig.gateway === "disabled"
+                      ? "Checkout Unavailable"
+                      : "Confirm & Pay"
+                  : "Continue"}
               </Text>
               <Ionicons name="arrow-forward" size={16} color="#fff" />
             </>
@@ -697,11 +879,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  headerTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },
-  yachtName: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  headerTitle: { fontSize: 17, fontFamily: "Marcellus_400Regular" },
+  yachtName: { fontSize: 13, fontFamily: "HankenGrotesk_400Regular" },
   content: { padding: 16 },
   stepContent: { gap: 14 },
-  stepLabel: { fontSize: 18, fontFamily: "Inter_700Bold", marginBottom: 4 },
+  stepLabel: { fontSize: 18, fontFamily: "HankenGrotesk_700Bold", marginBottom: 4 },
   optionCard: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -710,25 +892,13 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     gap: 12,
   },
-  optionTitle: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
-  optionSub: { fontSize: 13, fontFamily: "Inter_400Regular", marginTop: 2 },
+  optionTitle: { fontSize: 16, fontFamily: "HankenGrotesk_600SemiBold" },
+  optionSub: { fontSize: 13, fontFamily: "HankenGrotesk_400Regular", marginTop: 2 },
   addOnRight: { alignItems: "flex-end", gap: 6 },
-  addOnPrice: { fontSize: 14, fontFamily: "Inter_700Bold" },
-  dateRow: { gap: 10, paddingVertical: 2, paddingRight: 8 },
-  dateChip: {
-    width: 64,
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingVertical: 12,
-    alignItems: "center",
-    gap: 2,
-  },
-  dateChipDow: { fontSize: 12, fontFamily: "Inter_500Medium" },
-  dateChipDay: { fontSize: 20, fontFamily: "Inter_700Bold" },
-  dateChipMon: { fontSize: 11, fontFamily: "Inter_400Regular" },
-  slotsLabel: { fontSize: 15, fontFamily: "Inter_700Bold", marginTop: 8 },
+  addOnPrice: { fontSize: 14, fontFamily: "HankenGrotesk_700Bold" },
+  slotsLabel: { fontSize: 15, fontFamily: "HankenGrotesk_700Bold", marginTop: 8 },
   noSlots: { alignItems: "center", padding: 24, borderRadius: 14, borderWidth: 1, gap: 10 },
-  noSlotsText: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center" },
+  noSlotsText: { fontSize: 14, fontFamily: "HankenGrotesk_400Regular", textAlign: "center" },
   slotCard: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -736,22 +906,23 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 12,
   },
-  slotTime: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  slotTime: { fontSize: 15, fontFamily: "HankenGrotesk_600SemiBold" },
+  slotPrice: { fontSize: 11, fontFamily: "HankenGrotesk_400Regular", marginTop: 2 },
   counterBox: { borderRadius: 14, borderWidth: 1, padding: 16, gap: 12 },
-  counterLabel: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
+  counterLabel: { fontSize: 16, fontFamily: "HankenGrotesk_600SemiBold" },
   counter: { flexDirection: "row", alignItems: "center", gap: 20 },
   counterBtn: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  counterValue: { fontSize: 24, fontFamily: "Inter_700Bold", minWidth: 40, textAlign: "center" },
-  capacityNote: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  counterValue: { fontSize: 24, fontFamily: "HankenGrotesk_700Bold", minWidth: 40, textAlign: "center" },
+  capacityNote: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular" },
   field: { gap: 8 },
-  fieldLabel: { fontSize: 14, fontFamily: "Inter_500Medium" },
+  fieldLabel: { fontSize: 14, fontFamily: "HankenGrotesk_500Medium" },
   textInput: {
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
   },
   noteInput: {
     borderRadius: 12,
@@ -759,18 +930,57 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
     height: 100,
   },
   summaryCard: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 10 },
-  summaryTitle: { fontSize: 16, fontFamily: "Inter_700Bold", marginBottom: 4 },
+  summaryTitle: { fontSize: 16, fontFamily: "HankenGrotesk_700Bold", marginBottom: 4 },
   summaryRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  summaryLabel: { fontSize: 14, fontFamily: "Inter_400Regular" },
-  summaryValue: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  summaryLabel: { fontSize: 14, fontFamily: "HankenGrotesk_400Regular" },
+  summaryValue: { fontSize: 14, fontFamily: "HankenGrotesk_600SemiBold" },
   divider: { height: 1 },
   totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 10, borderTopWidth: 1 },
-  totalLabel: { fontSize: 16, fontFamily: "Inter_700Bold" },
-  totalAmount: { fontSize: 20, fontFamily: "Inter_700Bold" },
+  totalLabel: { fontSize: 16, fontFamily: "HankenGrotesk_700Bold" },
+  totalAmount: { fontSize: 20, fontFamily: "HankenGrotesk_700Bold" },
+  policyCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 15,
+    gap: 14,
+  },
+  policyHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
+  policyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  policyTitle: { fontSize: 15, fontFamily: "HankenGrotesk_700Bold" },
+  policySubtitle: { fontSize: 11, fontFamily: "HankenGrotesk_400Regular", marginTop: 2 },
+  policyRules: { gap: 9 },
+  policyRule: { flexDirection: "row", alignItems: "center", gap: 7 },
+  policyBullet: { width: 6, height: 6, borderRadius: 3 },
+  policyRange: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: "HankenGrotesk_400Regular",
+    lineHeight: 16,
+  },
+  policyFee: { fontSize: 11, fontFamily: "HankenGrotesk_700Bold" },
+  policyError: { fontSize: 12, fontFamily: "HankenGrotesk_500Medium", lineHeight: 17 },
+  acceptanceRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+    paddingTop: 2,
+  },
+  acceptanceText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "HankenGrotesk_500Medium",
+    lineHeight: 18,
+  },
   stripeNote: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -779,7 +989,24 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
   },
-  stripeText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  stripeText: { flex: 1, fontSize: 13, fontFamily: "HankenGrotesk_400Regular", lineHeight: 18 },
+  paymentNoticeContent: { flex: 1, gap: 10 },
+  paymentRetryButton: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: "#FCA5A5",
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  paymentRetryText: {
+    color: "#B91C1C",
+    fontSize: 12,
+    fontFamily: "HankenGrotesk_600SemiBold",
+  },
   footer: {
     position: "absolute",
     bottom: 0,
@@ -792,19 +1019,19 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
   },
   backBtn: { borderRadius: 12, paddingVertical: 14, paddingHorizontal: 20, borderWidth: 1, alignItems: "center" },
-  backBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  backBtnText: { fontSize: 15, fontFamily: "HankenGrotesk_600SemiBold" },
   nextBtn: { flex: 1, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 8, borderRadius: 12, paddingVertical: 14 },
-  nextBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  nextBtnText: { color: "#fff", fontSize: 15, fontFamily: "HankenGrotesk_600SemiBold" },
   success: { flex: 1, alignItems: "center", paddingHorizontal: 32, gap: 20 },
   successIcon: { width: 96, height: 96, borderRadius: 48, alignItems: "center", justifyContent: "center" },
-  successTitle: { fontSize: 26, fontFamily: "Inter_700Bold", textAlign: "center" },
-  successText: { fontSize: 15, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 22 },
+  successTitle: { fontSize: 26, fontFamily: "Marcellus_400Regular", textAlign: "center" },
+  successText: { fontSize: 15, fontFamily: "HankenGrotesk_400Regular", textAlign: "center", lineHeight: 22 },
   confirmBox: { borderRadius: 16, borderWidth: 1, padding: 20, alignItems: "center", gap: 6, width: "100%" },
-  confirmLabel: { fontSize: 13, fontFamily: "Inter_500Medium" },
-  confirmAmount: { fontSize: 28, fontFamily: "Inter_700Bold" },
-  confirmSub: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center" },
+  confirmLabel: { fontSize: 13, fontFamily: "HankenGrotesk_500Medium" },
+  confirmAmount: { fontSize: 28, fontFamily: "HankenGrotesk_700Bold" },
+  confirmSub: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular", textAlign: "center" },
   doneBtn: { borderRadius: 14, paddingVertical: 15, paddingHorizontal: 32, marginTop: 8 },
-  doneBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  doneBtnText: { color: "#fff", fontSize: 15, fontFamily: "HankenGrotesk_600SemiBold" },
   errorBox: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -815,5 +1042,5 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     width: "100%",
   },
-  errorText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", color: "#DC2626", lineHeight: 18 },
+  errorText: { flex: 1, fontSize: 13, fontFamily: "HankenGrotesk_400Regular", color: "#DC2626", lineHeight: 18 },
 });

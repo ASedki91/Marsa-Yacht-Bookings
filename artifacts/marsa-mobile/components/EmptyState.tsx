@@ -52,12 +52,12 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "HankenGrotesk_600SemiBold",
     textAlign: "center",
   },
   subtitle: {
     fontSize: 14,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "HankenGrotesk_400Regular",
     textAlign: "center",
     lineHeight: 20,
   },
@@ -69,6 +69,6 @@ const styles = StyleSheet.create({
   },
   btnText: {
     fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "HankenGrotesk_600SemiBold",
   },
 });

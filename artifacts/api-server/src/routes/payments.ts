@@ -9,19 +9,23 @@ import {
 import { and, eq } from "drizzle-orm";
 import { z } from "zod/v4";
 import { requireAuth, validateBody } from "../middlewares/index";
-import { getStripeClient, getStripePublishableKey } from "../lib/stripe";
+import { getStripeClient } from "../lib/stripe";
+import { getConfiguredPaymentGateway } from "../lib/payments";
 
 const router: IRouter = Router();
 
 // ── GET /payments/config ──────────────────────────────────────────────────────
 /**
- * Public Stripe config for clients. The publishable key is safe to expose and is
- * sourced from the Replit Stripe connector, so clients never need a build-time key.
+ * Public payment config for clients. A publishable key is exposed only when
+ * Stripe is the selected gateway; test and disabled modes do not need one.
  */
-router.get("/payments/config", async (_req: Request, res: Response): Promise<void> => {
-  const publishableKey = await getStripePublishableKey();
-  res.json({ publishableKey });
-});
+router.get(
+  "/payments/config",
+  async (_req: Request, res: Response): Promise<void> => {
+    const config = await getConfiguredPaymentGateway().getPublicConfig();
+    res.json(config);
+  },
+);
 
 // ── GET /payments/:bookingId ──────────────────────────────────────────────────
 /**
@@ -57,7 +61,12 @@ router.get(
         ? await db
             .select()
             .from(yachtsTable)
-            .where(and(eq(yachtsTable.id, booking.yachtId), eq(yachtsTable.hostId, profile.id)))
+            .where(
+              and(
+                eq(yachtsTable.id, booking.yachtId),
+                eq(yachtsTable.hostId, profile.id),
+              ),
+            )
             .limit(1)
         : [];
       if (!ownedYacht) {
@@ -101,7 +110,12 @@ router.post(
     const [booking] = await db
       .select()
       .from(bookingsTable)
-      .where(and(eq(bookingsTable.id, bookingId), eq(bookingsTable.guestId, user.id)))
+      .where(
+        and(
+          eq(bookingsTable.id, bookingId),
+          eq(bookingsTable.guestId, user.id),
+        ),
+      )
       .limit(1);
 
     if (!booking) {
@@ -110,7 +124,9 @@ router.post(
     }
 
     if (booking.status !== "pending_payment") {
-      res.status(400).json({ error: "Payment is no longer pending for this booking" });
+      res
+        .status(400)
+        .json({ error: "Payment is no longer pending for this booking" });
       return;
     }
 
@@ -120,14 +136,16 @@ router.post(
       .where(eq(paymentsTable.bookingId, bookingId))
       .limit(1);
 
-    if (!payment?.stripePaymentIntentId) {
+    if (payment?.provider !== "stripe" || !payment.stripePaymentIntentId) {
       res.status(404).json({ error: "Payment intent not found" });
       return;
     }
 
     try {
       const stripeClient = await getStripeClient();
-      const pi = await stripeClient.paymentIntents.retrieve(payment.stripePaymentIntentId);
+      const pi = await stripeClient.paymentIntents.retrieve(
+        payment.stripePaymentIntentId,
+      );
       res.json({
         clientSecret: pi.client_secret,
         paymentIntentId: pi.id,
