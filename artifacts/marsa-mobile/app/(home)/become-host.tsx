@@ -14,6 +14,7 @@ import {
 import { useColors } from "@/hooks/useColors";
 import colors from "@/constants/colors";
 import { CONTACT_EMAIL } from "@/constants/legal";
+import { WhatsAppSupportButton } from "@/components/WhatsAppSupportButton";
 
 const PERKS = [
   { icon: "cash-outline", title: "Earn in EGP", desc: "Get paid directly for every charter booking" },
@@ -178,6 +179,8 @@ export default function BecomeHostScreen() {
               </Text>
             </View>
           )}
+
+          <WhatsAppSupportButton context="host onboarding and verification" />
 
           <Pressable
             style={[styles.doneBtn, { backgroundColor: colors.light.navy }]}
@@ -348,6 +351,7 @@ export default function BecomeHostScreen() {
             </View>
           </>
         )}
+        <WhatsAppSupportButton context="host onboarding and verification" />
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: bottomPad + 12, backgroundColor: c.background, borderTopColor: c.border }]}>

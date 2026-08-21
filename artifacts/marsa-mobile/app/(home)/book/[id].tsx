@@ -26,6 +26,7 @@ import { useColors } from "@/hooks/useColors";
 import { useUser } from "@/contexts/UserContext";
 import { usePaymentConfig } from "@/contexts/PaymentConfigContext";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { WhatsAppSupportButton } from "@/components/WhatsAppSupportButton";
 import {
   addDaysToDateKey,
   DateMatrixPicker,
@@ -825,6 +826,9 @@ export default function BookScreen() {
             <Ionicons name="alert-circle-outline" size={16} color="#DC2626" />
             <Text style={styles.errorText}>{payError}</Text>
           </View>
+        )}
+        {step === 4 && (
+          <WhatsAppSupportButton context="a pending or failed checkout" />
         )}
         {step > 0 && (
           <Pressable

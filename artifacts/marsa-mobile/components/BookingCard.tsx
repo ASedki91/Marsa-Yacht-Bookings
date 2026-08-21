@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import colors from "@/constants/colors";
-import { WhatsAppSupportButton } from "@/components/WhatsAppSupportButton";
 
 const STATUS_CONFIG: Record<
   string,
@@ -76,7 +75,6 @@ interface BookingCardProps {
   onReject?: () => void;
   showLeaveReview?: boolean;
   onLeaveReview?: () => void;
-  showSupport?: boolean;
 }
 
 export function BookingCard({
@@ -87,7 +85,6 @@ export function BookingCard({
   onReject,
   showLeaveReview,
   onLeaveReview,
-  showSupport,
 }: BookingCardProps) {
   const c = useColors();
   const cfg = STATUS_CONFIG[booking.status] ?? {
@@ -182,8 +179,6 @@ export function BookingCard({
           </View>
         )}
       </View>
-
-      {showSupport && <WhatsAppSupportButton bookingId={booking.id} compact />}
 
       {showLeaveReview && (
         <Pressable

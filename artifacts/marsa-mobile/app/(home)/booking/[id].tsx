@@ -234,6 +234,8 @@ export default function BookingDetailScreen() {
     "paid_under_review",
     "confirmed",
     "cancel_requested",
+    "cancelled",
+    "rejected_refunded",
   ].includes(status);
 
   const totalEgp = booking.totalAmountEgp ?? booking.totalPriceEgp ?? booking.totalEgp ?? "—";
@@ -387,9 +389,18 @@ export default function BookingDetailScreen() {
             </Text>
             <Text style={[styles.supportCopy, { color: c.mutedForeground }]}>
               Our support team can help with your booking status, payment, or
-              cancellation request.
+              cancellation and refund questions.
             </Text>
-            <WhatsAppSupportButton bookingId={id!} />
+            <WhatsAppSupportButton
+              bookingId={id!}
+              context={
+                ["cancel_requested", "cancelled", "rejected_refunded"].includes(
+                  status,
+                )
+                  ? "a cancellation or refund"
+                  : undefined
+              }
+            />
           </View>
         )}
 

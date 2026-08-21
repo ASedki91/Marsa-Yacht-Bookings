@@ -14,13 +14,13 @@ import { CONTACT_EMAIL } from "@/constants/legal";
 import { useColors } from "@/hooks/useColors";
 
 interface WhatsAppSupportButtonProps {
-  bookingId: string;
-  compact?: boolean;
+  bookingId?: string;
+  context?: string;
 }
 
 export function WhatsAppSupportButton({
   bookingId,
-  compact = false,
+  context,
 }: WhatsAppSupportButtonProps) {
   const colors = useColors();
   const supportConfig = useGetSupportConfig();
@@ -38,8 +38,9 @@ export function WhatsAppSupportButton({
       return;
     }
 
-    const bookingReference = bookingId.slice(0, 8).toUpperCase();
-    const message = `Hello MARSA Support, I need help with booking #${bookingReference}.`;
+    const message = bookingId
+      ? `Hello MARSA Support, I need help with booking #${bookingId.slice(0, 8).toUpperCase()}${context ? ` regarding ${context}` : ""}.`
+      : `Hello MARSA Support, I need help with ${context ?? "my MARSA account"}.`;
 
     try {
       await Linking.openURL(
@@ -69,19 +70,17 @@ export function WhatsAppSupportButton({
             backgroundColor: "#22C55E12",
             opacity: supportConfig.isLoading ? 0.55 : pressed ? 0.82 : 1,
           },
-          compact && styles.compactButton,
         ]}
       >
         {supportConfig.isLoading ? (
           <ActivityIndicator size="small" color="#15803D" />
         ) : (
-          <Ionicons name="logo-whatsapp" size={compact ? 15 : 18} color="#15803D" />
+          <Ionicons name="logo-whatsapp" size={18} color="#15803D" />
         )}
         <Text
           style={[
             styles.label,
             { color: "#15803D" },
-            compact && styles.compactLabel,
           ]}
         >
           WhatsApp Support
@@ -107,8 +106,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 11,
   },
-  compactButton: { minHeight: 40, marginTop: 12, paddingVertical: 9 },
   label: { fontSize: 14, fontFamily: "HankenGrotesk_600SemiBold" },
-  compactLabel: { fontSize: 13 },
   error: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular", textAlign: "center" },
 });

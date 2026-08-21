@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import colors from "@/constants/colors";
 import { CONTACT_EMAIL } from "@/constants/legal";
 import { ConfirmActionModal } from "@/components/ConfirmActionModal";
+import { WhatsAppSupportButton } from "@/components/WhatsAppSupportButton";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { usePushNotifications } from "@/contexts/PushNotificationsContext";
 import { useUser } from "@/contexts/UserContext";
@@ -367,6 +368,7 @@ export function ModeProfileScreen({ mode }: { mode: ProfileMode }) {
               )
             }
           />
+          <WhatsAppSupportButton context="my account or general support" />
           <ProfileRow
             icon="shield-checkmark-outline"
             label="Privacy Policy"
