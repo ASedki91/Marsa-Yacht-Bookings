@@ -593,6 +593,24 @@ effects. For production setup and schema rollout, follow
 
 **Native/development domain:** determined by Expo
 
+### Published web and native delivery
+
+The mobile artifact produces three production outputs in one build:
+
+| Output | Location | Served to |
+|--------|----------|-----------|
+| Expo web export | `static-build/web/` | Ordinary browser requests to `/` |
+| iOS Expo bundle + manifest | `static-build/<build-id>/` and `static-build/ios/manifest.json` | Requests carrying `expo-platform: ios` |
+| Android Expo bundle + manifest | `static-build/<build-id>/` and `static-build/android/manifest.json` | Requests carrying `expo-platform: android` |
+
+`scripts/build.js` exports the browser app first, then generates the native
+bundles and rewrites their asset URLs for the deployed domain. `server/serve.js`
+serves web assets and Expo Router client-side routes from `static-build/web/`;
+it preserves the platform-aware manifest responses required by Expo Launch and
+App Store iOS publishing. The optional `EXPO_METRO_PORT` build variable changes
+only the local Metro port used while generating native bundles; production
+defaults to `8081`.
+
 ### Screen map
 
 ```
