@@ -1,14 +1,48 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import {
+  CONTACT_EMAIL,
   legalDocuments,
   type LegalDocumentKey,
 } from "@/constants/legal";
+
+function LegalBody({
+  body,
+  color,
+  linkColor,
+}: {
+  body: string;
+  color: string;
+  linkColor: string;
+}) {
+  const parts = body.split(CONTACT_EMAIL);
+
+  return (
+    <Text style={[styles.body, { color }]}>
+      {parts.map((part, index) => (
+        <React.Fragment key={`${part}-${index}`}>
+          {index > 0 && (
+            <Text
+              accessibilityRole="link"
+              onPress={() => {
+                void Linking.openURL(`mailto:${CONTACT_EMAIL}`);
+              }}
+              style={[styles.emailLink, { color: linkColor }]}
+            >
+              {CONTACT_EMAIL}
+            </Text>
+          )}
+          {part}
+        </React.Fragment>
+      ))}
+    </Text>
+  );
+}
 
 export default function LegalDocumentScreen() {
   const params = useLocalSearchParams<{ document?: string | string[] }>();
@@ -79,9 +113,11 @@ export default function LegalDocumentScreen() {
                 {section.heading}
               </Text>
             )}
-            <Text style={[styles.body, { color: palette.foreground }]}>
-              {section.body}
-            </Text>
+            <LegalBody
+              body={section.body}
+              color={palette.foreground}
+              linkColor={palette.primary}
+            />
           </View>
         ))}
       </ScrollView>
@@ -141,5 +177,9 @@ const styles = StyleSheet.create({
     fontFamily: "HankenGrotesk_400Regular",
     fontSize: 15,
     lineHeight: 24,
+  },
+  emailLink: {
+    fontFamily: "HankenGrotesk_600SemiBold",
+    textDecorationLine: "underline",
   },
 });

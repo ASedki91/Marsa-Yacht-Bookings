@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   View, Text, TextInput, Pressable, StyleSheet,
-  ScrollView, Platform, ActivityIndicator, Alert, Image,
+  ScrollView, Platform, ActivityIndicator, Alert, Image, Linking,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -13,6 +13,7 @@ import {
 } from "@workspace/api-client-react";
 import { useColors } from "@/hooks/useColors";
 import colors from "@/constants/colors";
+import { CONTACT_EMAIL } from "@/constants/legal";
 
 const PERKS = [
   { icon: "cash-outline", title: "Earn in EGP", desc: "Get paid directly for every charter booking" },
@@ -164,7 +165,16 @@ export default function BecomeHostScreen() {
               <Ionicons name="alert-circle-outline" size={18} color="#EA580C" />
               <Text style={[styles.infoText, { color: "#9A3412" }]}>
                 You still need to submit your verification documents. Email them to{" "}
-                <Text style={{ fontFamily: "HankenGrotesk_600SemiBold" }}>verify@marsa.app</Text> to speed up your review.
+                <Text
+                  accessibilityRole="link"
+                  onPress={() => {
+                    void Linking.openURL(`mailto:${CONTACT_EMAIL}`);
+                  }}
+                  style={[styles.emailLink, { color: colors.light.ocean }]}
+                >
+                  {CONTACT_EMAIL}
+                </Text>{" "}
+                to speed up your review.
               </Text>
             </View>
           )}
@@ -324,7 +334,16 @@ export default function BecomeHostScreen() {
             <View style={[styles.infoBox, { backgroundColor: c.card, borderColor: c.border }]}>
               <Ionicons name="information-circle-outline" size={16} color={c.mutedForeground} />
               <Text style={[styles.infoText, { color: c.mutedForeground }]}>
-                You can submit without all documents and send them later to <Text style={{ fontFamily: "HankenGrotesk_600SemiBold" }}>verify@marsa.app</Text>
+                You can submit without all documents and send them later to{" "}
+                <Text
+                  accessibilityRole="link"
+                  onPress={() => {
+                    void Linking.openURL(`mailto:${CONTACT_EMAIL}`);
+                  }}
+                  style={[styles.emailLink, { color: c.primary }]}
+                >
+                  {CONTACT_EMAIL}
+                </Text>
               </Text>
             </View>
           </>
@@ -416,6 +435,7 @@ const styles = StyleSheet.create({
     padding: 14, borderRadius: 12, borderWidth: 1,
   },
   infoText: { flex: 1, fontSize: 13, fontFamily: "HankenGrotesk_400Regular", lineHeight: 18 },
+  emailLink: { fontFamily: "HankenGrotesk_600SemiBold", textDecorationLine: "underline" },
   feeCard: { borderRadius: 14, borderWidth: 1, padding: 14 },
   feeCardRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   feeIconBg: { width: 38, height: 38, borderRadius: 10, alignItems: "center", justifyContent: "center" },

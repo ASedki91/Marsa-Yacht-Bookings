@@ -9,6 +9,8 @@ export interface LegalDocument {
   sections: LegalSection[];
 }
 
+export const CONTACT_EMAIL = "info@getmarsa.app";
+
 export const privacyPolicy: LegalDocument = {
   title: "Privacy Policy",
   sections: [
@@ -42,7 +44,7 @@ export const privacyPolicy: LegalDocument = {
     },
     {
       heading: "7. Your Rights and Choices",
-      body: "You can edit your profile, manage notifications, and request account deletion by emailing us at privacy@marsa.app. You may also request a copy of your data or ask us to correct it.",
+      body: "You can edit your profile, manage notifications, and request account deletion by emailing us at info@getmarsa.app. You may also request a copy of your data or ask us to correct it.",
     },
     {
       heading: "8. Children",
@@ -54,7 +56,7 @@ export const privacyPolicy: LegalDocument = {
     },
     {
       heading: "10. Contact Us",
-      body: "Questions or requests about your data? Email privacy@marsa.app and we will respond.",
+      body: "Questions or requests about your data? Email info@getmarsa.app and we will respond.",
     },
   ],
 };

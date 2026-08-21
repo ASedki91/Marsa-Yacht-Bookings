@@ -11,6 +11,7 @@ import { useColors } from "@/hooks/useColors";
 import { useUser } from "@/contexts/UserContext";
 import { API_BASE_URL } from "@/lib/env";
 import colors from "@/constants/colors";
+import { CONTACT_EMAIL } from "@/constants/legal";
 
 const WHATSAPP_NUMBER = "201030303030";
 
@@ -288,9 +289,13 @@ export default function ProfileScreen() {
             icon="logo-whatsapp"
             label="WhatsApp Support"
             iconColor="#22C55E"
-            onPress={() => Linking.openURL(`https://wa.me/${WHATSAPP_NUMBER}?text=Hi%2C%20I%20need%20help%20with%20MARSA`).catch(() =>
-              Alert.alert("WhatsApp", "Could not open WhatsApp. Please contact support@marsa.app")
-            )}
+            onPress={() =>
+              Linking.openURL(`https://wa.me/${WHATSAPP_NUMBER}?text=Hi%2C%20I%20need%20help%20with%20MARSA`).catch(() =>
+                Linking.openURL(`mailto:${CONTACT_EMAIL}`).catch(() =>
+                  Alert.alert("Support", `Please contact ${CONTACT_EMAIL}.`),
+                ),
+              )
+            }
           />
           <SettingRow
             icon="information-circle-outline"

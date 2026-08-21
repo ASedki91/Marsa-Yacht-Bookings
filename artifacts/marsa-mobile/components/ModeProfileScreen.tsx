@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
   Alert,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -14,6 +15,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import colors from "@/constants/colors";
+import { CONTACT_EMAIL } from "@/constants/legal";
 import { ConfirmActionModal } from "@/components/ConfirmActionModal";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { usePushNotifications } from "@/contexts/PushNotificationsContext";
@@ -353,12 +355,15 @@ export function ModeProfileScreen({ mode }: { mode: ProfileMode }) {
             onPress={() => router.push("/(home)/profile")}
           />
           <ProfileRow
-            icon="help-circle-outline"
-            label="Help & support"
+            icon="mail-outline"
+            label="Email support"
+            detail={CONTACT_EMAIL}
             onPress={() =>
-              Alert.alert(
-                "MARSA support",
-                "Contact support@marsa.app for help with your account or bookings.",
+              Linking.openURL(`mailto:${CONTACT_EMAIL}`).catch(() =>
+                Alert.alert(
+                  "Email support",
+                  `Could not open your email app. Please contact ${CONTACT_EMAIL}.`,
+                ),
               )
             }
           />
