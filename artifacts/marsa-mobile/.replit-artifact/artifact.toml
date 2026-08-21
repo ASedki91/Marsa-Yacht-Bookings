@@ -1,5 +1,5 @@
 kind = "mobile"
-previewPath = "/marsa-mobile/"
+previewPath = "/"
 title = "MARSA Mobile"
 version = "1.0.0"
 id = "artifacts/marsa-mobile"
@@ -12,7 +12,7 @@ version = "1.0.0"
 [[services]]
 ensurePreviewReachable = "/status"
 name = "expo"
-paths = [ "/marsa-mobile/" ]
+paths = [ "/" ]
 localPort = 20933
 
 [services.development]
@@ -24,4 +24,4 @@ run = [ "pnpm", "--filter", "@workspace/marsa-mobile", "run", "serve" ]
 
 [services.env]
 PORT = "20933"
-BASE_PATH = "/marsa-mobile/"
+BASE_PATH = "/"
