@@ -97,6 +97,8 @@ import type {
   NotificationCampaignInput,
   NotificationCampaignListResponse,
   NotificationListResponse,
+  OperatorOperationRequest,
+  OperatorOperationResponse,
   PaymentConfig,
   PhotographerRequest,
   PhotographerRequestInput,
@@ -450,6 +452,79 @@ export function useGetMe<TData = Awaited<ReturnType<typeof getMe>>, TError = Err
 
 
 
+
+export const getRunProductionOperatorOperationUrl = () => {
+
+
+
+
+  return `/api/internal/operator`
+}
+
+/**
+ * Server-only endpoint authenticated with MARSA_OPERATOR_SECRET. It is unavailable outside production and must never be called from browser or mobile clients. Always run a dry run, present its changes for explicit confirmation, then execute the exact same request with its confirmation token.
+
+ * @summary Prepare or execute a narrowly scoped production setup operation
+ */
+export const runProductionOperatorOperation = async (operatorOperationRequest: OperatorOperationRequest, options?: RequestInit): Promise<OperatorOperationResponse> => {
+
+  return customFetch<OperatorOperationResponse>(getRunProductionOperatorOperationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      operatorOperationRequest,)
+  }
+);}
+
+
+
+
+export const getRunProductionOperatorOperationMutationOptions = <TError = ErrorType<ErrorResponse | OperatorOperationResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runProductionOperatorOperation>>, TError,{data: BodyType<OperatorOperationRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof runProductionOperatorOperation>>, TError,{data: BodyType<OperatorOperationRequest>}, TContext> => {
+
+const mutationKey = ['runProductionOperatorOperation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof runProductionOperatorOperation>>, {data: BodyType<OperatorOperationRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  runProductionOperatorOperation(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RunProductionOperatorOperationMutationResult = NonNullable<Awaited<ReturnType<typeof runProductionOperatorOperation>>>
+    export type RunProductionOperatorOperationMutationBody = BodyType<OperatorOperationRequest>
+    export type RunProductionOperatorOperationMutationError = ErrorType<ErrorResponse | OperatorOperationResponse>
+
+    /**
+ * @summary Prepare or execute a narrowly scoped production setup operation
+ */
+export const useRunProductionOperatorOperation = <TError = ErrorType<ErrorResponse | OperatorOperationResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runProductionOperatorOperation>>, TError,{data: BodyType<OperatorOperationRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof runProductionOperatorOperation>>,
+        TError,
+        {data: BodyType<OperatorOperationRequest>},
+        TContext
+      > => {
+      return useMutation(getRunProductionOperatorOperationMutationOptions(options));
+    }
 
 export const getListYachtsUrl = (params?: ListYachtsParams,) => {
   const normalizedParams = new URLSearchParams();

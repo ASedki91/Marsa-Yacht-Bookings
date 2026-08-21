@@ -32,6 +32,8 @@ tags:
     description: Guest wishlist
   - name: payments
     description: Payment gateway configuration
+  - name: internal
+    description: Server-only operational endpoints. Never call from mobile or admin clients.
 
 paths:
   /healthz:
@@ -126,6 +128,60 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /internal/operator:
+    post:
+      operationId: runProductionOperatorOperation
+      tags: [internal]
+      summary: Prepare or execute a narrowly scoped production setup operation
+      description: >
+        Server-only endpoint authenticated with MARSA_OPERATOR_SECRET. It is
+        unavailable outside production and must never be called from browser or
+        mobile clients. Always run a dry run, present its changes for explicit
+        confirmation, then execute the exact same request with its confirmation token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OperatorOperationRequest"
+      responses:
+        "200":
+          description: Dry-run proposal or completed idempotent outcome
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperatorOperationResponse"
+        "400":
+          description: Invalid operation request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Missing or invalid production operator credential
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Expired confirmation, concurrent execution, or conflicting state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Dry-run validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperatorOperationResponse"
+        "503":
+          description: Production operator credential is not configured
           content:
             application/json:
               schema:
@@ -4060,6 +4116,136 @@ components:
         - url
 
     # ── Shared CRUD Input Schemas ───────────────────────────────────────────────
+    OperatorUserAction:
+      type: object
+      properties:
+        kind: { type: string, enum: [user] }
+        email: { type: string, format: email }
+        role: { type: string, enum: [guest, host, admin] }
+        fullName: { type: string, maxLength: 200 }
+        hostBio: { type: string, minLength: 10, maxLength: 2000 }
+      required: [kind, email, role]
+
+    OperatorLocationAction:
+      type: object
+      properties:
+        kind: { type: string, enum: [location] }
+        name: { type: string, maxLength: 120 }
+        city: { type: string, maxLength: 120 }
+        country: { type: string, maxLength: 120 }
+        timeZone: { type: string, description: Valid IANA time zone }
+        isDefault: { type: boolean, default: false }
+        sortOrder: { type: integer, minimum: 0, default: 0 }
+      required: [kind, name, city, country, timeZone]
+
+    OperatorCategoryAction:
+      type: object
+      properties:
+        kind: { type: string, enum: [category] }
+        name: { type: string, maxLength: 120 }
+        slug: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
+        iconUrl: { type: string, format: uri }
+        sortOrder: { type: integer, minimum: 0, default: 0 }
+      required: [kind, name, slug]
+
+    OperatorBookingTemplateAction:
+      type: object
+      properties:
+        kind: { type: string, enum: [booking_template] }
+        name: { type: string, maxLength: 120 }
+        durationHours: { type: integer, minimum: 1, maximum: 168 }
+        description: { type: string, maxLength: 1000 }
+        isActive: { type: boolean, default: true }
+        sortOrder: { type: integer, minimum: 0, default: 0 }
+      required: [kind, name, durationHours]
+
+    OperatorYachtDraftAction:
+      type: object
+      properties:
+        kind: { type: string, enum: [yacht_draft] }
+        hostEmail: { type: string, format: email }
+        title: { type: string, minLength: 3, maxLength: 200 }
+        description: { type: string, maxLength: 5000 }
+        locationId: { type: string, format: uuid }
+        categoryId: { type: ["string", "null"], format: uuid }
+        capacity: { type: integer, minimum: 1, maximum: 200 }
+        lengthFt: { type: number, exclusiveMinimum: 0 }
+        yearBuilt: { type: integer, minimum: 1800 }
+        manufacturer: { type: string, maxLength: 100 }
+        features:
+          type: array
+          items: { type: string, maxLength: 100 }
+          maxItems: 50
+        pricing:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            properties:
+              templateId: { type: string, format: uuid }
+              priceEgp: { type: number, exclusiveMinimum: 0 }
+            required: [templateId, priceEgp]
+      required: [kind, hostEmail, title, locationId, capacity]
+
+    OperatorAction:
+      oneOf:
+        - $ref: "#/components/schemas/OperatorUserAction"
+        - $ref: "#/components/schemas/OperatorLocationAction"
+        - $ref: "#/components/schemas/OperatorCategoryAction"
+        - $ref: "#/components/schemas/OperatorBookingTemplateAction"
+        - $ref: "#/components/schemas/OperatorYachtDraftAction"
+      discriminator:
+        propertyName: kind
+
+    OperatorOperationRequest:
+      type: object
+      properties:
+        phase: { type: string, enum: [dry_run, execute] }
+        operationId: { type: string, format: uuid }
+        action:
+          $ref: "#/components/schemas/OperatorAction"
+        confirmationToken:
+          type: string
+          description: Required only for phase=execute; obtained from a dry run.
+        confirmed:
+          type: boolean
+          description: Must be true only after the dry-run changes have explicit approval.
+      required: [phase, operationId, action]
+
+    OperatorPlannedChange:
+      type: object
+      properties:
+        entityType: { type: string }
+        entityId: { type: string }
+        action: { type: string, enum: [create, skip] }
+        summary: { type: string }
+      required: [entityType, entityId, action, summary]
+
+    OperatorOperationResponse:
+      type: object
+      properties:
+        operationId: { type: string }
+        expiresAt: { type: string, format: date-time }
+        changes:
+          type: array
+          items: { $ref: "#/components/schemas/OperatorPlannedChange" }
+        confirmationToken:
+          type: string
+          description: Returned only for a valid dry run; never store or log it.
+        nextStep: { type: string }
+        status: { type: string, enum: [completed, skipped, partial] }
+        created:
+          type: array
+          items: { $ref: "#/components/schemas/OperatorPlannedChange" }
+        skipped:
+          type: array
+          items: { $ref: "#/components/schemas/OperatorPlannedChange" }
+        errors:
+          type: array
+          items: { type: string }
+        idempotent: { type: boolean }
+      required: [operationId]
+
     CategoryInput:
       type: object
       properties:

@@ -15,6 +15,9 @@ module is not implemented yet, and **Buy — Soon** remains disabled.
 - `pnpm --filter @workspace/scripts run backfill:marketplace-update` — run the idempotent additive backfill
 - `pnpm --filter @workspace/scripts run seed` — seed the database with booking templates, categories, add-ons, and example photos
 - Required core env: `DATABASE_URL`, Clerk keys, and `INTERNAL_SECRET_TOKEN`
+- Production operator provisioning additionally requires the production-only
+  `MARSA_OPERATOR_SECRET`; see `docs/production-operator.md`. Never share it
+  with the admin or mobile clients.
 - Local test checkout: `PAYMENT_GATEWAY=test` and `ENABLE_TEST_PAYMENT_GATEWAY=true`
 - Published deployments fail closed if the test gateway is selected
 

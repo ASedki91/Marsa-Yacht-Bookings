@@ -1136,6 +1136,199 @@ export interface ExamplePhotoInput {
   isActive?: boolean;
 }
 
+export type OperatorUserActionKind = typeof OperatorUserActionKind[keyof typeof OperatorUserActionKind];
+
+
+export const OperatorUserActionKind = {
+  user: 'user',
+} as const;
+
+export type OperatorUserActionRole = typeof OperatorUserActionRole[keyof typeof OperatorUserActionRole];
+
+
+export const OperatorUserActionRole = {
+  guest: 'guest',
+  host: 'host',
+  admin: 'admin',
+} as const;
+
+export interface OperatorUserAction {
+  kind: OperatorUserActionKind;
+  email: string;
+  role: OperatorUserActionRole;
+  /** @maxLength 200 */
+  fullName?: string;
+  /**
+     * @minLength 10
+     * @maxLength 2000
+     */
+  hostBio?: string;
+}
+
+export type OperatorLocationActionKind = typeof OperatorLocationActionKind[keyof typeof OperatorLocationActionKind];
+
+
+export const OperatorLocationActionKind = {
+  location: 'location',
+} as const;
+
+export interface OperatorLocationAction {
+  kind: OperatorLocationActionKind;
+  /** @maxLength 120 */
+  name: string;
+  /** @maxLength 120 */
+  city: string;
+  /** @maxLength 120 */
+  country: string;
+  /** Valid IANA time zone */
+  timeZone: string;
+  isDefault?: boolean;
+  /** @minimum 0 */
+  sortOrder?: number;
+}
+
+export type OperatorCategoryActionKind = typeof OperatorCategoryActionKind[keyof typeof OperatorCategoryActionKind];
+
+
+export const OperatorCategoryActionKind = {
+  category: 'category',
+} as const;
+
+export interface OperatorCategoryAction {
+  kind: OperatorCategoryActionKind;
+  /** @maxLength 120 */
+  name: string;
+  /** @pattern ^[a-z0-9]+(?:-[a-z0-9]+)*$ */
+  slug: string;
+  iconUrl?: string;
+  /** @minimum 0 */
+  sortOrder?: number;
+}
+
+export type OperatorBookingTemplateActionKind = typeof OperatorBookingTemplateActionKind[keyof typeof OperatorBookingTemplateActionKind];
+
+
+export const OperatorBookingTemplateActionKind = {
+  booking_template: 'booking_template',
+} as const;
+
+export interface OperatorBookingTemplateAction {
+  kind: OperatorBookingTemplateActionKind;
+  /** @maxLength 120 */
+  name: string;
+  /**
+     * @minimum 1
+     * @maximum 168
+     */
+  durationHours: number;
+  /** @maxLength 1000 */
+  description?: string;
+  isActive?: boolean;
+  /** @minimum 0 */
+  sortOrder?: number;
+}
+
+export type OperatorYachtDraftActionKind = typeof OperatorYachtDraftActionKind[keyof typeof OperatorYachtDraftActionKind];
+
+
+export const OperatorYachtDraftActionKind = {
+  yacht_draft: 'yacht_draft',
+} as const;
+
+export type OperatorYachtDraftActionPricingItem = {
+  templateId: string;
+  /** @exclusiveMinimum 0 */
+  priceEgp: number;
+};
+
+export interface OperatorYachtDraftAction {
+  kind: OperatorYachtDraftActionKind;
+  hostEmail: string;
+  /**
+     * @minLength 3
+     * @maxLength 200
+     */
+  title: string;
+  /** @maxLength 5000 */
+  description?: string;
+  locationId: string;
+  /** @nullable */
+  categoryId?: string | null;
+  /**
+     * @minimum 1
+     * @maximum 200
+     */
+  capacity: number;
+  /** @exclusiveMinimum 0 */
+  lengthFt?: number;
+  /** @minimum 1800 */
+  yearBuilt?: number;
+  /** @maxLength 100 */
+  manufacturer?: string;
+  /** @maxItems 50 */
+  features?: string[];
+  /** @maxItems 20 */
+  pricing?: OperatorYachtDraftActionPricingItem[];
+}
+
+export type OperatorAction = OperatorUserAction | OperatorLocationAction | OperatorCategoryAction | OperatorBookingTemplateAction | OperatorYachtDraftAction;
+
+export type OperatorOperationRequestPhase = typeof OperatorOperationRequestPhase[keyof typeof OperatorOperationRequestPhase];
+
+
+export const OperatorOperationRequestPhase = {
+  dry_run: 'dry_run',
+  execute: 'execute',
+} as const;
+
+export interface OperatorOperationRequest {
+  phase: OperatorOperationRequestPhase;
+  operationId: string;
+  action: OperatorAction;
+  /** Required only for phase=execute; obtained from a dry run. */
+  confirmationToken?: string;
+  /** Must be true only after the dry-run changes have explicit approval. */
+  confirmed?: boolean;
+}
+
+export type OperatorPlannedChangeAction = typeof OperatorPlannedChangeAction[keyof typeof OperatorPlannedChangeAction];
+
+
+export const OperatorPlannedChangeAction = {
+  create: 'create',
+  skip: 'skip',
+} as const;
+
+export interface OperatorPlannedChange {
+  entityType: string;
+  entityId: string;
+  action: OperatorPlannedChangeAction;
+  summary: string;
+}
+
+export type OperatorOperationResponseStatus = typeof OperatorOperationResponseStatus[keyof typeof OperatorOperationResponseStatus];
+
+
+export const OperatorOperationResponseStatus = {
+  completed: 'completed',
+  skipped: 'skipped',
+  partial: 'partial',
+} as const;
+
+export interface OperatorOperationResponse {
+  operationId: string;
+  expiresAt?: string;
+  changes?: OperatorPlannedChange[];
+  /** Returned only for a valid dry run; never store or log it. */
+  confirmationToken?: string;
+  nextStep?: string;
+  status?: OperatorOperationResponseStatus;
+  created?: OperatorPlannedChange[];
+  skipped?: OperatorPlannedChange[];
+  errors?: string[];
+  idempotent?: boolean;
+}
+
 export interface CategoryInput {
   name: string;
   slug: string;

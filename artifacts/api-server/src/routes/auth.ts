@@ -34,6 +34,13 @@ function normalizeEmail(email: string): string {
   return email.trim().toLocaleLowerCase();
 }
 
+export function submittedEmailMatchesVerifiedEmail(
+  submittedEmail: string,
+  verifiedEmail: string,
+): boolean {
+  return normalizeEmail(submittedEmail) === normalizeEmail(verifiedEmail);
+}
+
 /**
  * POST /auth/sync
  * Called by the mobile/web app after Clerk sign-in to ensure a local user record exists.
@@ -72,7 +79,7 @@ router.post(
       res.status(502).json({ error: "Unable to verify your account email" });
       return;
     }
-    if (normalizeEmail(submittedEmail) !== email) {
+    if (!submittedEmailMatchesVerifiedEmail(submittedEmail, email)) {
       res.status(403).json({ error: "Account email does not match the signed-in user" });
       return;
     }
@@ -102,7 +109,7 @@ router.post(
           .update(usersTable)
           .set({ clerkId: clerkUserId })
           .where(
-            sql`${usersTable.id} = ${byEmail[0].id} AND ${usersTable.clerkId} LIKE 'invited:%'`,
+            sql`${usersTable.id} = ${byEmail[0].id} AND (${usersTable.clerkId} LIKE 'invited:%' OR ${usersTable.clerkId} LIKE 'pending_invitation:%')`,
           )
           .returning();
         if (!relinked) {

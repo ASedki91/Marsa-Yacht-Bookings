@@ -76,6 +76,145 @@ export const GetMeResponse = zod.object({
 
 
 /**
+ * Server-only endpoint authenticated with MARSA_OPERATOR_SECRET. It is unavailable outside production and must never be called from browser or mobile clients. Always run a dry run, present its changes for explicit confirmation, then execute the exact same request with its confirmation token.
+
+ * @summary Prepare or execute a narrowly scoped production setup operation
+ */
+export const runProductionOperatorOperationBodyActionOneFullNameMax = 200;
+
+export const runProductionOperatorOperationBodyActionOneHostBioMin = 10;
+export const runProductionOperatorOperationBodyActionOneHostBioMax = 2000;
+
+export const runProductionOperatorOperationBodyActionTwoNameMax = 120;
+
+export const runProductionOperatorOperationBodyActionTwoCityMax = 120;
+
+export const runProductionOperatorOperationBodyActionTwoCountryMax = 120;
+
+export const runProductionOperatorOperationBodyActionTwoIsDefaultDefault = false;
+export const runProductionOperatorOperationBodyActionTwoSortOrderDefault = 0;
+export const runProductionOperatorOperationBodyActionTwoSortOrderMin = 0;
+
+export const runProductionOperatorOperationBodyActionThreeNameMax = 120;
+
+export const runProductionOperatorOperationBodyActionThreeSlugRegExp = new RegExp('^[a-z0-9]+(?:-[a-z0-9]+)\*$');
+export const runProductionOperatorOperationBodyActionThreeSortOrderDefault = 0;
+export const runProductionOperatorOperationBodyActionThreeSortOrderMin = 0;
+
+export const runProductionOperatorOperationBodyActionFourNameMax = 120;
+
+export const runProductionOperatorOperationBodyActionFourDurationHoursMax = 168;
+
+export const runProductionOperatorOperationBodyActionFourDescriptionMax = 1000;
+
+export const runProductionOperatorOperationBodyActionFourIsActiveDefault = true;
+export const runProductionOperatorOperationBodyActionFourSortOrderDefault = 0;
+export const runProductionOperatorOperationBodyActionFourSortOrderMin = 0;
+
+export const runProductionOperatorOperationBodyActionFiveTitleMin = 3;
+export const runProductionOperatorOperationBodyActionFiveTitleMax = 200;
+
+export const runProductionOperatorOperationBodyActionFiveDescriptionMax = 5000;
+
+export const runProductionOperatorOperationBodyActionFiveCapacityMax = 200;
+
+export const runProductionOperatorOperationBodyActionFiveLengthFtExclusiveMin = 0;
+
+export const runProductionOperatorOperationBodyActionFiveYearBuiltMin = 1800;
+
+export const runProductionOperatorOperationBodyActionFiveManufacturerMax = 100;
+
+export const runProductionOperatorOperationBodyActionFiveFeaturesItemMax = 100;
+
+export const runProductionOperatorOperationBodyActionFiveFeaturesMax = 50;
+
+export const runProductionOperatorOperationBodyActionFivePricingItemPriceEgpExclusiveMin = 0;
+
+export const runProductionOperatorOperationBodyActionFivePricingMax = 20;
+
+
+
+export const RunProductionOperatorOperationBody = zod.object({
+  "phase": zod.enum(['dry_run', 'execute']),
+  "operationId": zod.string().uuid(),
+  "action": zod.union([zod.object({
+  "kind": zod.enum(['user']),
+  "email": zod.string().email(),
+  "role": zod.enum(['guest', 'host', 'admin']),
+  "fullName": zod.string().max(runProductionOperatorOperationBodyActionOneFullNameMax).optional(),
+  "hostBio": zod.string().min(runProductionOperatorOperationBodyActionOneHostBioMin).max(runProductionOperatorOperationBodyActionOneHostBioMax).optional()
+}),zod.object({
+  "kind": zod.enum(['location']),
+  "name": zod.string().max(runProductionOperatorOperationBodyActionTwoNameMax),
+  "city": zod.string().max(runProductionOperatorOperationBodyActionTwoCityMax),
+  "country": zod.string().max(runProductionOperatorOperationBodyActionTwoCountryMax),
+  "timeZone": zod.string().describe('Valid IANA time zone'),
+  "isDefault": zod.boolean().default(runProductionOperatorOperationBodyActionTwoIsDefaultDefault),
+  "sortOrder": zod.number().min(runProductionOperatorOperationBodyActionTwoSortOrderMin).default(runProductionOperatorOperationBodyActionTwoSortOrderDefault)
+}),zod.object({
+  "kind": zod.enum(['category']),
+  "name": zod.string().max(runProductionOperatorOperationBodyActionThreeNameMax),
+  "slug": zod.string().regex(runProductionOperatorOperationBodyActionThreeSlugRegExp),
+  "iconUrl": zod.string().url().optional(),
+  "sortOrder": zod.number().min(runProductionOperatorOperationBodyActionThreeSortOrderMin).default(runProductionOperatorOperationBodyActionThreeSortOrderDefault)
+}),zod.object({
+  "kind": zod.enum(['booking_template']),
+  "name": zod.string().max(runProductionOperatorOperationBodyActionFourNameMax),
+  "durationHours": zod.number().min(1).max(runProductionOperatorOperationBodyActionFourDurationHoursMax),
+  "description": zod.string().max(runProductionOperatorOperationBodyActionFourDescriptionMax).optional(),
+  "isActive": zod.boolean().default(runProductionOperatorOperationBodyActionFourIsActiveDefault),
+  "sortOrder": zod.number().min(runProductionOperatorOperationBodyActionFourSortOrderMin).default(runProductionOperatorOperationBodyActionFourSortOrderDefault)
+}),zod.object({
+  "kind": zod.enum(['yacht_draft']),
+  "hostEmail": zod.string().email(),
+  "title": zod.string().min(runProductionOperatorOperationBodyActionFiveTitleMin).max(runProductionOperatorOperationBodyActionFiveTitleMax),
+  "description": zod.string().max(runProductionOperatorOperationBodyActionFiveDescriptionMax).optional(),
+  "locationId": zod.string().uuid(),
+  "categoryId": zod.string().uuid().nullish(),
+  "capacity": zod.number().min(1).max(runProductionOperatorOperationBodyActionFiveCapacityMax),
+  "lengthFt": zod.number().gt(runProductionOperatorOperationBodyActionFiveLengthFtExclusiveMin).optional(),
+  "yearBuilt": zod.number().min(runProductionOperatorOperationBodyActionFiveYearBuiltMin).optional(),
+  "manufacturer": zod.string().max(runProductionOperatorOperationBodyActionFiveManufacturerMax).optional(),
+  "features": zod.array(zod.string().max(runProductionOperatorOperationBodyActionFiveFeaturesItemMax)).max(runProductionOperatorOperationBodyActionFiveFeaturesMax).optional(),
+  "pricing": zod.array(zod.object({
+  "templateId": zod.string().uuid(),
+  "priceEgp": zod.number().gt(runProductionOperatorOperationBodyActionFivePricingItemPriceEgpExclusiveMin)
+})).max(runProductionOperatorOperationBodyActionFivePricingMax).optional()
+})]),
+  "confirmationToken": zod.string().optional().describe('Required only for phase=execute; obtained from a dry run.'),
+  "confirmed": zod.boolean().optional().describe('Must be true only after the dry-run changes have explicit approval.')
+})
+
+export const RunProductionOperatorOperationResponse = zod.object({
+  "operationId": zod.string(),
+  "expiresAt": zod.coerce.date().optional(),
+  "changes": zod.array(zod.object({
+  "entityType": zod.string(),
+  "entityId": zod.string(),
+  "action": zod.enum(['create', 'skip']),
+  "summary": zod.string()
+})).optional(),
+  "confirmationToken": zod.string().optional().describe('Returned only for a valid dry run; never store or log it.'),
+  "nextStep": zod.string().optional(),
+  "status": zod.enum(['completed', 'skipped', 'partial']).optional(),
+  "created": zod.array(zod.object({
+  "entityType": zod.string(),
+  "entityId": zod.string(),
+  "action": zod.enum(['create', 'skip']),
+  "summary": zod.string()
+})).optional(),
+  "skipped": zod.array(zod.object({
+  "entityType": zod.string(),
+  "entityId": zod.string(),
+  "action": zod.enum(['create', 'skip']),
+  "summary": zod.string()
+})).optional(),
+  "errors": zod.array(zod.string()).optional(),
+  "idempotent": zod.boolean().optional()
+})
+
+
+/**
  * @summary List live yachts
  */
 export const listYachtsQueryPageDefault = 1;
