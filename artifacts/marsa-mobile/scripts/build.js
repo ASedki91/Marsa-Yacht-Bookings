@@ -75,6 +75,22 @@ function getDeploymentDomain() {
   process.exit(1);
 }
 
+function getClerkProxyPath() {
+  const proxyPath = process.env.CLERK_PROXY_URL?.trim() || "";
+
+  if (!proxyPath) {
+    return "";
+  }
+
+  if (!proxyPath.startsWith("/") || proxyPath.startsWith("//")) {
+    throw new Error(
+      "CLERK_PROXY_URL must be a root-relative path such as /api/__clerk",
+    );
+  }
+
+  return proxyPath.replace(/\/+$/, "");
+}
+
 function prepareDirectories(timestamp) {
   console.log("Preparing build directories...");
 
@@ -102,9 +118,9 @@ function exportWebApp(expoPublicDomain, expoPublicReplId) {
   return new Promise((resolve, reject) => {
     console.log("Exporting Expo web app...");
 
-    const clerkProxyUrl = process.env.CLERK_PROXY_URL
-      ? `https://${expoPublicDomain}${process.env.CLERK_PROXY_URL}`
-      : "";
+    // Keep the web proxy root-relative so the same exported bundle works on
+    // both Replit's hostname and any attached custom domain.
+    const clerkProxyUrl = getClerkProxyPath();
     const env = {
       ...process.env,
       EXPO_PUBLIC_DOMAIN: expoPublicDomain,
@@ -247,8 +263,9 @@ async function startMetro(expoPublicDomain, expoPublicReplId) {
 
   console.log("Starting Metro...");
   console.log(`Setting EXPO_PUBLIC_DOMAIN=${expoPublicDomain}`);
-  const clerkProxyUrl = process.env.CLERK_PROXY_URL
-    ? `https://${expoPublicDomain}${process.env.CLERK_PROXY_URL}`
+  const clerkProxyPath = getClerkProxyPath();
+  const clerkProxyUrl = clerkProxyPath
+    ? `https://${expoPublicDomain}${clerkProxyPath}`
     : "";
   const env = {
     ...process.env,

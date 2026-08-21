@@ -200,6 +200,7 @@ Each `artifacts/*` package is a standalone deployable application. They share li
 | `DATABASE_URL` | API server | PostgreSQL connection string |
 | `CLERK_PUBLISHABLE_KEY` | API server | Clerk publishable key |
 | `CLERK_SECRET_KEY` | API server | Clerk secret key |
+| `CLERK_PROXY_URL` | Mobile production build | Root-relative Clerk proxy path; use `/api/__clerk` so Replit and custom domains share one web bundle |
 | `VITE_CLERK_PUBLISHABLE_KEY` | Admin (Vite build) | Same Clerk key for browser |
 | `DEFAULT_OBJECT_STORAGE_BUCKET_ID` | API server | GCS bucket ID |
 | `PRIVATE_OBJECT_DIR` | API server | Private object storage prefix |
@@ -1036,6 +1037,13 @@ const booking = useGetBooking(id, { query: { enabled: !!id } });
     MARSA upload paths and check ownership before attaching them. Admin
     previews must resolve through the authenticated storage proxy rather than
     rendering a stored URL directly.
+
+18. **Keep the Expo web Clerk proxy origin-relative** — Production
+    `CLERK_PROXY_URL` must be a root-relative path such as `/api/__clerk`.
+    The web export embeds that path unchanged so it follows whichever host the
+    user opened (`getmarsa.replit.app` or `getmarsa.app`); native bundles expand
+    it to an absolute deployment URL. Prefixing the web value with Replit's
+    internal hostname makes Clerk reject requests from the custom domain.
 
 ---
 
