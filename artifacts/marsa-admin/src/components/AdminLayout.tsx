@@ -23,6 +23,7 @@ import {
   MapPinned,
   BellRing,
   SlidersHorizontal,
+  Settings,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -84,6 +85,7 @@ const navItems = [
   },
   { path: "/example-photos", label: "Example Photos", icon: Image },
   { path: "/audit-log", label: "Audit Log", icon: ScrollText },
+  { path: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -112,10 +114,11 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-30 w-56 flex flex-col bg-sidebar border-r border-sidebar-border transition-transform duration-200",
+          "fixed inset-y-0 left-0 z-30 h-[100dvh] w-56 flex flex-col bg-sidebar border-r border-sidebar-border opacity-100 transition-transform duration-200",
           "lg:relative lg:translate-x-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
+        style={{ backgroundColor: "hsl(var(--sidebar))" }}
       >
         {/* Logo */}
         <div className="flex items-center gap-2 px-4 py-4 border-b border-sidebar-border">

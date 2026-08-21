@@ -434,6 +434,17 @@ export const GetPaymentConfigResponse = zod.object({
 
 
 /**
+ * @summary Get public customer-support configuration
+ */
+export const getSupportConfigResponseWhatsappSupportNumberRegExp = new RegExp('^[0-9]{7,15}$');
+
+
+export const GetSupportConfigResponse = zod.object({
+  "whatsappSupportNumber": zod.string().regex(getSupportConfigResponseWhatsappSupportNumberRegExp).describe('International WhatsApp number, without a leading plus sign.')
+})
+
+
+/**
  * @summary Get the active customer-facing cancellation policy
  */
 export const getCurrentCancellationPolicyResponseRulesItemMinimumMinutesBeforeTripMin = 0;
@@ -2364,6 +2375,37 @@ export const AdminGetNotificationCampaignResponse = zod.object({
   "createdAt": zod.string(),
   "startedAt": zod.string().nullish(),
   "completedAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Get customer-support configuration
+ */
+export const adminGetSupportConfigResponseWhatsappSupportNumberRegExp = new RegExp('^[0-9]{7,15}$');
+
+
+export const AdminGetSupportConfigResponse = zod.object({
+  "whatsappSupportNumber": zod.string().regex(adminGetSupportConfigResponseWhatsappSupportNumberRegExp).describe('International WhatsApp number, without a leading plus sign.')
+})
+
+
+/**
+ * @summary Update the WhatsApp customer-support number
+ */
+export const adminUpdateSupportConfigBodyWhatsappSupportNumberMin = 7;
+export const adminUpdateSupportConfigBodyWhatsappSupportNumberMax = 32;
+
+
+
+export const AdminUpdateSupportConfigBody = zod.object({
+  "whatsappSupportNumber": zod.string().min(adminUpdateSupportConfigBodyWhatsappSupportNumberMin).max(adminUpdateSupportConfigBodyWhatsappSupportNumberMax).describe('International WhatsApp number. Spaces, dashes, and a leading plus are accepted.')
+})
+
+export const adminUpdateSupportConfigResponseWhatsappSupportNumberRegExp = new RegExp('^[0-9]{7,15}$');
+
+
+export const AdminUpdateSupportConfigResponse = zod.object({
+  "whatsappSupportNumber": zod.string().regex(adminUpdateSupportConfigResponseWhatsappSupportNumberRegExp).describe('International WhatsApp number, without a leading plus sign.')
 })
 
 

@@ -24,3 +24,4 @@ export * from "./notificationCampaigns";
 export * from "./cancellationPolicies";
 export * from "./bookingCancellationTerms";
 export * from "./bookingCancellations";
+export * from "./platformSettings";

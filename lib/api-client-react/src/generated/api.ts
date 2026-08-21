@@ -115,6 +115,8 @@ import type {
   ReviewListResponse,
   ReviewModerationInput,
   RoleUpdate,
+  SupportConfig,
+  SupportConfigUpdateInput,
   User,
   UserListResponse,
   UserSyncInput,
@@ -1604,6 +1606,83 @@ export function useGetPaymentConfig<TData = Awaited<ReturnType<typeof getPayment
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetPaymentConfigQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetSupportConfigUrl = () => {
+
+
+
+
+  return `/api/support-config`
+}
+
+/**
+ * @summary Get public customer-support configuration
+ */
+export const getSupportConfig = async ( options?: RequestInit): Promise<SupportConfig> => {
+
+  return customFetch<SupportConfig>(getGetSupportConfigUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSupportConfigQueryKey = () => {
+    return [
+    `/api/support-config`
+    ] as const;
+    }
+
+
+export const getGetSupportConfigQueryOptions = <TData = Awaited<ReturnType<typeof getSupportConfig>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSupportConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSupportConfigQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSupportConfig>>> = ({ signal }) => getSupportConfig({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSupportConfig>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSupportConfigQueryResult = NonNullable<Awaited<ReturnType<typeof getSupportConfig>>>
+export type GetSupportConfigQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get public customer-support configuration
+ */
+
+export function useGetSupportConfig<TData = Awaited<ReturnType<typeof getSupportConfig>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSupportConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSupportConfigQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -7778,6 +7857,154 @@ export function useAdminGetNotificationCampaign<TData = Awaited<ReturnType<typeo
 
 
 
+
+export const getAdminGetSupportConfigUrl = () => {
+
+
+
+
+  return `/api/admin/support-config`
+}
+
+/**
+ * @summary Get customer-support configuration
+ */
+export const adminGetSupportConfig = async ( options?: RequestInit): Promise<SupportConfig> => {
+
+  return customFetch<SupportConfig>(getAdminGetSupportConfigUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getAdminGetSupportConfigQueryKey = () => {
+    return [
+    `/api/admin/support-config`
+    ] as const;
+    }
+
+
+export const getAdminGetSupportConfigQueryOptions = <TData = Awaited<ReturnType<typeof adminGetSupportConfig>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof adminGetSupportConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAdminGetSupportConfigQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof adminGetSupportConfig>>> = ({ signal }) => adminGetSupportConfig({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof adminGetSupportConfig>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type AdminGetSupportConfigQueryResult = NonNullable<Awaited<ReturnType<typeof adminGetSupportConfig>>>
+export type AdminGetSupportConfigQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get customer-support configuration
+ */
+
+export function useAdminGetSupportConfig<TData = Awaited<ReturnType<typeof adminGetSupportConfig>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof adminGetSupportConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getAdminGetSupportConfigQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getAdminUpdateSupportConfigUrl = () => {
+
+
+
+
+  return `/api/admin/support-config`
+}
+
+/**
+ * @summary Update the WhatsApp customer-support number
+ */
+export const adminUpdateSupportConfig = async (supportConfigUpdateInput: SupportConfigUpdateInput, options?: RequestInit): Promise<SupportConfig> => {
+
+  return customFetch<SupportConfig>(getAdminUpdateSupportConfigUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      supportConfigUpdateInput,)
+  }
+);}
+
+
+
+
+export const getAdminUpdateSupportConfigMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminUpdateSupportConfig>>, TError,{data: BodyType<SupportConfigUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof adminUpdateSupportConfig>>, TError,{data: BodyType<SupportConfigUpdateInput>}, TContext> => {
+
+const mutationKey = ['adminUpdateSupportConfig'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminUpdateSupportConfig>>, {data: BodyType<SupportConfigUpdateInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  adminUpdateSupportConfig(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdminUpdateSupportConfigMutationResult = NonNullable<Awaited<ReturnType<typeof adminUpdateSupportConfig>>>
+    export type AdminUpdateSupportConfigMutationBody = BodyType<SupportConfigUpdateInput>
+    export type AdminUpdateSupportConfigMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update the WhatsApp customer-support number
+ */
+export const useAdminUpdateSupportConfig = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminUpdateSupportConfig>>, TError,{data: BodyType<SupportConfigUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof adminUpdateSupportConfig>>,
+        TError,
+        {data: BodyType<SupportConfigUpdateInput>},
+        TContext
+      > => {
+      return useMutation(getAdminUpdateSupportConfigMutationOptions(options));
+    }
 
 export const getAdminListCancellationPoliciesUrl = () => {
 

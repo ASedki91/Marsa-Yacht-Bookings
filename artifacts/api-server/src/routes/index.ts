@@ -23,6 +23,7 @@ import adminLocationsRouter from "./adminLocations";
 import adminYachtsMarketplaceRouter from "./adminYachtsMarketplace";
 import adminActivityRouter from "./adminActivity";
 import adminCampaignsRouter from "./adminCampaigns";
+import supportConfigRouter from "./supportConfig";
 
 const router: IRouter = Router();
 
@@ -54,6 +55,7 @@ router.use(adminLocationsRouter);
 router.use(adminYachtsMarketplaceRouter);
 router.use(adminActivityRouter);
 router.use(adminCampaignsRouter);
+router.use(supportConfigRouter);
 router.use(adminRouter);
 router.use(internalRouter);
 

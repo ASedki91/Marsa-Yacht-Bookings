@@ -411,6 +411,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/PaymentConfig"
 
+  /support-config:
+    get:
+      operationId: getSupportConfig
+      tags: [discovery]
+      summary: Get public customer-support configuration
+      responses:
+        "200":
+          description: Support configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportConfig"
+
   /cancellation-policy/current:
     get:
       operationId: getCurrentCancellationPolicy
@@ -2080,6 +2093,36 @@ paths:
               schema:
                 $ref: "#/components/schemas/NotificationCampaign"
 
+  /admin/support-config:
+    get:
+      operationId: adminGetSupportConfig
+      tags: [admin]
+      summary: Get customer-support configuration
+      responses:
+        "200":
+          description: Support configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportConfig"
+    patch:
+      operationId: adminUpdateSupportConfig
+      tags: [admin]
+      summary: Update the WhatsApp customer-support number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SupportConfigUpdateInput"
+      responses:
+        "200":
+          description: Support configuration updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportConfig"
+
   /admin/cancellation-policies:
     get:
       operationId: adminListCancellationPolicies
@@ -2611,6 +2654,25 @@ components:
         publishableKey:
           type: ["string", "null"]
       required: [gateway, checkoutEnabled, testMode, publishableKey]
+
+    SupportConfig:
+      type: object
+      properties:
+        whatsappSupportNumber:
+          type: string
+          description: International WhatsApp number, without a leading plus sign.
+          pattern: "^[0-9]{7,15}$"
+      required: [whatsappSupportNumber]
+
+    SupportConfigUpdateInput:
+      type: object
+      properties:
+        whatsappSupportNumber:
+          type: string
+          description: International WhatsApp number. Spaces, dashes, and a leading plus are accepted.
+          minLength: 7
+          maxLength: 32
+      required: [whatsappSupportNumber]
 
     Yacht:
       type: object

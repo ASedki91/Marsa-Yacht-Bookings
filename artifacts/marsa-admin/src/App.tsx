@@ -27,6 +27,7 @@ import BookingTemplates from "./pages/BookingTemplates";
 import PhotographerRequests from "./pages/PhotographerRequests";
 import ExamplePhotos from "./pages/ExamplePhotos";
 import AuditLog from "./pages/AuditLog";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/not-found";
 
 const clerkPubKey = publishableKeyFromHost(
@@ -205,6 +206,7 @@ function AdminApp() {
           <Route path="/photographer-requests" component={PhotographerRequests} />
           <Route path="/example-photos" component={ExamplePhotos} />
           <Route path="/audit-log" component={AuditLog} />
+          <Route path="/settings" component={Settings} />
           <Route component={NotFound} />
         </Switch>
       </AdminLayout>

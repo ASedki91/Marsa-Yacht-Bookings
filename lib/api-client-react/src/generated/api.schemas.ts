@@ -289,6 +289,23 @@ export interface PaymentConfig {
   publishableKey: string | null;
 }
 
+export interface SupportConfig {
+  /**
+     * International WhatsApp number, without a leading plus sign.
+     * @pattern ^[0-9]{7,15}$
+     */
+  whatsappSupportNumber: string;
+}
+
+export interface SupportConfigUpdateInput {
+  /**
+     * International WhatsApp number. Spaces, dashes, and a leading plus are accepted.
+     * @minLength 7
+     * @maxLength 32
+     */
+  whatsappSupportNumber: string;
+}
+
 export interface YachtPhoto {
   id: string;
   url: string;

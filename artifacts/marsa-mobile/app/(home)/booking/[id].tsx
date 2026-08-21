@@ -15,6 +15,7 @@ import { useColors } from "@/hooks/useColors";
 import { useUser } from "@/contexts/UserContext";
 import { EmptyState } from "@/components/EmptyState";
 import colors from "@/constants/colors";
+import { WhatsAppSupportButton } from "@/components/WhatsAppSupportButton";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: string }> = {
   pending_payment:   { label: "Pending Payment",  color: "#92400E", bg: "#F2E5CF", icon: "card-outline" },
@@ -228,6 +229,12 @@ export default function BookingDetailScreen() {
   const statusCfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending_payment;
   const canCancel = ["pending_payment", "paid_under_review", "confirmed"].includes(status) && booking.guestId === user?.id;
   const canReview = status === "completed" && booking.guestId === user?.id && !booking.hasReview;
+  const canGetSupport = [
+    "pending_payment",
+    "paid_under_review",
+    "confirmed",
+    "cancel_requested",
+  ].includes(status);
 
   const totalEgp = booking.totalAmountEgp ?? booking.totalPriceEgp ?? booking.totalEgp ?? "—";
   const totalUsd = booking.totalAmountUsd ?? booking.totalPriceUsd ?? booking.totalUsd ?? "—";
@@ -370,6 +377,19 @@ export default function BookingDetailScreen() {
                   </Text>
                 </View>
               ))}
+          </View>
+        )}
+
+        {canGetSupport && (
+          <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Text style={[styles.sectionTitle, { color: c.foreground }]}>
+              Need help with this booking?
+            </Text>
+            <Text style={[styles.supportCopy, { color: c.mutedForeground }]}>
+              Our support team can help with your booking status, payment, or
+              cancellation request.
+            </Text>
+            <WhatsAppSupportButton bookingId={id!} />
           </View>
         )}
 
@@ -661,6 +681,12 @@ const styles = StyleSheet.create({
   },
   termsWindow: { flex: 1, fontSize: 12, fontFamily: "HankenGrotesk_400Regular" },
   termsFee: { fontSize: 12, fontFamily: "HankenGrotesk_700Bold" },
+  supportCopy: {
+    fontSize: 13,
+    fontFamily: "HankenGrotesk_400Regular",
+    lineHeight: 19,
+    marginBottom: 10,
+  },
   modalBackdrop: {
     flex: 1,
     justifyContent: "flex-end",

@@ -12,8 +12,7 @@ import { useUser } from "@/contexts/UserContext";
 import { API_BASE_URL } from "@/lib/env";
 import colors from "@/constants/colors";
 import { CONTACT_EMAIL } from "@/constants/legal";
-
-const WHATSAPP_NUMBER = "201030303030";
+import { useGetSupportConfig } from "@workspace/api-client-react";
 
 interface SettingRowProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -61,6 +60,7 @@ export default function ProfileScreen() {
   const { getToken } = useAuth();
   const router = useRouter();
   const { user, isHost, isAdmin, refetch } = useUser();
+  const supportConfig = useGetSupportConfig();
 
   const [hostLoading, setHostLoading] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -289,13 +289,19 @@ export default function ProfileScreen() {
             icon="logo-whatsapp"
             label="WhatsApp Support"
             iconColor="#22C55E"
-            onPress={() =>
-              Linking.openURL(`https://wa.me/${WHATSAPP_NUMBER}?text=Hi%2C%20I%20need%20help%20with%20MARSA`).catch(() =>
+            onPress={() => {
+              const whatsappNumber = supportConfig.data?.whatsappSupportNumber;
+              return (whatsappNumber
+                ? Linking.openURL(
+                    `https://wa.me/${whatsappNumber}?text=Hi%2C%20I%20need%20help%20with%20MARSA`,
+                  )
+                : Promise.reject()
+              ).catch(() =>
                 Linking.openURL(`mailto:${CONTACT_EMAIL}`).catch(() =>
                   Alert.alert("Support", `Please contact ${CONTACT_EMAIL}.`),
                 ),
-              )
-            }
+              );
+            }}
           />
           <SettingRow
             icon="information-circle-outline"

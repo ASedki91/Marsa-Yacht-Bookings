@@ -199,6 +199,9 @@ export function ModeBookingsScreen({ mode }: { mode: BookingMode }) {
                 item.guestId === user?.id
               }
               onLeaveReview={() => router.push(`/(home)/review/${item.id}`)}
+              showSupport={
+                segment === "active" && ACTIVE_STATUSES.includes(item.status)
+              }
             />
           )}
           refreshControl={

@@ -144,6 +144,8 @@ export * from './reviewModerationInput';
 export * from './reviewModerationInputStatus';
 export * from './roleUpdate';
 export * from './roleUpdateRole';
+export * from './supportConfig';
+export * from './supportConfigUpdateInput';
 export * from './user';
 export * from './userListResponse';
 export * from './userRole';
