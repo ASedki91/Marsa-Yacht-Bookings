@@ -163,9 +163,9 @@ function addWebMetadata(domain) {
     projectRoot,
     "assets",
     "images",
-    "yacht-hero.png",
+    "marsa-social-preview.png",
   );
-  const imageTarget = path.join(webRoot, "yacht-hero.png");
+  const imageTarget = path.join(webRoot, "marsa-social-preview.png");
 
   if (!fs.existsSync(indexPath)) {
     throw new Error("Expo web export did not produce static-build/web/index.html");
@@ -176,7 +176,7 @@ function addWebMetadata(domain) {
 
   const baseUrl = `https://${domain}`;
   const rootUrl = basePath ? `${baseUrl}${basePath}/` : `${baseUrl}/`;
-  const imageUrl = `${rootUrl}yacht-hero.png`;
+  const imageUrl = `${rootUrl}marsa-social-preview.png`;
   const metadata = `
     <title>MARSA | Premier Yacht Marketplace</title>
     <meta name="description" content="Discover and book unforgettable yacht experiences with MARSA." />

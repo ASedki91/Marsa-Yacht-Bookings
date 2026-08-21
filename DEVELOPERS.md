@@ -607,9 +607,11 @@ The mobile artifact produces three production outputs in one build:
 bundles and rewrites their asset URLs for the deployed domain. `server/serve.js`
 serves web assets and Expo Router client-side routes from `static-build/web/`;
 it preserves the platform-aware manifest responses required by Expo Launch and
-App Store iOS publishing. The optional `EXPO_METRO_PORT` build variable changes
-only the local Metro port used while generating native bundles; production
-defaults to `8081`.
+App Store iOS publishing. The web export also copies
+`assets/images/marsa-social-preview.png` to the web root and uses it for
+Open Graph and Twitter link previews. The optional `EXPO_METRO_PORT` build
+variable changes only the local Metro port used while generating native
+bundles; production defaults to `8081`.
 
 ### Screen map
 
