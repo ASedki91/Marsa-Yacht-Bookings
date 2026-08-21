@@ -368,7 +368,10 @@ export function ModeProfileScreen({ mode }: { mode: ProfileMode }) {
               )
             }
           />
-          <WhatsAppSupportButton context="my account or general support" />
+          <WhatsAppSupportButton
+            context="my account or general support"
+            variant="profileRow"
+          />
           <ProfileRow
             icon="shield-checkmark-outline"
             label="Privacy Policy"

@@ -16,16 +16,19 @@ import { useColors } from "@/hooks/useColors";
 interface WhatsAppSupportButtonProps {
   bookingId?: string;
   context?: string;
+  variant?: "default" | "profileRow";
 }
 
 export function WhatsAppSupportButton({
   bookingId,
   context,
+  variant = "default",
 }: WhatsAppSupportButtonProps) {
   const colors = useColors();
   const supportConfig = useGetSupportConfig();
   const [error, setError] = useState<string | null>(null);
   const whatsappNumber = supportConfig.data?.whatsappSupportNumber;
+  const isProfileRow = variant === "profileRow";
 
   const openSupport = async () => {
     setError(null);
@@ -58,33 +61,56 @@ export function WhatsAppSupportButton({
   return (
     <View style={styles.container}>
       <Pressable
+        accessibilityRole="button"
         disabled={supportConfig.isLoading}
         onPress={(event) => {
           event.stopPropagation?.();
           void openSupport();
         }}
         style={({ pressed }) => [
-          styles.button,
+          isProfileRow ? styles.profileButton : styles.button,
           {
-            borderColor: "#22C55E",
-            backgroundColor: "#22C55E12",
+            borderColor: isProfileRow ? colors.border : "#22C55E",
+            backgroundColor: isProfileRow ? colors.card : "#22C55E12",
             opacity: supportConfig.isLoading ? 0.55 : pressed ? 0.82 : 1,
           },
         ]}
       >
-        {supportConfig.isLoading ? (
-          <ActivityIndicator size="small" color="#15803D" />
-        ) : (
-          <Ionicons name="logo-whatsapp" size={18} color="#15803D" />
-        )}
+        <View
+          style={
+            isProfileRow
+              ? [styles.profileIcon, { backgroundColor: colors.primary + "14" }]
+              : undefined
+          }
+        >
+          {supportConfig.isLoading ? (
+            <ActivityIndicator
+              size="small"
+              color={isProfileRow ? colors.primary : "#15803D"}
+            />
+          ) : (
+            <Ionicons
+              name="logo-whatsapp"
+              size={isProfileRow ? 20 : 18}
+              color={isProfileRow ? colors.primary : "#15803D"}
+            />
+          )}
+        </View>
         <Text
           style={[
-            styles.label,
-            { color: "#15803D" },
+            isProfileRow ? styles.profileLabel : styles.label,
+            { color: isProfileRow ? colors.foreground : "#15803D" },
           ]}
         >
-          WhatsApp Support
+          WhatsApp support
         </Text>
+        {isProfileRow && (
+          <Ionicons
+            name="chevron-forward"
+            size={17}
+            color={colors.mutedForeground}
+          />
+        )}
       </Pressable>
       {error ? (
         <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text>
@@ -105,6 +131,27 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 11,
+  },
+  profileButton: {
+    minHeight: 58,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 13,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 11,
+  },
+  profileIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  profileLabel: {
+    flex: 1,
+    fontFamily: "HankenGrotesk_600SemiBold",
+    fontSize: 14,
   },
   label: { fontSize: 14, fontFamily: "HankenGrotesk_600SemiBold" },
   error: { fontSize: 12, fontFamily: "HankenGrotesk_400Regular", textAlign: "center" },
