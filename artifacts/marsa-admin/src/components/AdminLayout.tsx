@@ -118,7 +118,6 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           "lg:relative lg:translate-x-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
-        style={{ backgroundColor: "hsl(var(--sidebar))" }}
       >
         {/* Logo */}
         <div className="flex items-center gap-2 px-4 py-4 border-b border-sidebar-border">
@@ -133,12 +132,12 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             <p className="text-sm font-display tracking-[0.26em] text-sidebar-foreground leading-none">
               MARSA
             </p>
-            <p className="text-[10px] text-sidebar-foreground/50 tracking-widest uppercase leading-none mt-0.5">
+            <p className="text-[10px] text-sidebar-muted-foreground tracking-widest uppercase leading-none mt-0.5">
               Admin
             </p>
           </div>
           <button
-            className="ml-auto lg:hidden text-sidebar-foreground/50 hover:text-sidebar-foreground"
+            className="ml-auto lg:hidden text-sidebar-muted-foreground hover:text-sidebar-foreground"
             onClick={() => setMobileOpen(false)}
           >
             <X className="w-4 h-4" />
@@ -158,7 +157,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                     "flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors mb-0.5",
                     active
                       ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                      : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent",
+                      : "text-sidebar-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent",
                   )}
                   onClick={() => setMobileOpen(false)}
                 >
@@ -196,7 +195,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           <button
             data-testid="button-sign-out"
             onClick={() => signOut()}
-            className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent w-full transition-colors"
+            className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm font-medium text-sidebar-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent w-full transition-colors"
           >
             <LogOut className="w-4 h-4" />
             Sign Out

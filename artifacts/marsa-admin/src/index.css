@@ -39,6 +39,8 @@
   --color-destructive-foreground: hsl(var(--destructive-foreground));
   --color-destructive-border: var(--destructive-border);
 
+  --color-sidebar-muted-foreground: hsl(var(--sidebar-muted-foreground));
+
   --font-sans: "Hanken Grotesk", system-ui, sans-serif;
   --font-display: "Marcellus", Georgia, serif;
   --font-mono: "Space Mono", ui-monospace, monospace;
@@ -81,13 +83,14 @@
   --input: 38.5 37.1% 79.4%;
   --ring: 211.4 53.8% 31.4%;
 
-  --sidebar: 211.6 44.2% 25.3%;
-  --sidebar-foreground: 40 48.8% 91.6%;
-  --sidebar-border: 210 19.7% 29.8%;
-  --sidebar-primary: 35 48.5% 53.5%;
-  --sidebar-primary-foreground: 211.6 44.2% 25.3%;
-  --sidebar-accent: 211.4 53.8% 31.4%;
-  --sidebar-accent-foreground: 40 60% 96.1%;
+  --sidebar: 40 48.8% 91.6%;
+  --sidebar-foreground: 211.6 44.2% 25.3%;
+  --sidebar-border: 38.5 37.1% 79.4%;
+  --sidebar-primary: 211.4 53.8% 31.4%;
+  --sidebar-primary-foreground: 40 60% 96.1%;
+  --sidebar-accent: 38.2 53.7% 83.9%;
+  --sidebar-accent-foreground: 211.6 44.2% 25.3%;
+  --sidebar-muted-foreground: 211.6 30% 32%;
   --sidebar-ring: 35 48.5% 53.5%;
 
   --chart-1: 211.4 53.8% 31.4%;
@@ -150,6 +153,7 @@
   --sidebar-primary-foreground: 210 45% 15.7%;
   --sidebar-accent: 211.6 44.2% 25.3%;
   --sidebar-accent-foreground: 40 60% 96.1%;
+  --sidebar-muted-foreground: 38.2 53.7% 83.9%;
   --sidebar-ring: 35 56.4% 64.9%;
 
   --chart-1: 35 56.4% 64.9%;
