@@ -46,9 +46,10 @@ function requireInternalToken(
     return;
   }
   const auth = req.headers["authorization"] ?? "";
-  const token = auth.startsWith("Bearer ")
-    ? auth.slice(7)
-    : (req.query.token as string);
+  // Internal credentials must stay in the Authorization header. Never accept
+  // them from the URL, where proxies, schedulers, browsers, and referrers may
+  // retain the full request target.
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : undefined;
   if (token !== INTERNAL_TOKEN) {
     res.status(401).json({ error: "Unauthorized" });
     return;
