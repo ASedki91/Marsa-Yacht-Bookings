@@ -114,7 +114,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-30 h-[100dvh] w-56 flex flex-col bg-sidebar border-r border-sidebar-border opacity-100 transition-transform duration-200",
+          "admin-sidebar-surface fixed inset-y-0 left-0 z-30 h-[100dvh] w-56 flex flex-col bg-sidebar border-r border-sidebar-border transition-transform duration-200",
           "lg:relative lg:translate-x-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
