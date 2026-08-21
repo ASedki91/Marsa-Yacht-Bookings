@@ -179,7 +179,7 @@ export default function ProfileScreen() {
         body: JSON.stringify({ name: fileName, size: blob.size, contentType }),
       });
       if (!urlRes.ok) throw new Error("Failed to request upload URL.");
-      const { uploadURL, objectPath } = await urlRes.json();
+      const { uploadURL, objectPath, uploadToken } = await urlRes.json();
 
       // Step 2: Upload binary directly to GCS
       const uploadRes = await fetch(uploadURL, {
@@ -196,7 +196,7 @@ export default function ProfileScreen() {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ objectPath, visibility: "public" }),
+        body: JSON.stringify({ objectPath, uploadToken, visibility: "public" }),
       });
       if (!finalizeRes.ok) throw new Error("Failed to finalize upload.");
 

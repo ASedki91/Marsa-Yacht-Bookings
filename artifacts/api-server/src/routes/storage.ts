@@ -3,6 +3,7 @@ import { Readable } from "stream";
 import { z } from "zod/v4";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { requireAuth } from "../middlewares/index";
+import { createUploadIntent, verifyUploadIntent } from "../lib/uploadIntent";
 
 // Inline schemas (avoids codegen dependency for storage endpoints)
 const RequestUploadUrlBody = z.object({
@@ -14,6 +15,7 @@ const RequestUploadUrlBody = z.object({
 const RequestUploadUrlResponse = z.object({
   uploadURL: z.string(),
   objectPath: z.string(),
+  uploadToken: z.string(),
   metadata: z.object({ name: z.string(), size: z.number(), contentType: z.string() }),
 });
 
@@ -43,11 +45,13 @@ router.post(
 
       const uploadURL = await objectStorageService.getObjectEntityUploadURL();
       const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+      const user = (req as any).localUser;
 
       res.json(
         RequestUploadUrlResponse.parse({
           uploadURL,
           objectPath,
+          uploadToken: createUploadIntent(user.id, objectPath),
           metadata: { name, size, contentType },
         }),
       );
@@ -65,10 +69,11 @@ router.post(
  * Sets the ACL ownership metadata on the newly uploaded object so that
  * canAccessObjectEntity() works correctly for future access checks.
  *
- * Body: { objectPath: string, visibility?: "private" | "public" }
+ * Body: { objectPath: string, uploadToken: string, visibility?: "private" | "public" }
  */
 const FinalizeUploadBody = z.object({
   objectPath: z.string().min(1),
+  uploadToken: z.string().min(1),
   visibility: z.enum(["private", "public"]).optional().default("private"),
 });
 
@@ -78,15 +83,20 @@ router.post(
   async (req: Request, res: Response) => {
     const parsed = FinalizeUploadBody.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: "objectPath is required" });
+      res.status(400).json({ error: "objectPath and uploadToken are required" });
       return;
     }
 
     try {
       const user = (req as any).localUser;
-      const { objectPath, visibility } = parsed.data;
+      const { objectPath, uploadToken, visibility } = parsed.data;
+      const normalizedRequestedPath = objectStorageService.normalizeObjectEntityPath(objectPath);
+      if (!verifyUploadIntent(uploadToken, user.id, normalizedRequestedPath)) {
+        res.status(403).json({ error: "Upload intent is invalid or expired" });
+        return;
+      }
 
-      const normalizedPath = await objectStorageService.trySetObjectEntityAclPolicy(objectPath, {
+      const normalizedPath = await objectStorageService.trySetObjectEntityAclPolicy(normalizedRequestedPath, {
         owner: user.id,
         visibility,
         aclRules: [],
