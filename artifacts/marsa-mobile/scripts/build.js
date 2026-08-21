@@ -21,6 +21,8 @@ function findWorkspaceRoot(startDir) {
 
 const workspaceRoot = findWorkspaceRoot(projectRoot);
 const basePath = (process.env.BASE_PATH || "/").replace(/\/+$/, "");
+const metroPort = Number(process.env.EXPO_METRO_PORT || "8081");
+const metroBaseUrl = `http://localhost:${metroPort}`;
 
 function exitWithError(message) {
   console.error(message);
@@ -82,6 +84,7 @@ function prepareDirectories(timestamp) {
   }
 
   const dirs = [
+    path.join(staticBuild, "web"),
     path.join(staticBuild, timestamp, "_expo", "static", "js", "ios"),
     path.join(staticBuild, timestamp, "_expo", "static", "js", "android"),
     path.join(staticBuild, "ios"),
@@ -93,6 +96,64 @@ function prepareDirectories(timestamp) {
   }
 
   console.log("Build:", timestamp);
+}
+
+function exportWebApp(expoPublicDomain, expoPublicReplId) {
+  return new Promise((resolve, reject) => {
+    console.log("Exporting Expo web app...");
+
+    const clerkProxyUrl = process.env.CLERK_PROXY_URL
+      ? `https://${expoPublicDomain}${process.env.CLERK_PROXY_URL}`
+      : "";
+    const env = {
+      ...process.env,
+      EXPO_PUBLIC_DOMAIN: expoPublicDomain,
+      EXPO_PUBLIC_REPL_ID: expoPublicReplId,
+      EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.CLERK_PUBLISHABLE_KEY || "",
+      EXPO_PUBLIC_CLERK_PROXY_URL: clerkProxyUrl,
+    };
+
+    const exportProcess = spawn(
+      "pnpm",
+      [
+        "exec",
+        "expo",
+        "export",
+        "--platform",
+        "web",
+        "--output-dir",
+        path.join("static-build", "web"),
+        "--clear",
+      ],
+      {
+        stdio: ["ignore", "pipe", "pipe"],
+        cwd: projectRoot,
+        env,
+      },
+    );
+
+    exportProcess.stdout?.on("data", (data) => {
+      const output = data.toString().trim();
+      if (output) console.log(`[Expo Web] ${output}`);
+    });
+    exportProcess.stderr?.on("data", (data) => {
+      const output = data.toString().trim();
+      if (output) console.error(`[Expo Web Error] ${output}`);
+    });
+    exportProcess.on("error", reject);
+    exportProcess.on("close", (code, signal) => {
+      if (code === 0) {
+        console.log("Expo web app ready");
+        resolve();
+      } else {
+        reject(
+          new Error(
+            `Expo web export failed${signal ? ` (${signal})` : ""} with exit code ${code}`,
+          ),
+        );
+      }
+    });
+  });
 }
 
 function clearMetroCache() {
@@ -114,7 +175,7 @@ function clearMetroCache() {
 
 async function checkMetroHealth() {
   try {
-    const response = await fetch("http://localhost:8081/status", {
+    const response = await fetch(`${metroBaseUrl}/status`, {
       signal: AbortSignal.timeout(5000),
     });
     return response.ok;
@@ -160,6 +221,8 @@ async function startMetro(expoPublicDomain, expoPublicReplId) {
       "--no-dev",
       "--minify",
       "--localhost",
+      "--port",
+      String(metroPort),
     ],
     {
       stdio: ["ignore", "pipe", "pipe"],
@@ -235,7 +298,7 @@ async function downloadFile(url, outputPath) {
 async function downloadBundle(platform, timestamp) {
   const entryPath = path.resolve(projectRoot, "node_modules", "expo-router", "entry");
   const bundlePath = path.relative(workspaceRoot, entryPath);
-  const url = new URL(`http://localhost:8081/${bundlePath}.bundle`);
+   const url = new URL(`${metroBaseUrl}/${bundlePath}.bundle`);
   url.searchParams.set("platform", platform);
   url.searchParams.set("dev", "false");
   url.searchParams.set("hot", "false");
@@ -263,7 +326,7 @@ async function downloadManifest(platform) {
 
   try {
     console.log(`Fetching ${platform} manifest...`);
-    const response = await fetch("http://localhost:8081/manifest", {
+    const response = await fetch(`${metroBaseUrl}/manifest`, {
       headers: { "expo-platform": platform },
       signal: controller.signal,
     });
@@ -331,7 +394,7 @@ function extractAssets(timestamp) {
       const originalPath = match[1];
       const filename = match[3] + "." + match[4];
 
-      const tempUrl = new URL(`http://localhost:8081${originalPath}`);
+      const tempUrl = new URL(`${metroBaseUrl}${originalPath}`);
       const unstablePath = tempUrl.searchParams.get("unstable_path");
 
       if (!unstablePath) {
@@ -373,7 +436,7 @@ async function downloadAssets(assets, timestamp) {
   const failures = [];
 
   const downloadPromises = assets.map(async (asset) => {
-    const tempUrl = new URL(`http://localhost:8081${asset.originalPath}`);
+    const tempUrl = new URL(`${metroBaseUrl}${asset.originalPath}`);
     const unstablePath = tempUrl.searchParams.get("unstable_path");
 
     if (!unstablePath) {
@@ -446,7 +509,7 @@ function updateBundleUrls(timestamp, baseUrl) {
     bundle = bundle.replace(
       /httpServerLocation:"(\/[^"]+)"/g,
       (_match, capturedPath) => {
-        const tempUrl = new URL(`http://localhost:8081${capturedPath}`);
+        const tempUrl = new URL(`${metroBaseUrl}${capturedPath}`);
         const unstablePath = tempUrl.searchParams.get("unstable_path");
 
         if (!unstablePath) {
@@ -511,7 +574,7 @@ function updateManifests(manifests, timestamp, baseUrl, assetsByHash) {
 }
 
 async function main() {
-  console.log("Building static Expo Go deployment...");
+  console.log("Building Expo web and native deployment...");
 
   setupSignalHandlers();
 
@@ -522,6 +585,7 @@ async function main() {
 
   prepareDirectories(timestamp);
   clearMetroCache();
+  await exportWebApp(domain, expoPublicReplId);
 
   await startMetro(domain, expoPublicReplId);
 
@@ -558,7 +622,7 @@ async function main() {
     updateBundleUrls(timestamp, baseUrl);
   }
 
-  console.log("Updating manifests and creating landing page...");
+  console.log("Updating native manifests...");
   updateManifests(manifests, timestamp, baseUrl, assetsByHash);
 
   console.log("Build complete! Deploy to:", baseUrl);

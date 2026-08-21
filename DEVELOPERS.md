@@ -130,10 +130,15 @@ seams and a disabled **Buy — Soon** choice are present.
   draft must pass the normal host submission and moderation flow before it can
   become live. See [`docs/production-operator.md`](docs/production-operator.md)
   for the operational runbook.
-- Publishing routing is path-based: the mobile web experience is served at
-  `/`, the admin dashboard at `/marsa-admin/`, and the API at `/api/`. The
-  mobile artifact’s registered `previewPath`, service path, and `BASE_PATH` are
-  `/`; the admin artifact remains `/marsa-admin/`.
+- Publishing routing is path-based: the Expo web experience is served at `/`,
+  the admin dashboard at `/marsa-admin/`, and the API at `/api/`. The mobile
+  artifact’s registered `previewPath`, service path, and `BASE_PATH` are `/`;
+  the admin artifact remains `/marsa-admin/`. The mobile production build
+  exports a browser bundle alongside the iOS and Android Expo manifests.
+- The published browser root serves the exported Expo web app, including
+  client-side route fallbacks. Requests with an `expo-platform` header still
+  receive the native iOS or Android manifest, so the same artifact continues
+  to support Expo Launch and App Store iOS publishing.
 - Security hardening now includes a repository threat model in
   `threat_model.md`, header-only internal service authentication, signed
   user/path-bound upload intents, owner-preserving object ACL updates, and
@@ -148,7 +153,7 @@ artifacts-monorepo/
 ├── artifacts/
 │   ├── api-server/          # Express 5 API (port from $PORT, default 8080)
 │   ├── marsa-admin/         # React + Vite admin dashboard (path: /marsa-admin/)
-│   ├── marsa-mobile/        # Expo React Native mobile app (web path: /)
+│   ├── marsa-mobile/        # Expo React Native + web app (path: /)
 │   └── mockup-sandbox/      # Design prototyping sandbox (internal use)
 ├── lib/
 │   ├── api-spec/            # OpenAPI 3.1 spec + Orval codegen config
@@ -275,7 +280,7 @@ A shared reverse proxy routes traffic by path prefix. In the dev shell, use `loc
 ```bash
 curl localhost:80/api/healthz       # API health
 curl localhost:80/marsa-admin/      # Admin dashboard
-curl localhost:80/                  # Mobile web app
+curl localhost:80/                  # Expo web app
 # Expo native/dev-domain access remains available through $REPLIT_EXPO_DEV_DOMAIN
 ```
 
@@ -935,7 +940,7 @@ const booking = useGetBooking(id, { query: { enabled: !!id } });
 | Booking templates | Duration packages (e.g. "3-hour trip", "full day") are platform-wide and admin-managed. Hosts set a price per template. This lets the platform control the product surface while hosts set rates. |
 | Availability as explicit slots | Hosts create explicit date/time/template slots in a per-yacht calendar; each slot may override its template price. |
 | Production operator channel | Typed, production-only, dry-run/confirm operations with atomic request claims, Clerk invitations, verified-host checks, audit history, and draft-only yacht creation provide controlled agent-assisted setup without exposing database credentials or arbitrary SQL. |
-| Path-based multi-artifact publishing | The mobile web app owns `/`, the admin owns `/marsa-admin/`, and the API owns `/api/`; each artifact’s validated configuration supplies `BASE_PATH` and service routing. |
+| Path-based multi-artifact publishing | The Expo web app owns `/`, the admin owns `/marsa-admin/`, and the API owns `/api/`; each artifact’s validated configuration supplies `BASE_PATH` and service routing. |
 | Drizzle `inArray` not `ANY` | `sql\`col = ANY(${array})\`` generates invalid SQL in Drizzle. Always use `inArray(col, array)` from `drizzle-orm`. |
 | `@stripe/stripe-react-native` web stub | The native Stripe SDK cannot be bundled for web builds. A `.web.tsx` no-op file is resolved by the Metro bundler on web/Expo Go web. |
 
