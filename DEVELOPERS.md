@@ -101,6 +101,40 @@ seams and a disabled **Buy — Soon** choice are present.
 - This checkpoint is UI/content-only. It adds no API endpoint, migration,
   database table, environment variable, or payment behavior change.
 
+### Support, production operations, and publishing checkpoint (2026-08-21)
+
+- WhatsApp support is now a durable marketplace setting. Admins configure the
+  support number from Settings; the singleton value is stored in
+  `platform_settings` and exposed publicly through `GET /api/support-config`.
+  Admin reads and updates use `/api/admin/support-config`. Numbers accept an
+  optional `+`, spaces, and dashes, then normalize to 7–15 digits. The safe
+  fallback remains `201030303030`.
+- Support placement is intentional: booking detail, checkout failure/pending
+  states, cancellation/refund contexts, general Profile/Account help, and host
+  onboarding/verification. It is not shown on booking cards or booking lists.
+  The Profile/Account action uses the shared account-row treatment; contextual
+  support actions retain the green button treatment.
+- Agent-assisted production operations are implemented behind the
+  production-only `/api/internal/operator/*` routes. They support Clerk
+  invitations and local role provisioning, locations, categories, booking
+  templates, and yacht draft creation with optional photos and pricing.
+  Operations are typed, rate-limited, dry-run first, explicitly confirmed,
+  idempotent by request ID, and recorded in `operator_operations` and the
+  admin activity trail. Yacht operations always create `draft` listings.
+- Operator access requires the server-only `AGENT_OPERATOR_TOKEN` and the
+  production `CLERK_SECRET_KEY`; the routes return 404 outside production and
+  never accept arbitrary SQL or passwords. Clerk-to-local account relinking
+  uses the authenticated Clerk user’s verified primary email, not an
+  untrusted client email. Local emails have a case-insensitive unique index.
+- Admin yacht approval is restricted to `pending_review`, so an operator-created
+  draft must pass the normal host submission and moderation flow before it can
+  become live. See [`docs/production-operator.md`](docs/production-operator.md)
+  for the operational runbook.
+- Publishing routing is path-based: the mobile web experience is served at
+  `/`, the admin dashboard at `/marsa-admin/`, and the API at `/api/`. The
+  mobile artifact’s registered `previewPath`, service path, and `BASE_PATH` are
+  `/`; the admin artifact remains `/marsa-admin/`.
+
 ---
 
 ## 2. Repository Structure
@@ -110,7 +144,7 @@ artifacts-monorepo/
 ├── artifacts/
 │   ├── api-server/          # Express 5 API (port from $PORT, default 8080)
 │   ├── marsa-admin/         # React + Vite admin dashboard (path: /marsa-admin/)
-│   ├── marsa-mobile/        # Expo React Native mobile app (path: /marsa-mobile/)
+│   ├── marsa-mobile/        # Expo React Native mobile app (web path: /)
 │   └── mockup-sandbox/      # Design prototyping sandbox (internal use)
 ├── lib/
 │   ├── api-spec/            # OpenAPI 3.1 spec + Orval codegen config
@@ -163,6 +197,7 @@ Each `artifacts/*` package is a standalone deployable application. They share li
 | `PUBLIC_OBJECT_SEARCH_PATHS` | API server | Public object storage search paths |
 | `SESSION_SECRET` | API server | Session signing secret |
 | `INTERNAL_SECRET_TOKEN` | API workers | Bearer token for scheduled delivery/hold workers |
+| `AGENT_OPERATOR_TOKEN` | API server (Production only) | Server-only token for confirmed agent-assisted marketplace operations |
 | `PAYMENT_GATEWAY` | API server | `test`, `disabled`, or `stripe`; use `test` only for local/Replit development |
 | `ENABLE_TEST_PAYMENT_GATEWAY` | API server | Must be exactly `true` to permit test checkout outside a published deployment |
 | `DEFAULT_MARKET_TIME_ZONE` | API server | Fallback IANA time zone, normally `Africa/Cairo` |
@@ -236,8 +271,21 @@ A shared reverse proxy routes traffic by path prefix. In the dev shell, use `loc
 ```bash
 curl localhost:80/api/healthz       # API health
 curl localhost:80/marsa-admin/      # Admin dashboard
-# Mobile: use $REPLIT_EXPO_DEV_DOMAIN
+curl localhost:80/                  # Mobile web app
+# Expo native/dev-domain access remains available through $REPLIT_EXPO_DEV_DOMAIN
 ```
+
+The registered artifact paths are:
+
+| Artifact | Path | Config source |
+|----------|------|--------------|
+| `marsa-mobile` | `/` | `artifacts/marsa-mobile/.replit-artifact/artifact.toml` |
+| `marsa-admin` | `/marsa-admin/` | `artifacts/marsa-admin/.replit-artifact/artifact.toml` |
+| `api-server` | `/api/` | API artifact configuration |
+
+Publish all artifacts together and attach the custom domain to the project.
+Replit routes each artifact by its registered path; do not add a second legacy
+workflow or hardcode service ports.
 
 ---
 
@@ -276,6 +324,7 @@ All schema files are in `lib/db/src/schema/`. The DB client is exported from `@w
 | `wishlist_items` | `wishlistItems.ts` | Per-user saved rental yachts |
 | `admin_events`, `admin_section_views` | `adminActivity.ts` | Per-admin unseen activity |
 | `user_push_tokens` | `userPushTokens.ts` | Owned Expo device tokens |
+| `operator_operations` | `operatorOperations.ts` | Idempotent, audited agent-assisted production operations |
 | `notification_campaigns`, `notification_deliveries` | `notificationCampaigns.ts` | Broadcast queue and channel delivery history |
 | `cancellation_policies`, `cancellation_policy_rules` | `cancellationPolicies.ts` | Immutable, versioned fee tiers |
 | `booking_cancellation_terms` | `bookingCancellationTerms.ts` | Policy snapshot accepted with each new booking |
@@ -285,7 +334,7 @@ All schema files are in `lib/db/src/schema/`. The DB client is exported from `@w
 
 #### `users`
 ```
-id (PK, text/uuid) | clerkId (unique) | email | phone | fullName
+id (PK, text/uuid) | clerkId (unique) | email (case-insensitive unique) | phone | fullName
 nationality | avatarUrl | role: guest|host|admin
 ```
 All users start as `guest`. Hosts must apply and be approved by an admin. Roles are **additive** — a host can also book as a guest.
@@ -352,7 +401,7 @@ All routes are defined in `artifacts/api-server/src/routes/`.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `POST` | `/api/auth/sync` | Clerk JWT | Sync Clerk user to local DB; creates user record on first login |
+| `POST` | `/api/auth/sync` | Clerk JWT | Sync Clerk user to local DB using the verified Clerk primary email |
 | `GET` | `/api/auth/me` | Required | Return current user profile |
 | `GET` | `/api/healthz` | None | Shallow health check |
 | `GET` | `/api/health` | None | Deep health check (DB connectivity) |
@@ -435,7 +484,7 @@ All admin routes require `role = admin`.
 | `GET` | `/api/admin/users` | List all users (paginated, filterable) |
 | `PATCH` | `/api/admin/users/:id/role` | Change a user's role |
 | `GET` | `/api/admin/yachts` | List all yachts (any status) |
-| `POST` | `/api/admin/yachts/:id/approve` | Approve a yacht (sets status → live) |
+| `POST` | `/api/admin/yachts/:id/approve` | Approve a submitted `pending_review` yacht (sets status → live) |
 | `POST` | `/api/admin/yachts/:id/reject` | Reject a yacht |
 | `POST` | `/api/admin/yachts/:id/request-changes` | Request changes to a yacht listing |
 | `POST` | `/api/admin/yachts/:id/suspend` | Suspend a live yacht |
@@ -501,13 +550,37 @@ All admin routes require `role = admin`.
 `lib/api-spec/openapi.yaml` remains the exact contract source of truth; consult
 the generated hooks rather than copying endpoint shapes from this overview.
 
+### Internal production operator endpoints
+
+These routes are server-to-server operational endpoints and are intentionally
+not exposed through the mobile/admin client or generated OpenAPI hooks. They
+require the `x-marsa-operator-token` header, `NODE_ENV=production`, and
+`AGENT_OPERATOR_TOKEN`.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/api/internal/operator/users` | Invite a Clerk user and provision a local role |
+| `POST` | `/api/internal/operator/locations` | Create a managed location |
+| `POST` | `/api/internal/operator/categories` | Create a yacht category |
+| `POST` | `/api/internal/operator/booking-templates` | Create a duration/pricing template |
+| `POST` | `/api/internal/operator/yachts` | Create a verified-host yacht draft with optional photos/pricing |
+
+Every request includes a UUID `requestId` and `confirm` boolean. First send
+`confirm: false` for validation; only resend the exact request with
+`confirm: true` after explicit confirmation. Completed request IDs replay their
+stored result; running or failed IDs remain locked to avoid duplicate side
+effects. For production setup and schema rollout, follow
+[`docs/production-operator.md`](docs/production-operator.md).
+
 ---
 
 ## 8. Mobile App (Expo)
 
 **Package:** `@workspace/marsa-mobile`  
 **Framework:** Expo SDK 54, expo-router v6, React Native 0.81  
-**Path:** `/marsa-mobile/`
+**Web path:** `/`
+
+**Native/development domain:** determined by Expo
 
 ### Screen map
 
@@ -690,7 +763,7 @@ with password, email code, or Google OAuth. Clerk issues JWTs.
    with `/(auth)/sign-in`.
 
 ### 2. `POST /api/auth/sync`
-Called by clients after sign-in. Creates (or updates) the local `users` DB record from Clerk data. Must be called before any other authenticated request — otherwise `requireAuth` returns 401 "User not found."
+Called by clients after sign-in. Creates (or updates) the local `users` DB record from Clerk data. The server fetches the authenticated Clerk user and requires a verified primary email; it compares the submitted email to that server-authoritative value and only relinks a pre-provisioned `invited:*` local record when normalized emails match. Must be called before any other authenticated request — otherwise `requireAuth` returns 401 "User not found."
 
 ### 3. `requireAuth` middleware
 Validates the Clerk JWT on each request, looks up the local user, and attaches it to `req.localUser`. Routes that also need a specific role use `requireRole("host")` or `requireRole("admin")` after `requireAuth`.
@@ -844,6 +917,8 @@ const booking = useGetBooking(id, { query: { enabled: !!id } });
 | Auth sync endpoint | Clerk is the identity source; we keep a local `users` table for FKs, roles, and profile data Clerk doesn't own. Sync is explicit (called by client after login) not implicit (webhook), to avoid cold-start race conditions. |
 | Booking templates | Duration packages (e.g. "3-hour trip", "full day") are platform-wide and admin-managed. Hosts set a price per template. This lets the platform control the product surface while hosts set rates. |
 | Availability as explicit slots | Hosts create explicit date/time/template slots in a per-yacht calendar; each slot may override its template price. |
+| Production operator channel | Typed, production-only, dry-run/confirm operations with atomic request claims, Clerk invitations, verified-host checks, audit history, and draft-only yacht creation provide controlled agent-assisted setup without exposing database credentials or arbitrary SQL. |
+| Path-based multi-artifact publishing | The mobile web app owns `/`, the admin owns `/marsa-admin/`, and the API owns `/api/`; each artifact’s validated configuration supplies `BASE_PATH` and service routing. |
 | Drizzle `inArray` not `ANY` | `sql\`col = ANY(${array})\`` generates invalid SQL in Drizzle. Always use `inArray(col, array)` from `drizzle-orm`. |
 | `@stripe/stripe-react-native` web stub | The native Stripe SDK cannot be bundled for web builds. A `.web.tsx` no-op file is resolved by the Metro bundler on web/Expo Go web. |
 
@@ -888,6 +963,17 @@ const booking = useGetBooking(id, { query: { enabled: !!id } });
     or calculate fees in React. Activate a new draft and use each booking's
     stored quote/terms.
 
+13. **Expo port conflicts after restart** — A stale Metro process can retain
+    the managed port and cause Expo to silently offer the next port, producing
+    a blank preview. Check the workflow log and kill only the stale Expo/Metro
+    process before restarting the managed `artifacts/marsa-mobile: expo`
+    workflow. Do not create a replacement workflow.
+
+14. **Production operator actions are not development actions** — The operator
+    routes intentionally return 404 unless `NODE_ENV=production`. Configure
+    `AGENT_OPERATOR_TOKEN` only in Production and use the dry-run/confirmation
+    protocol; never paste the token into source, a client, or chat.
+
 ---
 
 ## 17. Progress Tracker
@@ -917,6 +1003,9 @@ const booking = useGetBooking(id, { query: { enabled: !!id } });
 | Admin: document review | Approve/reject host documents |
 | Admin: audit log | Full admin action trail |
 | Admin: content management | Categories, add-ons, booking templates, example photos |
+| WhatsApp support | Admin-configured durable number, public support config, and contextual mobile support actions |
+| Agent-assisted production operations | Production-only Clerk invitations, typed marketplace setup, verified-host yacht drafts, atomic request IDs, and audit history |
+| Publishing path routing | Mobile web at `/`, admin at `/marsa-admin/`, API at `/api/` |
 | Admin: photographer requests | Scheduling workflow |
 | File storage | GCS two-step signed upload |
 | Exchange rate caching | EGP/USD live rate, cached in DB |
@@ -967,4 +1056,4 @@ const booking = useGetBooking(id, { query: { enabled: !!id } });
 
 ---
 
-*Last updated: August 2026. See `replit.md` for quick-reference stack info and `replit.md > Gotchas` for Express/Drizzle-specific pitfalls.*
+*Last updated: August 21, 2026. See `replit.md` for quick-reference stack info and `replit.md > Gotchas` for Express/Drizzle-specific pitfalls.*
