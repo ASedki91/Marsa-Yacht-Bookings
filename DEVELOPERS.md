@@ -134,6 +134,10 @@ seams and a disabled **Buy — Soon** choice are present.
   `/`, the admin dashboard at `/marsa-admin/`, and the API at `/api/`. The
   mobile artifact’s registered `previewPath`, service path, and `BASE_PATH` are
   `/`; the admin artifact remains `/marsa-admin/`.
+- Security hardening now includes a repository threat model in
+  `threat_model.md`, header-only internal service authentication, signed
+  user/path-bound upload intents, owner-preserving object ACL updates, and
+  safe object-path handling for host verification documents.
 
 ---
 
@@ -467,7 +471,7 @@ All routes are defined in `artifacts/api-server/src/routes/`.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `POST` | `/api/storage/uploads/request-url` | Required | Get a signed GCS upload URL |
-| `POST` | `/api/storage/uploads/finalize` | Required | Confirm upload and set ACL |
+| `POST` | `/api/storage/uploads/finalize` | Required | Confirm upload with its short-lived user/path-bound intent and set ACL |
 
 ### Payments
 
@@ -546,6 +550,8 @@ All admin routes require `role = admin`.
   per-admin activity counts, notification campaigns, and campaign status.
 - Push: authenticated push-token registration/deactivation and internal
   bounded delivery/receipt workers.
+- Security hardening: internal worker credentials are accepted only as
+  `Authorization: Bearer ...` headers, never as URL query parameters.
 
 `lib/api-spec/openapi.yaml` remains the exact contract source of truth; consult
 the generated hooks rather than copying endpoint shapes from this overview.
@@ -849,8 +855,19 @@ when no provider refund is required).
 **Pattern:** Two-step upload
 
 1. Client calls `POST /api/storage/uploads/request-url` → receives a signed GCS upload URL
+   plus a short-lived upload intent bound to the authenticated user and object path.
 2. Client uploads directly to GCS
-3. Client calls `POST /api/storage/uploads/finalize` → server moves the file, sets ACL (public or private), and returns the permanent URL
+3. Client calls `POST /api/storage/uploads/finalize` with the object path and
+   upload intent → server verifies the intent, moves the file, sets ACL
+   (public or private), and returns the permanent URL.
+
+Upload intents are signed with `SESSION_SECRET` and expire after 15 minutes.
+Finalization cannot be used to assign an object to another user, and an
+existing object’s ACL owner cannot be replaced by a different user.
+Host verification documents accept only MARSA object paths under
+`/objects/uploads/`; the API checks ownership before attaching a document.
+The admin document UI resolves those paths through the authenticated storage
+proxy and does not render arbitrary stored URLs.
 
 Relevant env vars: `DEFAULT_OBJECT_STORAGE_BUCKET_ID`, `PRIVATE_OBJECT_DIR`, `PUBLIC_OBJECT_SEARCH_PATHS`
 
@@ -974,6 +991,21 @@ const booking = useGetBooking(id, { query: { enabled: !!id } });
     `AGENT_OPERATOR_TOKEN` only in Production and use the dry-run/confirmation
     protocol; never paste the token into source, a client, or chat.
 
+15. **Internal tokens must stay out of URLs** — Scheduled worker endpoints
+    accept service credentials only in the `Authorization: Bearer ...` header.
+    Never use a `?token=` query parameter because URLs can be retained by
+    proxies, browsers, logs, and referrers.
+
+16. **Upload finalization requires intent and ownership** — A signed upload
+    intent binds the authenticated user to the normalized object path for
+    15 minutes. Finalization must verify that intent, and ACL replacement must
+    preserve the existing object owner.
+
+17. **Host document URLs are not arbitrary URLs** — Accept only finalized
+    MARSA upload paths and check ownership before attaching them. Admin
+    previews must resolve through the authenticated storage proxy rather than
+    rendering a stored URL directly.
+
 ---
 
 ## 17. Progress Tracker
@@ -1006,6 +1038,7 @@ const booking = useGetBooking(id, { query: { enabled: !!id } });
 | WhatsApp support | Admin-configured durable number, public support config, and contextual mobile support actions |
 | Agent-assisted production operations | Production-only Clerk invitations, typed marketplace setup, verified-host yacht drafts, atomic request IDs, and audit history |
 | Publishing path routing | Mobile web at `/`, admin at `/marsa-admin/`, API at `/api/` |
+| Security threat model and storage hardening | Threat model, header-only internal tokens, signed upload intents, owner-bound ACL finalization, and safe host-document URL handling |
 | Admin: photographer requests | Scheduling workflow |
 | File storage | GCS two-step signed upload |
 | Exchange rate caching | EGP/USD live rate, cached in DB |
